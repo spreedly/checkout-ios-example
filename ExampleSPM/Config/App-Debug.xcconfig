@@ -1,0 +1,5 @@
+// App-Debug.xcconfig
+// Loads merchant credentials for SPM targets.
+// Uses #include? (optional) so builds succeed before SpreedlyKeys.xcconfig is created.
+
+#include? "../../SpreedlyKeys.xcconfig"

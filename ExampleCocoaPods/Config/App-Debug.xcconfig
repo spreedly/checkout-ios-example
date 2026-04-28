@@ -1,0 +1,6 @@
+// App-Debug.xcconfig
+// Merges merchant credentials with CocoaPods-generated config.
+// Both includes use #include? (optional) so builds succeed even if one is missing.
+
+#include? "../../SpreedlyKeys.xcconfig"
+#include? "../Pods/Target Support Files/Pods-MerchantExamplePods/Pods-MerchantExamplePods.debug.xcconfig"

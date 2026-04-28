@@ -1,0 +1,4 @@
+// App-Release.xcconfig
+// Loads merchant credentials for SPM targets.
+
+#include? "../../SpreedlyKeys.xcconfig"

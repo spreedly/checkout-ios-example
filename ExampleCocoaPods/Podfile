@@ -1,0 +1,50 @@
+platform :ios, '14.0'
+
+# Toggle between local checkout-ios-package and remote GitHub release.
+# Set USE_LOCAL_PACKAGE = true and update LOCAL_PACKAGE path for local dev.
+LOCAL_PACKAGE = '../checkout-ios-package'
+REMOTE_PACKAGE = 'https://github.com/spreedly/checkout-ios-package.git'
+PACKAGE_TAG = '1.3.3'
+USE_LOCAL_PACKAGE = false
+
+def spreedly_pods
+  use_frameworks!
+
+  if USE_LOCAL_PACKAGE
+    pod 'SpreedlyCore',      :path => LOCAL_PACKAGE
+    pod 'SpreedlySecurity',  :path => LOCAL_PACKAGE
+    pod 'SpreedlyUI',        :path => LOCAL_PACKAGE
+    pod 'SpreedlyStripeAPM', :path => LOCAL_PACKAGE
+    pod 'SpreedlyBraintree', :path => LOCAL_PACKAGE
+  else
+    pod 'SpreedlyCore',      :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlySecurity',  :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlyUI',        :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlyStripeAPM', :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlyBraintree', :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+  end
+
+  # 3DS Global (Forter) -- optional, from Forter's repo
+  pod 'Forter3DS', :git => 'https://bitbucket.org/forter-mobile/forter-ios.git', :tag => '2.1.0'
+end
+
+target 'MerchantExamplePods' do
+  spreedly_pods
+
+  target 'MerchantExamplePodsTests' do
+    inherit! :search_paths
+  end
+end
+
+target 'MerchantExamplePodsObjC' do
+  spreedly_pods
+end
+
+# Stripe bundle patcher -- no-op on current SDK but kept for backward compatibility.
+unless USE_LOCAL_PACKAGE
+  post_install do |installer|
+    stripe_apm_pod = installer.sandbox.pod_dir('SpreedlyStripeAPM')
+    require File.join(stripe_apm_pod, 'scripts', 'cocoapods_stripe_bundle_patcher')
+    SpreedlyStripeAPM::CocoaPods.apply_stripe_bundle_patch(installer)
+  end
+end

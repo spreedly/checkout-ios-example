@@ -1,0 +1,5 @@
+// AppObjC-Release.xcconfig
+// Merges merchant credentials with CocoaPods-generated config for ObjC target.
+
+#include? "../../SpreedlyKeys.xcconfig"
+#include? "../Pods/Target Support Files/Pods-MerchantExamplePodsObjC/Pods-MerchantExamplePodsObjC.release.xcconfig"
