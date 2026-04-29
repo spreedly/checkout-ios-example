@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>SpreedlyEnvironmentKey</key>
+	<string>$(SPREEDLY_ENVIRONMENT_KEY)</string>
+	<key>SpreedlyForterSiteId</key>
+	<string>$(SPREEDLY_FORTER_SITE_ID)</string>
+	<key>SpreedlyServerURL</key>
+	<string>$(SPREEDLY_SERVER_URL)</string>
+	<key>SpreedlyBaseURL</key>
+	<string>$(SPREEDLY_BASE_URL)</string>
+	<key>SpreedlyApiKey</key>
+	<string>$(SPREEDLY_API_KEY)</string>
+	<key>StripePublishableKey</key>
+	<string>$(STRIPE_PUBLISHABLE_KEY)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>merchantExampleCApp</string>
+				<string>$(PRODUCT_BUNDLE_IDENTIFIER).spreedly.braintree</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>paypal</string>
+		<string>com.venmo.touch.v2</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>This app may use the camera to scan payment cards or identity documents when you choose a supported payment method.</string>
+	<key>CFBundleDisplayName</key>
+	<string>Spreedly Example ObjC (Pods)</string>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+</dict>
+</plist>

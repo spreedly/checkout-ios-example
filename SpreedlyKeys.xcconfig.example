@@ -1,0 +1,18 @@
+// SpreedlyKeys.xcconfig.example
+//
+// Template for local credential configuration.
+// Copy this file to SpreedlyKeys.xcconfig and fill in your values.
+// SpreedlyKeys.xcconfig is gitignored and will NOT be committed.
+//
+// Values are injected into Info.plist at build time via $(VARIABLE_NAME) references,
+// then read at runtime from Bundle.main.infoDictionary.
+//
+// NOTE: xcconfig treats '//' as a comment. Use '$()' to break URL schemes:
+//   EXAMPLE_URL = https:/$()/example.com/path
+
+SPREEDLY_ENVIRONMENT_KEY = your_environment_key_here
+SPREEDLY_FORTER_SITE_ID = your_forter_site_id_here
+SPREEDLY_SERVER_URL = https:/$()/your-server.example.com/api/v1/auth/params
+SPREEDLY_BASE_URL = https:/$()/your-server.example.com/api/v1
+SPREEDLY_API_KEY =
+STRIPE_PUBLISHABLE_KEY = your_stripe_publishable_key_here

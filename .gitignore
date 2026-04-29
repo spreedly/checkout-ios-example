@@ -1,0 +1,28 @@
+# Credentials (never commit)
+SpreedlyKeys.xcconfig
+
+# CocoaPods
+ExampleCocoaPods/Pods/
+ExampleCocoaPods/Podfile.lock
+ExampleCocoaPods/MerchantExamplePods.xcworkspace
+
+# Xcode
+*.xcuserdata
+xcuserdata/
+DerivedData/
+build/
+
+# XcodeGen (regenerated from project.yml)
+*.xcodeproj
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment & logs (defense-in-depth)
+*.env
+*.log
+
+# Swift Package Manager
+.build/
+Package.resolved

@@ -1,0 +1,77 @@
+name: MerchantExampleSPM
+options:
+  bundleIdPrefix: com.example.spreedly-merchant.spm
+  deploymentTarget:
+    iOS: "14.0"
+  xcodeVersion: "16.1"
+
+packages:
+  checkout-ios-package:
+    url: https://github.com/spreedly/checkout-ios-package
+    from: "1.3.3"
+  forter-ios:
+    url: https://bitbucket.org/forter-mobile/forter-ios.git
+    exactVersion: "2.1.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    SWIFT_STRICT_CONCURRENCY: targeted
+
+targets:
+  MerchantExampleSPM:
+    type: application
+    platform: iOS
+    sources:
+      - path: MerchantExampleSPM
+      - path: ../Shared/Swift
+    configFiles:
+      Debug: Config/App-Debug.xcconfig
+      Release: Config/App-Release.xcconfig
+    settings:
+      base:
+        INFOPLIST_FILE: MerchantExampleSPM/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.spreedly-merchant.spm
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - package: checkout-ios-package
+        product: SpreedlyCore
+      - package: checkout-ios-package
+        product: SpreedlySecurity
+      - package: checkout-ios-package
+        product: SpreedlyUI
+      - package: checkout-ios-package
+        product: SpreedlyStripeAPM
+      - package: checkout-ios-package
+        product: SpreedlyBraintree
+      - package: forter-ios
+        product: Forter3DS
+
+  MerchantExampleSPMObjC:
+    type: application
+    platform: iOS
+    sources:
+      - path: MerchantExampleSPMObjC
+      - path: ../Shared/ObjC
+    configFiles:
+      Debug: Config/App-Debug.xcconfig
+      Release: Config/App-Release.xcconfig
+    settings:
+      base:
+        INFOPLIST_FILE: MerchantExampleSPMObjC/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.spreedly-merchant.spm-objc
+        CODE_SIGN_STYLE: Automatic
+        CLANG_ENABLE_MODULES: YES
+    dependencies:
+      - package: checkout-ios-package
+        product: SpreedlyCore
+      - package: checkout-ios-package
+        product: SpreedlySecurity
+      - package: checkout-ios-package
+        product: SpreedlyUI
+      - package: checkout-ios-package
+        product: SpreedlyStripeAPM
+      - package: checkout-ios-package
+        product: SpreedlyBraintree
+      - package: forter-ios
+        product: Forter3DS

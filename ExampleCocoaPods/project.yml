@@ -1,0 +1,52 @@
+name: MerchantExamplePods
+options:
+  bundleIdPrefix: com.example.spreedly-merchant.pods
+  deploymentTarget:
+    iOS: "14.0"
+  xcodeVersion: "16.1"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    SWIFT_STRICT_CONCURRENCY: targeted
+
+targets:
+  MerchantExamplePods:
+    type: application
+    platform: iOS
+    sources:
+      - path: MerchantExamplePods
+      - path: ../Shared/Swift
+    configFiles:
+      Debug: Config/App-Debug.xcconfig
+      Release: Config/App-Release.xcconfig
+    settings:
+      base:
+        INFOPLIST_FILE: MerchantExamplePods/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.spreedly-merchant.pods
+        CODE_SIGN_STYLE: Automatic
+
+  MerchantExamplePodsTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: MerchantExamplePodsTests
+        optional: true
+    dependencies:
+      - target: MerchantExamplePods
+
+  MerchantExamplePodsObjC:
+    type: application
+    platform: iOS
+    sources:
+      - path: MerchantExamplePodsObjC
+      - path: ../Shared/ObjC
+    configFiles:
+      Debug: Config/AppObjC-Debug.xcconfig
+      Release: Config/AppObjC-Release.xcconfig
+    settings:
+      base:
+        INFOPLIST_FILE: MerchantExamplePodsObjC/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.spreedly-merchant.pods-objc
+        CODE_SIGN_STYLE: Automatic
+        CLANG_ENABLE_MODULES: YES
