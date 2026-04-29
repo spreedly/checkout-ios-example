@@ -12,3 +12,19 @@ e3414eb7e1ecd6d33ebb3c3eb69587a91b8eb7c7:Shared/ObjC/ViewControllers/SignatureGe
 e3414eb7e1ecd6d33ebb3c3eb69587a91b8eb7c7:Shared/ObjC/ViewControllers/SignatureGenerator.m:private-key:109
 e3414eb7e1ecd6d33ebb3c3eb69587a91b8eb7c7:Shared/Swift/Config/SignatureGenerator.swift:private-key:94
 e3414eb7e1ecd6d33ebb3c3eb69587a91b8eb7c7:Shared/Swift/Config/SignatureGenerator.swift:private-key:96
+
+# --no-git mode fingerprints (used by CI secret-scanning workflow)
+
+# PEM header stripping in SignatureGenerator (not actual keys)
+Shared/ObjC/ViewControllers/SignatureGenerator.m:private-key:107
+Shared/Swift/Config/SignatureGenerator.swift:private-key:94
+
+# README contains dummy/example values from gitleaks documentation
+README.md:sidekiq-secret:42
+README.md:aws-access-token:221
+README.md:aws-access-token:223
+README.md:aws-access-token:259
+
+# Documentation example placeholders (truncated/fake values)
+docs/guides/braintree-apm.md:generic-api-key:237
+docs/guides/stripe-apm.md:generic-api-key:213
