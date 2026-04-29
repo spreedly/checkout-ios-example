@@ -8,7 +8,7 @@ options:
 packages:
   checkout-ios-package:
     url: https://github.com/spreedly/checkout-ios-package
-    from: "1.3.3"
+    from: "1.3.4"
   forter-ios:
     url: https://bitbucket.org/forter-mobile/forter-ios.git
     exactVersion: "2.1.0"

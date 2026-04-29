@@ -1,0 +1,68 @@
+name: Build Verification
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: build-${{ github.head_ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-spm:
+    name: Build SPM Example
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ExampleSPM
+        run: xcodegen generate
+
+      - name: Build
+        working-directory: ExampleSPM
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project MerchantExampleSPM.xcodeproj \
+            -scheme MerchantExampleSPM \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO | xcpretty || exit 1
+
+  build-cocoapods:
+    name: Build CocoaPods Example
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ExampleCocoaPods
+        run: xcodegen generate
+
+      - name: Install pods
+        working-directory: ExampleCocoaPods
+        run: pod install
+
+      - name: Build
+        working-directory: ExampleCocoaPods
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -workspace MerchantExamplePods.xcworkspace \
+            -scheme MerchantExamplePods \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO | xcpretty || exit 1
