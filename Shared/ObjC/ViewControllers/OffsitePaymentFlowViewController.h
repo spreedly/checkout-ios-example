@@ -1,8 +1,8 @@
 //
 //  OffsitePaymentFlowViewController.h
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created by OpenAI on 02/09/26.
 //
 
 #import <UIKit/UIKit.h>

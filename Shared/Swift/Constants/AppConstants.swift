@@ -1,8 +1,8 @@
 //
 //  AppConstants.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
-//
+//  Created on [Date]
 //
 
 import Foundation
@@ -44,19 +44,19 @@ enum AppConstants {
     static let exampleCallbackURL = "https://www.google.com/"
 
     /// Redirect URL for EBANX checkout (app deep link).
-    static let ebanxRedirectURL = "merchantExampleApp://merchant-example/ebanx/checkout"
+    static let ebanxRedirectURL = "spreedlyApp://com.spreedly-example.sdk.SpreedlySDKExample/ebanx/checkout"
 
     /// Redirect URL for Stripe APM pending purchase API (where Spreedly redirects after payment).
-    static let stripeAPMRedirectURL = "https://merchant-example.test/stripe-apm/redirect"
+    static let stripeAPMRedirectURL = "https://spreedly.com/stripe-apm/redirect"
 
     /// Return URL for Stripe PaymentSheet (app deep link for redirect-based APMs).
-    static let stripeAPMReturnURL = "merchantExampleApp://stripe-redirect"
+    static let stripeAPMReturnURL = "spreedlyApp://stripe-redirect"
 
     /// Redirect URL for offsite (e.g. Sprel) checkout (app deep link).
-    static let offsiteRedirectURL = "merchantExampleApp://merchant-example/sprel/checkout"
+    static let offsiteRedirectURL = "spreedlyApp://com.spreedly-example.sdk.SpreedlySDKExample/sprel/checkout"
 
     /// Redirect URL for Braintree return (app deep link).
-    static let braintreeRedirectURL = "merchantExampleApp://merchant-example/braintree/return"
+    static let braintreeRedirectURL = "spreedlyApp://com.spreedly-example.sdk.SpreedlySDKExample/braintree/return"
 
 }
 

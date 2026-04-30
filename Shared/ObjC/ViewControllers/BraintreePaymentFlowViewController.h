@@ -1,6 +1,6 @@
 //
 //  BraintreePaymentFlowViewController.h
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
 //  Braintree PayPal/Venmo flow: create purchase via Spreedly API, present Braintree checkout via SDK,
 //  then confirm with nonce. Mirrors Swift BraintreePaymentFlowView.

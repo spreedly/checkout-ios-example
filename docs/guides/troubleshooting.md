@@ -308,7 +308,7 @@ if (![Spreedly isDeviceTrusted]) {
 
 ## Getting Help
 
-- **GitHub Issues**: [Bug reports and feature requests](https://github.com/spreedly/checkout-ios-package/issues)
+- **GitHub Issues**: [Bug reports and feature requests](https://github.com/spreedly/checkout-ios-sdk/issues)
 - **Spreedly Support**: [spreedly.com/support](https://spreedly.com/support/)
 - **Spreedly Documentation**: [docs.spreedly.com](https://docs.spreedly.com/)
-- **Security Issues**: See [Security Guide](security.md) or contact [security@spreedly.com](mailto:security@spreedly.com)
+- **Security Issues**: See [SECURITY.md](../../SECURITY.md)

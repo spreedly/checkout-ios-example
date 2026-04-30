@@ -1,8 +1,8 @@
 //
 //  ThreeDSPaymentFlowViewController.h
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import <UIKit/UIKit.h>

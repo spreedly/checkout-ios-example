@@ -1,8 +1,8 @@
 //
 //  RetainPaymentMethodAPIClient.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
-//
+//  Created on [Date]
 //
 
 import Foundation

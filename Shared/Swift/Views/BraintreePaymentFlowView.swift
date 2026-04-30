@@ -1,6 +1,6 @@
 //
 //  BraintreePaymentFlowView.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
 //  Braintree PayPal / Venmo flow using the SDK's SpreedlyBraintreeCheckout.
 //  When Braintree libraries are linked (via SpreedlyUI), the flow uses

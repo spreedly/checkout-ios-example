@@ -1,8 +1,8 @@
 //
 //  PurchaseAPIClient.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import "PurchaseAPIClient.h"

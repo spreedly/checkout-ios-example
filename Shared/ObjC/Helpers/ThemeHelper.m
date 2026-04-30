@@ -1,8 +1,8 @@
 //
 //  ThemeHelper.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import "ThemeHelper.h"

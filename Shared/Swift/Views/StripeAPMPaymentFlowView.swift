@@ -1,6 +1,6 @@
 //
 //  StripeAPMPaymentFlowView.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
 //  Requires the app target to link both SpreedlyStripeAPM and StripePaymentSheet (stripe-ios-spm).
 //  StripePaymentSheet must be added so its resource bundle (Stripe_StripePaymentSheet) is embedded;

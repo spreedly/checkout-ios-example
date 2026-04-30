@@ -1,8 +1,8 @@
 //
 //  APIResponseErrorParser.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import "APIResponseErrorParser.h"

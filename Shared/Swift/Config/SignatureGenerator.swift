@@ -1,8 +1,8 @@
 //
 //  SignatureGenerator.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
-//
+//  Created by Vinay Naikade on 24/06/25.
 //
 
 import Foundation

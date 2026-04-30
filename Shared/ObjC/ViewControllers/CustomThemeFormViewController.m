@@ -1,8 +1,8 @@
 //
 //  CustomThemeFormViewController.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created by Vinay Naikade on 12/08/25.
 //
 
 #import "CustomThemeFormViewController.h"
@@ -77,7 +77,10 @@
     // Set up payment result delegate
     [Spreedly.shared setPaymentDelegate:self];
     
-    // Device trust check handled internally by the SDK
+    if (![Spreedly isDeviceTrusted]) {
+        self.errorMessage = Spreedly.initializationError.message ?: @"SDK blocked by security check";
+        [self updateUI];
+    }
 }
 
 - (void)resetUI {

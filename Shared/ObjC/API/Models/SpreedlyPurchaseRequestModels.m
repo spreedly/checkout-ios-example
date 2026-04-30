@@ -1,8 +1,8 @@
 //
 //  SpreedlyPurchaseRequestModels.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import "SpreedlyPurchaseRequestModels.h"

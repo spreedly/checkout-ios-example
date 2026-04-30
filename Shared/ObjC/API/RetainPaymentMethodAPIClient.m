@@ -1,8 +1,8 @@
 //
 //  RetainPaymentMethodAPIClient.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import "RetainPaymentMethodAPIClient.h"

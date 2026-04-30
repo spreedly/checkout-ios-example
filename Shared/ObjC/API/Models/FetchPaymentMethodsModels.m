@@ -1,8 +1,8 @@
 //
 //  FetchPaymentMethodsModels.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import "FetchPaymentMethodsModels.h"

@@ -1,8 +1,8 @@
 //
 //  AppConstants.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import "AppConstants.h"

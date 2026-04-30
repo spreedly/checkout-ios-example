@@ -1,8 +1,8 @@
 //
 //  CustomFormView.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
-//
+//  Created by Vinay Naikade on 02/07/25.
 //
 
 // =============================================================================
@@ -527,7 +527,9 @@ struct CustomFormView: View {
         }
         // Step 8: onAppear — sync validation toggle states and subscribe to async payment results
         .onAppear {
-            // Device trust check handled internally by the SDK
+            if !Spreedly.isDeviceTrusted {
+                errorMessage = Spreedly.initializationError?.message ?? "SDK blocked by security check"
+            }
             
             allowBlankName = Spreedly.shared().paramsManager.getParam(parameter: .allowBlankName)
             allowExpiredDate = Spreedly.shared().paramsManager.getParam(parameter: .allowExpiredDate)

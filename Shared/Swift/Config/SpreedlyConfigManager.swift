@@ -1,8 +1,8 @@
 //
 //  SpreedlyConfigManager.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
-//
+//  Created by Vinay Naikade on 23/07/25.
 //
 
 import Foundation
@@ -50,6 +50,13 @@ class SpreedlyConfigManager {
             timestamp: String(signatureParams.timestamp)
         )
         Spreedly.setup(config: spreedlyConfig)
+        if let error = Spreedly.initializationError {
+            return .failure(NSError(
+                domain: "SpreedlyConfigManager",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "SDK blocked: \(error.message)"]
+            ))
+        }
         return .success(true)
     }
     

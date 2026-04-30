@@ -1,6 +1,6 @@
 //
 //  EbanxPaymentFlowViewController.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
 
 #import "EbanxPaymentFlowViewController.h"
@@ -1041,7 +1041,7 @@ static const NSInteger kEbanxStageLineTagBase   = 700;
 
     NSDecimalNumber *priceInDollars = self.selectedProduct.price;
     NSDecimalNumber *amountInCents = [priceInDollars decimalNumberByMultiplyingBy:[AppConstants centsPerDollar]];
-    NSString *redirectUrl = @"merchantExampleCApp://merchant-example/ebanx/checkout";
+    NSString *redirectUrl = @"spreedlyCApp://com.spreedly-example.sdk.SpreedlySDKExampleObjectiveC/ebanx/checkout";
     NSString *callbackUrl = @"https://www.google.com/";
     NSString *currency = [self currentCurrencyCode];
     NSString *document = (self.selectedProvider == OffsitePaymentMethodTypeOxxo) ? nil : @"853.513.468-93";

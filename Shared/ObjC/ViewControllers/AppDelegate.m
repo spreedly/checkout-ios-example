@@ -1,8 +1,8 @@
 //
 //  AppDelegate.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created by Vinay Naikade on 12/08/25.
 //
 
 #import "AppDelegate.h"

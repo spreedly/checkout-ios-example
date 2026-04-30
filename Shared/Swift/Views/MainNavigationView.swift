@@ -1,8 +1,8 @@
 //
 //  MainNavigationView.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
-//
+//  Created by Vinay Naikade on 02/07/25.
 //
 
 import SwiftUI

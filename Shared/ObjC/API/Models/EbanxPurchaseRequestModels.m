@@ -1,6 +1,6 @@
 //
 //  EbanxPurchaseRequestModels.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
 
 #import "EbanxPurchaseRequestModels.h"

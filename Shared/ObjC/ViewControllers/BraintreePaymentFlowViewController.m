@@ -1,6 +1,6 @@
 //
 //  BraintreePaymentFlowViewController.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
 //  Braintree PayPal/Venmo flow: create purchase (Spreedly API) -> present Braintree checkout (SDK) -> confirm with nonce.
 //  Mirrors Swift BraintreePaymentFlowView. Uses SpreedlyPaymentDelegate for result.
@@ -708,7 +708,7 @@ static const NSInteger kBraintreeStageLineTagBase   = 1200;
     [self.loadingIndicator startAnimating];
 
     NSDecimalNumber *amountInCents = [self.selectedProduct.price decimalNumberByMultiplyingBy:[AppConstants centsPerDollar]];
-    NSString *redirectUrl = @"merchantExampleCApp://merchant-example/braintree/checkout";
+    NSString *redirectUrl = @"spreedlyCApp://com.spreedly-example.sdk.SpreedlySDKExampleObjectiveC/braintree/checkout";
     NSString *callbackUrl = @"https://www.google.com/";
     __weak typeof(self) weakSelf = self;
     PurchaseAPIClient *client = [[SpreedlyConfigManager shared] createPurchaseAPIClient];

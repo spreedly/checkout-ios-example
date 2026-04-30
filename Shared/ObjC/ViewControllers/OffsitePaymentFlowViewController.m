@@ -1,8 +1,8 @@
 //
 //  OffsitePaymentFlowViewController.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created by OpenAI on 02/09/26.
 //
 
 #import "OffsitePaymentFlowViewController.h"
@@ -939,7 +939,7 @@ static const NSInteger kStageLineTagBase  = 400;
     }
     NSDecimalNumber *priceInDollars = self.selectedProduct.price;
     NSDecimalNumber *amountInCents = [priceInDollars decimalNumberByMultiplyingBy:[AppConstants centsPerDollar]];
-    NSString *redirectUrl = @"merchantExampleCApp://merchant-example/sprel/checkout";
+    NSString *redirectUrl = @"spreedlyCApp://com.spreedly-example.sdk.SpreedlySDKExampleObjectiveC/sprel/checkout";
     NSString *callbackUrl = @"https://www.google.com/";
 
     // Gateway name for merchant backend /offsite-purchase (matches Swift Offsite flow)

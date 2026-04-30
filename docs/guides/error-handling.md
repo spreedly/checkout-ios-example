@@ -529,6 +529,8 @@ The examples use the simple `failureDetails.getDescription()` pattern for displa
 | Blank form fields / empty `SPLTextField` | `blockJailbrokenDevices` is enabled and device failed integrity checks | Check `Spreedly.isDeviceTrusted`; drop-in components auto-dismiss, but custom forms must handle this — see [Custom Payment Forms](custom-payment-forms.md#prerequisites) |
 | SDK returns `.compromisedDevice` error | Device blocked by `SecurityManager` | `Spreedly.initializationError` has the details; see [Security — Runtime Integrity](security.md#runtime-integrity) |
 
+For SDK log delivery issues (Datadog), see [Telemetry Spec -- Operational Readiness](../development/TELEMETRY_SPEC.md#operational-readiness).
+
 ### What you can share with Spreedly Support
 
 **OK to share:** SDK version, approximate time (UTC), masked `environment_key` (first 4 characters only), `session_id` from Datadog global attributes (if you use SDK telemetry), `PaymentResult` `errorType` / `apiError`, HTTP status code if shown, iOS version, device model.

@@ -1,6 +1,6 @@
 //
 //  StripeAPMPurchaseModels.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
 //  Request models for creating a Stripe APM pending purchase via Spreedly API.
 //  Matches the API at: POST /v1/gateways/{gateway_token}/purchase.json
