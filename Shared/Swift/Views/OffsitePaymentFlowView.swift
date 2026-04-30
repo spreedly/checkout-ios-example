@@ -1,8 +1,8 @@
 //
 //  OffsitePaymentFlowView.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
-//
+//  Created by OpenAI on 02/09/26.
 //
 
 import SwiftUI

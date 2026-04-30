@@ -1,6 +1,6 @@
 //
 //  EbanxPaymentFlowViewController.h
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
 
 #import <UIKit/UIKit.h>

@@ -1,6 +1,6 @@
 //
 //  EbanxPurchaseRequestModels.h
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
 
 #import <Foundation/Foundation.h>

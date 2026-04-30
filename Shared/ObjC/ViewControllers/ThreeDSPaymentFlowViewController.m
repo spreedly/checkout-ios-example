@@ -1,8 +1,8 @@
 //
 //  ThreeDSPaymentFlowViewController.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import "ThreeDSPaymentFlowViewController.h"

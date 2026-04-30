@@ -68,7 +68,7 @@ struct ExampleCredentials {
 
 ### Use one package version for all Spreedly modules
 
-Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyBraintree**) are released together under **one** version (for example `1.3.4`). Use the **same** resolved version for every Spreedly product in your app.
+Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyBraintree**) are released together under **one** version (for example `1.3.5`). Use the **same** resolved version for every Spreedly product in your app.
 
 **SDK maintainers** (bumping versions in git): see [Versioning](../development/VERSIONING.md) — you edit **`Version.xcconfig`** and **`SpreedlyVersion.swift`**, then run the **Release SDK** workflow so **checkout-ios-package** gets the matching **`X.Y.Z`**.
 
@@ -91,7 +91,7 @@ SPM distribution is from a separate repository: `https://github.com/spreedly/che
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.3.4"),
+    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.3.5"),
     // Optional: add when using 3DS Global (Forter) — separate repo:
     // .package(url: "https://bitbucket.org/forter-mobile/forter-ios.git", exact: "2.1.0")
 ],
@@ -135,22 +135,22 @@ end
 
 Then run `pod install`.
 
-**Authenticated access (enterprise / private deployments):** If your organization restricts access to the package repository, use the `:git` option with a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens):
+**Private repository access:** If the SDK is distributed via a private GitHub repository, use the `:git` option with a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) instead of version specifiers (still Option A—remote install):
 
 ```ruby
 target 'YourApp' do
   use_frameworks!
 
-  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.4'
-  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.4'
-  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.4'
+  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.5'
+  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.5'
+  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.5'
   # Add these only if needed:
-  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.4'
-  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.4'
+  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.5'
+  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.5'
 end
 ```
 
-Replace `{GitToken}` with your GitHub personal access token. For the public `checkout-ios-package` repository, the standard `:git` option without authentication works for most users. Then run `pod install`.
+Replace `{GitToken}` with your GitHub personal access token that has read access to the repository. Then run `pod install`.
 
 #### Stripe APM: CocoaPods `post_install` (Required)
 
@@ -158,13 +158,13 @@ If you use **SpreedlyStripeAPM** with CocoaPods, you **must** add a `post_instal
 
 **SPM users do not need this step** — when you add `SpreedlyStripeAPM` via SPM, `StripePaymentSheet` is resolved as a transitive dependency automatically and bundles already use the correct names.
 
-**Full Podfile example (with Stripe APM):**
+**Full Podfile example (private repo with Stripe APM):**
 
 ```ruby
 platform :ios, '14.0'
 
-PACKAGE_REPO = 'https://github.com/spreedly/checkout-ios-package.git'
-PACKAGE_TAG  = '1.3.4'
+PACKAGE_REPO = 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git'
+PACKAGE_TAG  = '1.3.5'
 
 target 'YourApp' do
   use_frameworks!
@@ -267,8 +267,8 @@ Add these only when you need the corresponding features:
 | Feature | Package | URL | Version |
 |---------|---------|-----|---------|
 | 3DS Global | Forter3DS | `https://bitbucket.org/forter-mobile/forter-ios.git` | 2.1.0 (exact) |
-| Stripe APM | SpreedlyStripeAPM | `https://github.com/spreedly/checkout-ios-package` | 1.3.4+ |
-| Braintree (PayPal/Venmo) | SpreedlyBraintree | `https://github.com/spreedly/checkout-ios-package` | 1.3.4+ |
+| Stripe APM | SpreedlyStripeAPM | `https://github.com/spreedly/checkout-ios-package` | 1.3.5+ |
+| Braintree (PayPal/Venmo) | SpreedlyBraintree | `https://github.com/spreedly/checkout-ios-package` | 1.3.5+ |
 
 **Forter3DS (3DS Global):** Required for 3DS authentication. Add Forter3DS directly from Forter's Bitbucket repository. **Do not use** `pod 'SpreedlyForter3DS'` — use the Forter Bitbucket URL below. A dedicated `SpreedlyForter3DS` module is planned for a future release but is not yet available for standard CocoaPods usage.
 
@@ -692,6 +692,17 @@ Spreedly.setLogger(nil)
 
 **React Native:** Set `sdkPlatform` to `.reactNative` in `SpreedlyConfig` so telemetry events and payment method `source` fields are tagged correctly. All logging APIs above work the same from the native bridge.
 
+> **SDK developers: Datadog logging behavior**
+>
+> The Datadog logger defaults to `.debug` level when `DatadogConfig.clientToken` is non-empty. Diagnostic logs and structured telemetry events (e.g. `sdk_initialized`, `tokenization_success`) flow to Datadog immediately without any merchant call. If you see no logs reaching Datadog, check these in order:
+>
+> 1. **Client token is empty** — `DatadogConfig.clientToken` is `""` in local builds. CI overwrites it; for local testing you must set it manually.
+> 2. **Datadog modules not linked** — the `#if canImport(DatadogCore) && canImport(DatadogLogs)` guard strips all Datadog code if the packages are missing from the target.
+> 3. **Log level set to `.none`** — calling `setDatadogLogLevel(.none)` silences all logs _and_ telemetry events because `emitEvent()` respects the same level gate.
+> 4. **Early events dropped** — telemetry events like `sdk_initialized` fire during `Spreedly.initializeSDK()`. If a caller resets the Datadog log level to `.none` before that point, these events are lost. The default `.debug` level prevents this.
+>
+> These conditions apply equally to the native iOS SDK and the React Native bridge.
+
 See [Security — Logging Security](security.md#logging-security) for production recommendations and PCI compliance details.
 
 ### Structured Telemetry Events
@@ -786,6 +797,10 @@ let ms = FlowDurationTracker.shared.elapsedMs(key: "my_flow") // milliseconds as
 - `start(key:)` records the current time for the given key (overwrites if already started)
 - `elapsedMs(key:)` returns elapsed milliseconds and removes the mark; returns `-1` if no mark exists
 - Marks older than 30 minutes are automatically pruned to prevent memory leaks from abandoned flows
+
+#### Datadog Requirement
+
+Telemetry events only flow to Datadog when `DatadogConfig.clientToken` is non-empty. In CI this is injected automatically. For local development, set it manually or telemetry calls will be silently discarded. See the [Datadog logging behavior](#logging--observability-optional) note above.
 
 #### Platform Filtering
 
@@ -894,6 +909,8 @@ Call this before presenting any payment form or initiating any payment operation
 | SpreedlyStripeAPM | Stripe APM (iDEAL, Bancontact, EPS, P24, SEPA) |
 | SpreedlyBraintree | PayPal/Venmo via Braintree |
 
+> **SpreedlyAnalytics** is an internal module used by SpreedlyCore for logging and Datadog integration. You do not need to import or interact with it directly.
+
 > **3DS Note:** Both 3DS Global (Forter) and Gateway-Specific 3DS logic currently live inside `SpreedlyCore` (coordination, API calls, lifecycle) and `SpreedlyUI` (challenge presentation). They are **not separate modules yet**. We plan to extract them into dedicated modules (`SpreedlyForter3DS` for Global 3DS and `SpreedlyGateway3DS` for Gateway-Specific 3DS) in a future release. This will let merchants who don't use 3DS avoid pulling in those dependencies entirely. Today, the `Forter3DS` third-party SDK is already an optional runtime dependency -- see [Optional Dependencies](#optional-dependencies).
 
 ### Why Separate Modules?
@@ -922,7 +939,7 @@ This is standard practice across major mobile payment SDKs (Stripe, Braintree, A
 
 **Version conflicts:** If your app already uses the Datadog iOS SDK, ensure your version is compatible with `~> 3.1.0`. SPM and CocoaPods will report a conflict if the versions are incompatible.
 
-**Opting out:** Datadog telemetry is managed by Spreedly and requires no merchant configuration.
+**Opting out:** Datadog telemetry is active only when `DatadogConfig.clientToken` is non-empty. In local builds the client token defaults to `""`, so no data flows to Datadog unless explicitly configured.
 
 ---
 
@@ -1054,11 +1071,11 @@ Use this before shipping to production users. Details live in the linked guides 
 
 | Item | What to verify | Reference |
 |------|----------------|-----------|
-| SPM / CocoaPods access | `checkout-ios-package` added via SPM or CocoaPods; verify the dependency resolves | [Installation](#installation) above |
+| SPM / CocoaPods access | GitHub PAT with `read:packages` for `checkout-ios-package`, or CocoaPods token configured | [Installation](#installation) above |
 | Backend signing | Your server mints **new** signed init params (environment key, HMAC signature, timestamp) per session / flow | [Basic Setup](#basic-setup) above |
 | Errors and UX | Handle all `PaymentProcessingResult` / `PaymentResult` states; show user-friendly messages | [Error Handling](error-handling.md) |
 | Security | Use SDK form components (`SPLTextField` / `CardFormDropIn`); enable `ScreenPreventionSecureView` on custom payment screens | [Security](security.md) |
-| Privacy and telemetry | Understand Datadog logging and data handling; disclose in your privacy policy | [Privacy](privacy.md) |
+| Privacy and telemetry | Understand Datadog logging and data handling; disclose in your privacy policy | [Privacy](privacy.md), [Telemetry Spec](../development/TELEMETRY_SPEC.md) |
 | Minimum iOS version | Your deployment target is at least **iOS 14.0** | [README](../../README.md) |
 | 3DS setup (if applicable) | Forter3DS SDK added via SPM/CocoaPods; `#if canImport(Forter3DS)` pattern used | [3DS Global](3ds-global.md), [Conditional Imports](#conditional-imports-for-optional-modules) |
 | ObjC compatibility (if applicable) | ObjC delegates and view controllers tested if your app uses Objective-C | [Objective-C](objective-c.md) |

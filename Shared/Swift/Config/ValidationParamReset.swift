@@ -1,6 +1,6 @@
 //
 //  ValidationParamReset.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
 //  Resets shared validation parameters so toggles don't carry across screens.
 //

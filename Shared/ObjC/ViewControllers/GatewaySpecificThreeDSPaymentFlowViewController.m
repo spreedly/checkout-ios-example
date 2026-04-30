@@ -1,8 +1,8 @@
 //
 //  GatewaySpecificThreeDSPaymentFlowViewController.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import "GatewaySpecificThreeDSPaymentFlowViewController.h"

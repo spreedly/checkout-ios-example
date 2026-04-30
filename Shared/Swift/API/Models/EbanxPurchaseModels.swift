@@ -1,6 +1,6 @@
 //
 //  EbanxPurchaseModels.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
 
 import Foundation

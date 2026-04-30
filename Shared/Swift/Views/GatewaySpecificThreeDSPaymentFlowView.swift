@@ -1,8 +1,8 @@
 //
 //  ThreeDSPaymentFlowView.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
-//
+//  Created on [Date]
 //
 
 import SwiftUI

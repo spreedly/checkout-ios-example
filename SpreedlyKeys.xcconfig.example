@@ -1,14 +1,19 @@
 // SpreedlyKeys.xcconfig.example
 //
 // Template for local credential configuration.
+// Secret scanners (Gitleaks + CI) calibrate token shapes to these key names; keep placeholders
+// obviously non-secret. See repo root `.gitleaks.toml` comments for the mapping.
 // Copy this file to SpreedlyKeys.xcconfig and fill in your values.
 // SpreedlyKeys.xcconfig is gitignored and will NOT be committed.
 //
-// Values are injected into Info.plist at build time via $(VARIABLE_NAME) references,
-// then read at runtime from Bundle.main.infoDictionary.
+// Equivalent of Android's apikeys.properties.example
 //
 // NOTE: xcconfig treats '//' as a comment. Use '$()' to break URL schemes:
 //   EXAMPLE_URL = https:/$()/example.com/path
+//
+// The Datadog client token is NOT configured here. It is injected at the
+// framework level during CI builds (see build-frameworks.yml). Local builds
+// skip Datadog initialization automatically.
 
 SPREEDLY_ENVIRONMENT_KEY = your_environment_key_here
 SPREEDLY_FORTER_SITE_ID = your_forter_site_id_here

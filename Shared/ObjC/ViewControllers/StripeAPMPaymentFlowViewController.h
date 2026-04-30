@@ -1,6 +1,6 @@
 //
 //  StripeAPMPaymentFlowViewController.h
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
 //  Stripe APM payment flow: create pending purchase via Spreedly API,
 //  then present Stripe PaymentSheet via SDK. Mirrors Swift StripeAPMPaymentFlowView.

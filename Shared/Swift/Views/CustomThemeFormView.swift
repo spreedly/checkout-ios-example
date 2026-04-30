@@ -75,7 +75,9 @@ struct CustomThemeFormView: View {
         .navigationTitle("Custom Theme")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            // Device trust check handled internally by the SDK
+            if !Spreedly.isDeviceTrusted {
+                errorMessage = Spreedly.initializationError?.message ?? "SDK blocked by security check"
+            }
             
             allowBlankName = Spreedly.shared().paramsManager.getParam(parameter: .allowBlankName)
             allowExpiredDate = Spreedly.shared().paramsManager.getParam(parameter: .allowExpiredDate)

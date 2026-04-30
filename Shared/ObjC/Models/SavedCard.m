@@ -1,8 +1,8 @@
 //
 //  SavedCard.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import "SavedCard.h"

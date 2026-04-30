@@ -1,8 +1,8 @@
 //
 //  MessageView.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
-//
+//  Created on [Date]
 //
 
 import SwiftUI

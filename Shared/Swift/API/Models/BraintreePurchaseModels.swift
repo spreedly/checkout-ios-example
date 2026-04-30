@@ -1,6 +1,6 @@
 //
 //  BraintreePurchaseModels.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
 //  Request/response models for creating a Braintree purchase via Spreedly API.
 //  POST /v1/gateways/{braintree_gateway_token}/purchase.json

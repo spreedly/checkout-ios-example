@@ -1,8 +1,8 @@
 //
 //  SpreedlyConfigManager.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created by Vinay Naikade on 12/08/25.
 //
 //  This manager sets up Spreedly configuration and global theme
 //  for all examples in the Objective-C sample app.
@@ -105,6 +105,17 @@ static SpreedlyConfigManager *_shared = nil;
         spreedlyConfig.timestamp = [NSString stringWithFormat:@"%ld", (long)result.signatureParams.timestamp];
         
         [Spreedly setupWithConfig:spreedlyConfig];
+        
+        if (Spreedly.initializationError != nil) {
+            NSError *blockError = [NSError errorWithDomain:@"SpreedlyConfigManager"
+                                                      code:1
+                                                  userInfo:@{NSLocalizedDescriptionKey:
+                [NSString stringWithFormat:@"SDK blocked: %@", Spreedly.initializationError.message]}];
+            if (completion) {
+                completion(NO, blockError);
+            }
+            return;
+        }
         
         if (completion) {
             completion(YES, nil);

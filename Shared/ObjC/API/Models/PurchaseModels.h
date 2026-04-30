@@ -1,8 +1,8 @@
 //
 //  PurchaseModels.h
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
-//
+//  Created on [Date]
 //
 
 #import <Foundation/Foundation.h>

@@ -1,6 +1,6 @@
 //
 //  StripeAPMPaymentFlowViewController.m
-//  MerchantExample
+//  SpreedlySDKExampleObjectiveC
 //
 //  Flow: Merchant creates pending purchase (Spreedly API) -> SDK presents PaymentSheet -> Merchant handles result via delegate.
 //  Mirrors Swift StripeAPMPaymentFlowView.
@@ -39,8 +39,8 @@ typedef NS_ENUM(NSInteger, StripeAPMStage) {
 }
 @end
 
-static NSString * const kStripeAPMReturnURL = @"merchantExampleCApp://stripe-redirect";
-static NSString * const kStripeAPMRedirectURL = @"https://merchant-example.test/stripe-apm/redirect";
+static NSString * const kStripeAPMReturnURL = @"spreedlyCApp://stripe-redirect";
+static NSString * const kStripeAPMRedirectURL = @"https://spreedly.com/stripe-apm/redirect";
 static NSString * const kExampleCallbackURL = @"https://www.google.com/";
 
 static UIColor *stripeAPMStageDisabledColor(void) {

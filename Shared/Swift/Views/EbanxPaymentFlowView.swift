@@ -1,6 +1,6 @@
 //
 //  EbanxPaymentFlowView.swift
-//  MerchantExample
+//  SpreedlySDKExample
 //
 //  Follows the same architecture as StripeAPMPaymentFlowView and OffsitePaymentFlowView:
 //  {Flow}PaymentFlowView with stage enum, product selection, and PaymentResult subscription.
