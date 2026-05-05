@@ -267,7 +267,7 @@ SPLThemeConfig *config = [[SPLThemeConfig alloc]
 
 **Cause:** `SpreedlyKeys.xcconfig` contains secrets and is gitignored. CI needs to generate it.
 
-**Fix:** Use a `ci_post_clone.sh` script to generate the xcconfig from environment variables. See [TESTFLIGHT_DISTRIBUTION.md](../development/TESTFLIGHT_DISTRIBUTION.md) for the full CI setup.
+**Fix:** Use a `ci_post_clone.sh` script to generate the xcconfig from environment variables.
 
 ### Package.resolved desync
 
@@ -308,7 +308,6 @@ if (![Spreedly isDeviceTrusted]) {
 
 ## Getting Help
 
-- **GitHub Issues**: [Bug reports and feature requests](https://github.com/spreedly/checkout-ios-sdk/issues)
 - **Spreedly Support**: [spreedly.com/support](https://spreedly.com/support/)
 - **Spreedly Documentation**: [docs.spreedly.com](https://docs.spreedly.com/)
 - **Security Issues**: See [SECURITY.md](../../SECURITY.md)

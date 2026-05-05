@@ -760,4 +760,3 @@ You must collect the CVV via `SecureValueContainer` before calling this method. 
 | [error-handling.md](error-handling.md) | Error types, handling patterns, troubleshooting |
 | [theme-and-styling.md](theme-and-styling.md) | Theming and customization |
 | [security.md](security.md) | Security best practices |
-| [RECACHING_FLOW.md](../development/RECACHING_FLOW.md) | Detailed flow diagrams for CVV recaching |

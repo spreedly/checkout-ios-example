@@ -582,5 +582,3 @@ Example references: `BraintreePaymentFlowView` (SwiftUI) and `BraintreePaymentFl
 - [stripe-apm.md](stripe-apm.md) – Stripe alternative payment methods (iDEAL, Bancontact)
 - [ebanx-apm.md](ebanx-apm.md) – EBANX payments (Pix, Boleto, OXXO, NuPay)
 - [getting-started.md](getting-started.md) – Installation and basic setup
-- [BRAINTREE_FLOW.md](../development/BRAINTREE_FLOW.md) – Detailed flow diagrams for Braintree PayPal/Venmo
-- [BRAINTREE_UNIVERSAL_LINK_FLOW.md](../development/BRAINTREE_UNIVERSAL_LINK_FLOW.md) – Universal Link vs custom URL scheme flows, AASA status, and 3DS comparison

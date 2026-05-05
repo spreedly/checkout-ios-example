@@ -131,8 +131,8 @@ checkout-ios-example/
 
 ## SDK Documentation
 
-- [Getting Started Guide](https://github.com/spreedly/checkout-ios-package/blob/main/docs/guides/getting-started.md)
-- [SDK API Reference](https://github.com/spreedly/checkout-ios-package)
+- [Getting Started Guide](docs/guides/getting-started.md)
+- [SDK Distribution](https://github.com/spreedly/checkout-ios-package)
 
 ## License
 
