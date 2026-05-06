@@ -550,4 +550,3 @@ typedef NS_ENUM(NSInteger, StripeAPMStage) {
 - [offsite-payments.md](offsite-payments.md) - PayPal and Sprel offsite payments
 - [ebanx-apm.md](ebanx-apm.md) - Pix, Boleto, OXXO, NuPay
 - [braintree-apm.md](braintree-apm.md) - PayPal and Venmo via Braintree
-- [STRIPE_FLOW.md](../development/STRIPE_FLOW.md) - Detailed flow diagrams for Stripe APM

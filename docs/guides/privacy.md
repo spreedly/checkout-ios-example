@@ -78,6 +78,4 @@ When using the Spreedly iOS SDK, you should include in your app's privacy policy
 
 - [Security](security.md) -- Screen prevention and PCI compliance
 - [Getting Started](getting-started.md) -- Installation and initialization
-- [Telemetry Spec](../development/TELEMETRY_SPEC.md) -- Full telemetry event catalog and data attributes
-- [Platform Privacy Requirements](../development/PLATFORM_PRIVACY_REQUIREMENTS.md) -- iOS-specific privacy manifest details
 - [Spreedly Privacy Policy](https://www.spreedly.com/privacy)

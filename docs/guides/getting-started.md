@@ -70,8 +70,6 @@ struct ExampleCredentials {
 
 Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyBraintree**) are released together under **one** version (for example `1.3.5`). Use the **same** resolved version for every Spreedly product in your app.
 
-**SDK maintainers** (bumping versions in git): see [Versioning](../development/VERSIONING.md) — you edit **`Version.xcconfig`** and **`SpreedlyVersion.swift`**, then run the **Release SDK** workflow so **checkout-ios-package** gets the matching **`X.Y.Z`**.
-
 ### Option 1: Swift Package Manager (Recommended)
 
 SPM distribution is from a separate repository: `https://github.com/spreedly/checkout-ios-package`.
@@ -154,7 +152,7 @@ Replace `{GitToken}` with your GitHub personal access token that has read access
 
 #### Stripe APM: CocoaPods `post_install` (Required)
 
-If you use **SpreedlyStripeAPM** with CocoaPods, you **must** add a `post_install` block so Stripe resource bundles are copied with the names the SDK expects. Without this, the app will crash at runtime with `Fatal error: unable to find bundle named Stripe_StripePaymentSheet`. See the [Stripe APM guide](stripe-apm.md#cocoapods-stripe-bundle-patcher) and [STRIPE_COCOAPODS_BUNDLE_NAMING.md](https://github.com/spreedly/checkout-ios-package/blob/main/docs/STRIPE_COCOAPODS_BUNDLE_NAMING.md) for why this is needed.
+If you use **SpreedlyStripeAPM** with CocoaPods, you **must** add a `post_install` block so Stripe resource bundles are copied with the names the SDK expects. Without this, the app will crash at runtime with `Fatal error: unable to find bundle named Stripe_StripePaymentSheet`. See the [Stripe APM guide](stripe-apm.md#cocoapods-stripe-bundle-patcher) for why this is needed.
 
 **SPM users do not need this step** — when you add `SpreedlyStripeAPM` via SPM, `StripePaymentSheet` is resolved as a transitive dependency automatically and bundles already use the correct names.
 
@@ -1075,7 +1073,7 @@ Use this before shipping to production users. Details live in the linked guides 
 | Backend signing | Your server mints **new** signed init params (environment key, HMAC signature, timestamp) per session / flow | [Basic Setup](#basic-setup) above |
 | Errors and UX | Handle all `PaymentProcessingResult` / `PaymentResult` states; show user-friendly messages | [Error Handling](error-handling.md) |
 | Security | Use SDK form components (`SPLTextField` / `CardFormDropIn`); enable `ScreenPreventionSecureView` on custom payment screens | [Security](security.md) |
-| Privacy and telemetry | Understand Datadog logging and data handling; disclose in your privacy policy | [Privacy](privacy.md), [Telemetry Spec](../development/TELEMETRY_SPEC.md) |
+| Privacy and telemetry | Understand Datadog logging and data handling; disclose in your privacy policy | [Privacy](privacy.md) |
 | Minimum iOS version | Your deployment target is at least **iOS 14.0** | [README](../../README.md) |
 | 3DS setup (if applicable) | Forter3DS SDK added via SPM/CocoaPods; `#if canImport(Forter3DS)` pattern used | [3DS Global](3ds-global.md), [Conditional Imports](#conditional-imports-for-optional-modules) |
 | ObjC compatibility (if applicable) | ObjC delegates and view controllers tested if your app uses Objective-C | [Objective-C](objective-c.md) |

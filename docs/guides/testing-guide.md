@@ -278,8 +278,6 @@ Before switching to production:
 - [ ] Screen prevention (`ScreenPreventionSecureView`) wraps payment UI
 - [ ] No test card numbers or credentials in source code
 
-See [Go-Live Index](../GO_LIVE_INDEX.md) for the full production readiness checklist.
-
 ---
 
 ## Testing Blocked-Device Scenarios

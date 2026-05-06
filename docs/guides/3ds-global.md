@@ -380,4 +380,3 @@ For detailed error handling patterns, see [error-handling.md](error-handling.md)
 - [3ds-gateway-specific.md](3ds-gateway-specific.md) – Gateway-specific 3DS (e.g. Worldpay) with `/complete.json` flow
 - [error-handling.md](error-handling.md) – Error types, handling patterns, troubleshooting
 - [getting-started.md](getting-started.md) – Installation, setup, and basic configuration
-- [3DS_GLOBAL_FLOW.md](../development/3DS_GLOBAL_FLOW.md) – Detailed flow diagrams for 3DS Global (Forter) including sequence diagrams, SDK internals, and decision flows
