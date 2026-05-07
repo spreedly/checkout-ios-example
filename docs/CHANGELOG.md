@@ -5,6 +5,41 @@ All notable changes to the Spreedly iOS SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 2026-05-05
+
+### Changed
+
+- HC-1369 **Replaced the auto-merged release PR with a sync-branch + direct-tag-push pattern** in `tag-release.yml`. The previous `gh pr merge --squash` step failed against `checkout-ios-package`'s `Require PR Review` ruleset and only shipped 1.3.6 via a one-off manual approval. The dist-sync flow now: (1) pushes the version-bump commit to a `sync/v${VERSION}` branch, (2) pushes the GPG-signed tag directly to dist (tags bypass branch-protection rulesets), (3) creates the GitHub Release, and (4) opens a non-blocking sync PR for human review. GPG signing stays on the SDK runner; **no GPG keys are added to the public package repo**. Mirrors the approach used by `checkout-android-sdk`. Also adds a maintenance-aware `expected_branch` output (`main` for the current major, `release/N.x` otherwise) so dist sync targets the right branch on patch releases.
+
+### Notes
+
+This is a validation release for the new GPG-signed tag pipeline (HC-1369). The compiled SDK binary is functionally identical to 1.3.6 — same source code, same dependencies, only the embedded `SpreedlySDK.version` string changes. Merchants on 1.3.6 do not need to upgrade for functional reasons; 1.3.7 exists to prove the new release pipeline end-to-end before the next merchant-facing change ships.
+
+## [1.3.6] - 2026-05-04
+
+### Fixed
+
+- HC-1369 **Stale `sbom.json` in `checkout-ios-package`**: The SBOM is now copied from the SDK release artifact (`sbom-vX.Y.Z.json`) into `checkout-ios-package/sbom.json` during the `Sync to Package Repo` step. Previously the file was inherited from the prior release and reported the wrong component version, breaking PCI DSS audit trails.
+- HC-1369 **Stale `README.md` install snippets in `checkout-ios-package`**: Version pins in the badge, SPM `from:`, and all CocoaPods `:tag =>` lines are now `sed`-rewritten on every release. Previously merchants copy-pasting from README would install the previous version instead of the one they intended to install.
+- HC-1369 **Stale `PACKAGE_VERIFICATION.md` in `checkout-ios-package`**: Download URLs, `VERSION="..."`, and "Last Updated" lines are now `sed`-rewritten on every release. The verification guide had been pinned at 1.3.0 across five releases.
+- HC-1369 **Missing release entries in root `CHANGELOG.md` of `checkout-ios-package`**: A PCI DSS compliance entry is now auto-prepended for every release. Tickets are auto-extracted from the SDK CHANGELOG entry for that version. Previously the root CHANGELOG never received the new release header.
+- HC-1369 **Dead `*.tar.gz` archives in `checkout-ios-package`**: The release script now removes leftover `.tar.gz` files. Three stale archives from October 2025 (release 0.0.36) had been sitting in the repo since.
+- HC-1369 **No downloadable assets on `checkout-ios-package` release pages**: A new `attach-release-assets` job in `checkout-ios-package/.github/workflows/release.yml` auto-uploads `sbom.json`, all framework `*.zip` files, and their `*.zip.sha256` checksums to the GitHub Release page on `release: published`. Prior releases (1.3.0 through 1.3.5) had zero downloadable assets on the release page.
+
+### Changed
+
+- HC-1369 **`Sync to Package Repo` step in `tag-release.yml` now refreshes all version-coupled artifacts in `checkout-ios-package`**, not just XCFrameworks/podspecs/checksums. The PR body opened against the package repo now honestly enumerates every file group that was modified.
+
+### Security
+
+- HC-1369 **Automated GPG-signed release tags**: `tag-release.yml` now auto-signs RC/stable tags with the iOS Release Bot key (fingerprint `B5F9 FB98 4885 87B6 3590 D5BD 2DE8 551B 78F5 9704`) instead of relying on manual `git tag -s`. The same workflow also auto-merges the dist-repo release PR, pushes a GPG-signed bare-semver tag to `checkout-ios-package`, and creates the corresponding GitHub Release. Closes the manual-signing gap and brings iOS in line with the Android and React Native release pipelines.
+- HC-1369 **`attach-release-assets` job on `checkout-ios-package/.github/workflows/release.yml`**: Uploads `sbom.json`, all framework `*.zip` files, and their `*.zip.sha256` checksums to the dist GH Release page on `release: published`. Pairs with the new auto-created GH Release so the merchant-facing dist release page is now both signed and complete.
+- HC-1369 **GitHub `Verified` badge on signed tags**: The `tag-release.yml` auto-sign step now uses a GitHub-verifiable mailbox as the tagger email, so signed RC and stable tags display the green `Verified` badge on the releases page. Brings iOS to visual parity with Android and React Native.
+
+### Notes
+
+This release introduces tag-signing automation (HC-1369) and a set of dist-sync hygiene fixes prepared together. Framework binaries differ from 1.3.5 in three ways: the embedded `SpreedlySDK.version` string is now `1.3.6`, RC/stable tags are GPG-signed by the iOS Release Bot at CI time, and the dist GH Release page now ships with downloadable SBOM + framework zips + checksums. Merchants who want to verify release tags should contact Spreedly Support for the bot's verification key and `git tag -v` instructions.
+
 ## [1.3.5] - 2026-04-29
 
 ### Added
