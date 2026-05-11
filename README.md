@@ -6,7 +6,7 @@ Demonstrates integrating the [Spreedly iOS SDK](https://github.com/spreedly/chec
 
 Each variant contains a **SwiftUI (Swift)** target and a **UIKit (Objective-C)** target, showing both language integration paths.
 
-**SDK Version:** 1.3.7
+**SDK Version:** 1.3.8
 
 ## Prerequisites
 
