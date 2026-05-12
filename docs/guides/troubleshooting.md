@@ -268,7 +268,6 @@ SPLThemeConfig *config = [[SPLThemeConfig alloc]
 **Cause:** `SpreedlyKeys.xcconfig` contains secrets and is gitignored. CI needs to generate it.
 
 **Fix:** Use a `ci_post_clone.sh` script to generate the xcconfig from environment variables.
-
 ### Package.resolved desync
 
 **Cause:** Local `Package.resolved` doesn't match what CI resolves.

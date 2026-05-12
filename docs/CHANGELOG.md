@@ -5,138 +5,155 @@ All notable changes to the Spreedly iOS SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.8] - 2026-05-08
+
+### Added
+
+- **RC pre-releases on `checkout-ios-package`**: Tagged release candidates (`vX.Y.Z-rc.N`) now publish as pre-releases on `checkout-ios-package`. Partners (e.g. the React Native team) can pin to the exact RC for parallel validation via `exact: "X.Y.Z-rc.N"` in SPM or `:tag => 'X.Y.Z-rc.N'` in CocoaPods. Stable consumers tracking `from: "X.Y.Z"` are unaffected — pre-releases are opt-in by SemVer convention.
+
+### Changed
+
+- **RC TestFlight gate before stable promotion**: The release pipeline now ships every RC to a dedicated TestFlight tester group ahead of the stable tag push, giving QA real-device validation against the actual artifact that gets promoted. Stable promotion remains a no-rebuild artifact promotion (same XCFrameworks, identical checksums) so what QA validates is byte-identical to what merchants ship.
+
+- **Draft-first single-shot release publish for `checkout-ios-package`**: All 11 dist release assets (`sbom.json` + 5 framework zips + 5 `.sha256` checksums) now attach to a draft release first, the draft is verified to have the full asset set, and only then is it flipped to published. Replaces the previous post-publish upload from the dist repo, so `checkout-ios-package` can enable GitHub Immutable Releases (a published release becomes locked and a partial-asset publish would be unrecoverable). Asset list is single-source-of-truth and re-tried with stale-draft cleanup on transient upload failures.
+
+- **Documentation**: Historical entries in this changelog were rewritten for a merchant-facing voice; deeper engineering detail remains in internal SDK documentation that is not copied to the public package repository.
+
+### Fixed
+
+- **SDK identification on Core API requests**: All outbound requests to Spreedly Core now include `from` and `v` URL query parameters identifying the calling SDK platform and version. Previously, Core could not attribute HTTP traffic to a specific SDK — only Datadog telemetry carried this data.
+
+- **Example repository**: Merchant-facing docs no longer include internal-only SDK references; the sample app Swift Package Manager pin reflects the latest published package.
+- **Verified sync commits**: Commits synced to the public package repository ship with Verified status where signing is configured.
+
+### Security
+
+- **Stripe iOS SDK upgrade**: Embedded `stripe-ios-spm` updated from 24.25.0 to 25.10.0 (Stripe major release). `SpreedlyStripeAPM`'s public API surface is unchanged; merchants integrating Stripe APM should review Stripe's release notes for upstream behavior changes that may affect their payment flows.
+
 ## [1.3.7] - 2026-05-05
 
 ### Changed
 
-- HC-1369 **Replaced the auto-merged release PR with a sync-branch + direct-tag-push pattern** in `tag-release.yml`. The previous `gh pr merge --squash` step failed against `checkout-ios-package`'s `Require PR Review` ruleset and only shipped 1.3.6 via a one-off manual approval. The dist-sync flow now: (1) pushes the version-bump commit to a `sync/v${VERSION}` branch, (2) pushes the GPG-signed tag directly to dist (tags bypass branch-protection rulesets), (3) creates the GitHub Release, and (4) opens a non-blocking sync PR for human review. GPG signing stays on the SDK runner; **no GPG keys are added to the public package repo**. Mirrors the approach used by `checkout-android-sdk`. Also adds a maintenance-aware `expected_branch` output (`main` for the current major, `release/N.x` otherwise) so dist sync targets the right branch on patch releases.
+- Automated publishing adjustments on the Swift Package distribution repo only (no behavioral SDK surface change).
 
 ### Notes
 
-This is a validation release for the new GPG-signed tag pipeline (HC-1369). The compiled SDK binary is functionally identical to 1.3.6 — same source code, same dependencies, only the embedded `SpreedlySDK.version` string changes. Merchants on 1.3.6 do not need to upgrade for functional reasons; 1.3.7 exists to prove the new release pipeline end-to-end before the next merchant-facing change ships.
+Validation release — binary behavior matches `1.3.6` aside from embedded `SpreedlySDK.version` (`1.3.7`). No functional reason to upgrade from `1.3.6` unless you care about tagging or distribution bookkeeping for your own audits.
 
 ## [1.3.6] - 2026-05-04
 
 ### Fixed
 
-- HC-1369 **Stale `sbom.json` in `checkout-ios-package`**: The SBOM is now copied from the SDK release artifact (`sbom-vX.Y.Z.json`) into `checkout-ios-package/sbom.json` during the `Sync to Package Repo` step. Previously the file was inherited from the prior release and reported the wrong component version, breaking PCI DSS audit trails.
-- HC-1369 **Stale `README.md` install snippets in `checkout-ios-package`**: Version pins in the badge, SPM `from:`, and all CocoaPods `:tag =>` lines are now `sed`-rewritten on every release. Previously merchants copy-pasting from README would install the previous version instead of the one they intended to install.
-- HC-1369 **Stale `PACKAGE_VERIFICATION.md` in `checkout-ios-package`**: Download URLs, `VERSION="..."`, and "Last Updated" lines are now `sed`-rewritten on every release. The verification guide had been pinned at 1.3.0 across five releases.
-- HC-1369 **Missing release entries in root `CHANGELOG.md` of `checkout-ios-package`**: A PCI DSS compliance entry is now auto-prepended for every release. Tickets are auto-extracted from the SDK CHANGELOG entry for that version. Previously the root CHANGELOG never received the new release header.
-- HC-1369 **Dead `*.tar.gz` archives in `checkout-ios-package`**: The release script now removes leftover `.tar.gz` files. Three stale archives from October 2025 (release 0.0.36) had been sitting in the repo since.
-- HC-1369 **No downloadable assets on `checkout-ios-package` release pages**: A new `attach-release-assets` job in `checkout-ios-package/.github/workflows/release.yml` auto-uploads `sbom.json`, all framework `*.zip` files, and their `*.zip.sha256` checksums to the GitHub Release page on `release: published`. Prior releases (1.3.0 through 1.3.5) had zero downloadable assets on the release page.
+- **SBOM accuracy**: Published SBOM now matches each released SDK revision.
+- **Install directions**: README badges, SPM `from:` pins, and CocoaPods tags on the distribution repository update with each release so copied snippets reference the advertised version.
+- **Checksum guide**: Verification instructions reference the URLs and tarball versions for each release build.
+- **Publication hygiene**: Distribution changelog entries align with each shipped SDK release; stray legacy `.tar.gz` archives were removed from historic downloads.
+- **Release artifacts**: Stable GitHub Releases include downloadable frameworks, checksums, and SBOM payloads.
 
 ### Changed
 
-- HC-1369 **`Sync to Package Repo` step in `tag-release.yml` now refreshes all version-coupled artifacts in `checkout-ios-package`**, not just XCFrameworks/podspecs/checksums. The PR body opened against the package repo now honestly enumerates every file group that was modified.
+- Sync to the distribution repo refreshes every version-copied asset (checksums, podspec pins, manifests, prose), not binaries alone.
 
 ### Security
 
-- HC-1369 **Automated GPG-signed release tags**: `tag-release.yml` now auto-signs RC/stable tags with the iOS Release Bot key (fingerprint `B5F9 FB98 4885 87B6 3590 D5BD 2DE8 551B 78F5 9704`) instead of relying on manual `git tag -s`. The same workflow also auto-merges the dist-repo release PR, pushes a GPG-signed bare-semver tag to `checkout-ios-package`, and creates the corresponding GitHub Release. Closes the manual-signing gap and brings iOS in line with the Android and React Native release pipelines.
-- HC-1369 **`attach-release-assets` job on `checkout-ios-package/.github/workflows/release.yml`**: Uploads `sbom.json`, all framework `*.zip` files, and their `*.zip.sha256` checksums to the dist GH Release page on `release: published`. Pairs with the new auto-created GH Release so the merchant-facing dist release page is now both signed and complete.
-- HC-1369 **GitHub `Verified` badge on signed tags**: The `tag-release.yml` auto-sign step now uses a GitHub-verifiable mailbox as the tagger email, so signed RC and stable tags display the green `Verified` badge on the releases page. Brings iOS to visual parity with Android and React Native.
+- **Signed tags**: Release tags are automation-signed consistently with other Spreedly mobile SDK pipelines.
+- **Verified tags**: Stable tags expose GitHub's Verified badge wherever signing identities are corroborated.
+- **Downloadable payloads**: Releases continue attaching SBOM, framework ZIPs, and checksum sidecars alongside signed tags.
 
 ### Notes
 
-This release introduces tag-signing automation (HC-1369) and a set of dist-sync hygiene fixes prepared together. Framework binaries differ from 1.3.5 in three ways: the embedded `SpreedlySDK.version` string is now `1.3.6`, RC/stable tags are GPG-signed by the iOS Release Bot at CI time, and the dist GH Release page now ships with downloadable SBOM + framework zips + checksums. Merchants who want to verify release tags should contact Spreedly Support for the bot's verification key and `git tag -v` instructions.
+Beyond the bumped `SpreedlySDK.version` string and signed tagging, GitHub Releases now ship SBOM, packaged frameworks, and checksums consistently. Ask Spreedly Support if you need key material or `git tag -v` steps.
 
 ## [1.3.5] - 2026-04-29
 
+### Breaking Changes
+
+- **`sdkPlatform` on `SpreedlyConfig`**: Switched from string literals to the typed `SdkPlatform` enum. Swift callers passing `"react_native"` must migrate to `.reactNative`; native iOS integrations use `.ios`. Objective-C integrations remain compatible.
+
 ### Added
 
-- HC-1331 **Tag-driven release automation**: New `tag-release.yml` workflow triggered by `vX.Y.Z` tags. Builds XCFrameworks, creates GitHub Releases, and auto-syncs to `checkout-ios-package` and `checkout-ios-example` repos.
-- HC-1331 **Automated dev releases**: `auto-dev-release.yml` publishes dev pre-releases on every merge to `main`.
-- HC-1331 **Release readiness checks**: `release-readiness.yml` and `release-health.yml` for pre-release validation.
-- HC-1344 **Dependency vulnerability gating**: `dependency-review-action@v4` blocks PRs introducing high-severity CVEs.
-- HC-1335 **LICENSE embedded in XCFramework artifacts**: LICENSE file is now included inside each `.xcframework` bundle and `.zip` distribution archive.
-- HC-1278 **Secret scanning**: Gitleaks CI integration and pre-commit hook for credential detection.
-- HC-1311 CocoaPods custom xcconfig guide in getting-started documentation.
-- **Jailbreak device blocking**: New `blockJailbrokenDevices` option on `SpreedlyConfig` (defaults to `false`). When enabled, the SDK refuses to initialize on compromised devices and sets `Spreedly.initializationError` with a `SpreedlySecurityError`. Works from both Swift and Objective-C.
-- **`Spreedly.blockJailbrokenDevices` static property**: For merchants using `initializeSDK()` without a config object. Set before calling `initializeSDK()`.
-- **`Spreedly.isDeviceTrusted`**: Read-only property that returns `false` when the device fails integrity checks and the SDK is blocked. Replaces `isOperational`.
-- **Auto-dismiss on blocked devices**: `CardFormDropIn`, `CVVRecachingView`, and `DoChallengeIfNeeded` automatically dismiss their sheets when presented on a blocked device. Custom forms using `SPLTextField` directly still require a manual `isDeviceTrusted` check.
+- **Device integrity gate**: Opt-in blocking of jailbroken/compromised devices via `blockJailbrokenDevices` on `SpreedlyConfig`; blocked apps receive `SpreedlySecurityError`.
+- **`Spreedly.blockJailbrokenDevices`**: Static toggle for callers who initialize through `initializeSDK()` without assembling a standalone `SpreedlyConfig`.
+- **`Spreedly.isDeviceTrusted`**: Preferred read-only signal replacing deprecated trust wording (see Changed).
+- **Automatic sheet dismissal**: `CardFormDropIn`, CVV recache, gateway challenge flows dismiss when the device is blocked.
+- **LICENSE in archives**: Each XCFramework bundle and distribution ZIP embeds the license text.
+- **CocoaPods xcconfig guide**: Documented overrides for custom build settings in `getting-started`.
 
 ### Changed
 
-- HC-1336 **Pipeline hardening**: Pod spec lint validation, post-release asset verification, GPG-signed release tag documentation.
-- **Renamed `Spreedly.isOperational` to `Spreedly.isDeviceTrusted`**: Aligns with industry conventions (Apple `canMakePayments`, Google `isReadyToPay`).
-- HC-1311 **Forter3DS pinned to exact 2.1.0**: Changed from `from: "2.1.0"` (up-to-next-major) to `exact: "2.1.0"` for deterministic builds.
-- HC-1302 Documentation accuracy audit across integration guides.
-- HC-1263 **`sdkPlatform` is now a `SdkPlatform` enum**: Replaced the `String?` parameter on `SpreedlyConfig` with a type-safe `SdkPlatform` enum (`.ios`, `.reactNative`). **Breaking**: callers passing `sdkPlatform: "react_native"` must change to `sdkPlatform: .reactNative`.
+- **Renamed `Spreedly.isOperational` → `Spreedly.isDeviceTrusted`**: Aligns naming with common platform affordances.
+- **Forter 3DS dependency**: Pinned to exact `2.1.0` for reproducible builds.
+- **Distribution hardening**: Podspec linting, post-release asset validation, and signed-tag documentation updated.
+- **Integration guides**: Accuracy pass across major flows (3DS, APM, recache, testing).
 
 ### Fixed
 
-- HC-1317 `initializeSDK()` now correctly recovers from a previous security block when the device passes integrity checks.
-- HC-1312 **Duplicate ObjC class warnings resolved**: Eliminated runtime `Class X is implemented in both` warnings for Stripe, Datadog, and Braintree dependencies. SPM and CocoaPods consumers no longer see duplicate class loading.
-- HC-1302 CI cache key improvements to prevent `hashFiles` timeouts.
-- HC-1301 Release workflow YAML validation fixes.
-- HC-1278 Secret scanning workflow fixes (SARIF upload permissions, bash parse errors, regex improvements).
-- HC-1274 **Pending/processing status UI**: Payment example flows now render dedicated pending message styles for intermediate gateway states (Offsite, EBANX, Stripe APM, Braintree).
+- **Security recovery**: `initializeSDK()` now recovers when a device later passes integrity checks after a prior block.
+- **Duplicate ObjC classes**: Stripe, Datadog, and Braintree consumers no longer load two copies of the same symbols (SPM + CocoaPods).
+- **Stripe APM status copy**: iDEAL/SEPA flows show `processing` where appropriate, matching Android/Web.
+- **Example pending UI**: Example surfaces dedicated pending states for Offsite, EBANX, Stripe APM, and Braintree mid-flight responses.
 
 ### Security
 
-- HC-1313 Binary hardening improvements to protect SDK internals from reverse engineering.
-- HC-1314 Release binary optimization and symbol stripping across all frameworks.
-- HC-1315 ABI metadata suppression and access level tightening for internal types.
+- **Binary hardening**: Additional obfuscation and tighter visibility of non-public implementation details.
+- **Release binaries**: Optimized/stripped release slices with smaller local symbol tables.
 
 ### Removed
 
-- Removed unsupported Rapipago payment method from `OffsitePaymentMethodType`.
-- Removed unsupported NuPay Recurrent payment method from `OffsitePaymentMethodType`.
-- Removed unused `cryptoData` case from `PaymentMethodType`.
+- Unsupported `Rapipago` and `NuPay Recurrent` cases from `OffsitePaymentMethodType`.
+- Unused `cryptoData` case on `PaymentMethodType`.
 
 ## [1.3.4] - 2026-04-27
 
 ### Added
 
-- HC-1317 Runtime integrity checks, security blocking, and jailbreak device detection.
+- Runtime integrity checks, configurable security blocking, and jailbreak detection hooks.
 
 ## [1.2.7] - 2026-03-20
 
 ### Added
 
-- HC-1234 **`sdk_platform` telemetry attribute**: New `sdkPlatform` field on `SpreedlyConfig` (default `.ios`). React Native bridges pass `.reactNative` to distinguish integration surface.
-- HC-1263 **`source` field on payment method creation**: All payment method creation requests now include a `source` field identifying the checkout SDK platform (e.g. `"checkout-ios"`, `"checkout-react-native"`).
-- HC-1242 Braintree test coverage improvements.
+- **`sdkPlatform` telemetry**: `SpreedlyConfig` defaults to native iOS; React Native bridges should set `.reactNative` for analytics differentiation.
+- **`source` on payment methods**: Network requests include a source token indicating which checkout SDK produced the payload.
+- **Braintree coverage**: Expanded automated tests around Braintree flows.
 
 ### Fixed
 
-- HC-1179 **Stripe APM pending vs processing**: iOS now correctly shows "processing" for Stripe APM payments (iDEAL, SEPA), matching Android and Web behavior.
-- HC-1263 `setConfig()` now correctly propagates `sdkPlatform` when reconfiguring an already-initialized SDK.
-- HC-1251 **Card number field paste**: Pasted input with dashes or dots is now normalized to digits only and displayed with proper space-separated groups.
-- HC-1242 Thread safety and memory management improvements across multiple components.
-- HC-1249 **Xcode Cloud TestFlight build**: Resolved stale `Package.resolved` that caused build failures in Xcode Cloud.
+- **Stripe APM**: Correct processing label for iDEAL/SEPA once the gateway moves past `pending`.
+- **`setConfig`**: Re-applying configuration propagates `sdkPlatform` updates.
+- **Card form paste**: Sanitizes dashed/dotted PAN input before formatting.
+- **Concurrency & memory**: Broader thread-safety and lifecycle fixes across UI + networking.
+- **TestFlight/Xcode Cloud**: Example `Package.resolved` drift that broke cloud builds is reconciled.
 
 ### Changed
 
-- HC-1265 Documentation audit: corrected Forter 3DS install instructions, clarified Info.plist key requirements, updated dependency tables.
-- HC-1263 **`sdkPlatform` is now a `SdkPlatform` enum**: Replaced the `String?` parameter on `SpreedlyConfig` with a type-safe enum. **Breaking**: callers passing `sdkPlatform: "react_native"` must change to `sdkPlatform: .reactNative`.
-- HC-1242 Logging performance improvements with lazy evaluation.
+- **Docs / dependencies**: Forter 3DS install notes, Info.plist guidance, and dependency tables refreshed.
+- **Logging**: Hot-path logging now evaluates lazily for lower overhead.
 
 ## [1.1.4] - 2026-03-11
 
 ### Changed
 
-- HC-1234 Telemetry events and attributes for payment flows, 3DS, network, and error tracking.
-- HC-1233 Version consistency, SBOM updates, documentation sync, PCI compliance improvements.
+- Expanded structured telemetry for payments, 3DS, networking, and error surfaces.
+- Release metadata documentation, SBOM exports, and compliance-facing sync refreshed.
 
 ## [1.1.3] - 2026-03-09
 
 ### Fixed
 
-- HC-1223 Fixed TestFlight validation by removing nested framework embed from SPLAccessibility.
+- TestFlight validation failure caused by nested framework embedding in accessibility helpers.
 
 ## [1.1.2] - 2026-03-09
 
 ### Fixed
 
-- HC-1223 Fixed Xcode Cloud build by migrating to SPM and generating xcconfig on CI.
+- Xcode Cloud builds by finishing the Swift Package Manager migration and generating secrets via CI.
 
 ## [1.1.1] - 2026-03-09
 
 ### Changed
 
-- HC-1223 Updated version references and documentation for 1.1.0 release.
+- Version strings and release documentation aligned with the `1.1.0` launch.
 
 ## [1.1.0] - 2026-03-09
 
