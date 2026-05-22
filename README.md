@@ -134,6 +134,13 @@ checkout-ios-example/
 - [Getting Started Guide](docs/guides/getting-started.md)
 - [SDK Distribution](https://github.com/spreedly/checkout-ios-package)
 
-## License
+## Support
 
-This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+- **Spreedly Documentation**: [docs.spreedly.com](https://docs.spreedly.com/)
+- **Support Portal**: [spreedly.com/support](https://spreedly.com/support/)
+
+## Legal
+
+- [Terms of Service](https://legal.spreedly.com/#terms)
+- [Privacy Policy](https://legal.spreedly.com/#privacy-policy)
+- [License](LICENSE) (Apache 2.0)
