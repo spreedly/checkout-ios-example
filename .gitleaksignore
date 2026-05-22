@@ -21,7 +21,9 @@ e3414eb7e1ecd6d33ebb3c3eb69587a91b8eb7c7:Shared/Swift/Config/SignatureGenerator.
 
 # PEM header stripping in SignatureGenerator (not actual keys)
 Shared/ObjC/ViewControllers/SignatureGenerator.m:private-key:107
+Shared/ObjC/ViewControllers/SignatureGenerator.m:private-key:109
 Shared/Swift/Config/SignatureGenerator.swift:private-key:94
+Shared/Swift/Config/SignatureGenerator.swift:private-key:96
 
 # Documentation example placeholders (truncated/fake values)
 docs/guides/braintree-apm.md:generic-api-key:237
