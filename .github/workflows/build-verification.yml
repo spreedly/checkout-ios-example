@@ -34,7 +34,7 @@ jobs:
           xcodebuild build \
             -project MerchantExampleSPM.xcodeproj \
             -scheme MerchantExampleSPM \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'generic/platform=iOS Simulator' \
             -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO | xcpretty || exit 1
 
@@ -64,5 +64,5 @@ jobs:
           xcodebuild build \
             -workspace MerchantExamplePods.xcworkspace \
             -scheme MerchantExamplePods \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO | xcpretty || exit 1
