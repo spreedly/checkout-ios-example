@@ -24,6 +24,14 @@ struct StripeAPMPaymentFlowView: View {
     @State private var paymentResultCancellable: AnyCancellable?
     @State private var stage: StripeAPMStage = .idle
 
+    // PaymentSheet appearance (QA: tweak before starting checkout)
+    @State private var useCustomAppearance: Bool = true
+    @State private var appearancePrimaryColor: Color = Color(.systemIndigo)
+    @State private var appearanceBackgroundColor: Color = Color(.systemBackground)
+    @State private var appearanceButtonBackgroundColor: Color = Color(.systemIndigo)
+    @State private var appearanceButtonTextColor: Color = .white
+    @State private var appearanceCornerRadius: Double = 10
+
     private let products: [Product] = [
         Product(id: "prod_1", name: "Wireless Earbuds", price: 99, description: "Premium wireless earbuds with active noise cancellation", iconName: "airpods"),
         Product(id: "prod_2", name: "Smart Watch", price: 0.44, description: "Feature-rich smartwatch with health tracking", iconName: "applewatch"),
@@ -82,6 +90,8 @@ struct StripeAPMPaymentFlowView: View {
                 )
 
                 apmTypeSelectionSection
+
+                appearanceConfigurationSection
 
                 Button(action: startStripeAPMFlow) {
                     HStack {
@@ -152,6 +162,7 @@ struct StripeAPMPaymentFlowView: View {
         .onAppear {
             setupSubscriptions()
         }
+        .onDisappear(perform: cleanupSubscriptions)
     }
 
     // MARK: - Header
@@ -278,6 +289,101 @@ struct StripeAPMPaymentFlowView: View {
         .customShadow(theme.shadows.small)
     }
 
+    // MARK: - PaymentSheet Appearance (QA)
+
+    private var appearanceConfigurationSection: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.md) {
+            Text("PaymentSheet appearance")
+                .font(theme.typography.subtitleFont)
+                .foregroundColor(theme.colors.text)
+                .accessibilityIdentifier(AccessibilityIdentifiers.StripeAPMPayment.appearanceSectionTitle)
+                .accessibilityLabel(AccessibilityLabels.StripeAPMPayment.appearanceSectionTitle)
+                .accessibilityHint(AccessibilityHints.StripeAPMPayment.appearanceSectionTitle)
+                .accessibilityAddTraits(.isHeader)
+
+            Text("Colors map to `StripeAPMAppearanceConfig` and are applied when PaymentSheet opens.")
+                .font(theme.typography.captionFont)
+                .foregroundColor(theme.colors.textSecondary)
+
+            Toggle(
+                "Customize PaymentSheet appearance",
+                isOn: $useCustomAppearance
+            )
+            .font(theme.typography.bodyFont)
+            .accessibilityIdentifier(AccessibilityIdentifiers.StripeAPMPayment.useCustomAppearanceToggle)
+            .accessibilityLabel(AccessibilityLabels.StripeAPMPayment.useCustomAppearanceToggle)
+            .accessibilityHint(AccessibilityHints.StripeAPMPayment.useCustomAppearanceToggle)
+
+            if useCustomAppearance {
+                StripeAppearanceColorPickerRow(
+                    title: "Primary",
+                    selection: $appearancePrimaryColor,
+                    accessibilityIdentifier: AccessibilityIdentifiers.StripeAPMPayment.primaryColorPicker
+                )
+
+                StripeAppearanceColorPickerRow(
+                    title: "Background",
+                    selection: $appearanceBackgroundColor,
+                    accessibilityIdentifier: AccessibilityIdentifiers.StripeAPMPayment.backgroundColorPicker
+                )
+
+                StripeAppearanceColorPickerRow(
+                    title: "Pay button background",
+                    selection: $appearanceButtonBackgroundColor,
+                    accessibilityIdentifier: AccessibilityIdentifiers.StripeAPMPayment.buttonBackgroundColorPicker
+                )
+
+                StripeAppearanceColorPickerRow(
+                    title: "Pay button text",
+                    selection: $appearanceButtonTextColor,
+                    accessibilityIdentifier: AccessibilityIdentifiers.StripeAPMPayment.buttonTextColorPicker
+                )
+
+                HStack {
+                    Text("Corner radius")
+                        .font(theme.typography.bodyFont)
+                        .foregroundColor(theme.colors.text)
+                    Spacer()
+                    Stepper(
+                        value: $appearanceCornerRadius,
+                        in: 0...24,
+                        step: 1
+                    ) {
+                        Text("\(Int(appearanceCornerRadius)) pt")
+                            .font(theme.typography.bodyFont)
+                            .foregroundColor(theme.colors.textSecondary)
+                    }
+                }
+                .accessibilityIdentifier(AccessibilityIdentifiers.StripeAPMPayment.cornerRadiusStepper)
+                .accessibilityLabel(AccessibilityLabels.StripeAPMPayment.cornerRadiusStepper)
+                .accessibilityHint(AccessibilityHints.StripeAPMPayment.cornerRadiusStepper)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(theme.spacing.md)
+        .background(theme.colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: theme.borderRadius.xl))
+        .overlay(
+            RoundedRectangle(cornerRadius: theme.borderRadius.xl)
+                .stroke(theme.colors.border, lineWidth: 1)
+        )
+        .customShadow(theme.shadows.small)
+    }
+
+    private func makeStripeAppearance() -> StripeAPMAppearanceConfig? {
+        guard useCustomAppearance else { return nil }
+
+        let appearance = StripeAPMAppearanceConfig()
+        appearance.cornerRadius = NSNumber(value: appearanceCornerRadius)
+        appearance.colors.primary = appearancePrimaryColor.toUIColor()
+        appearance.colors.background = appearanceBackgroundColor.toUIColor()
+        appearance.primaryButton.backgroundColor = appearanceButtonBackgroundColor.toUIColor()
+        appearance.primaryButton.textColor = appearanceButtonTextColor.toUIColor()
+        appearance.primaryButton.cornerRadius = NSNumber(value: appearanceCornerRadius)
+        appearance.primaryButton.height = 52
+        return appearance
+    }
+
     // MARK: - Subscriptions
 
     // Step 0: Subscribe to payment results before starting the flow
@@ -286,6 +392,11 @@ struct StripeAPMPaymentFlowView: View {
         paymentResultCancellable = Spreedly.shared().subscribeToPaymentResults { result in
             handlePaymentResult(result)
         }
+    }
+
+    private func cleanupSubscriptions() {
+        paymentResultCancellable?.cancel()
+        paymentResultCancellable = nil
     }
 
     // MARK: - Flow
@@ -364,7 +475,12 @@ struct StripeAPMPaymentFlowView: View {
                     returnURL: AppConstants.stripeAPMReturnURL
                 )
 
-                SpreedlyStripeAPMCheckout.present(config: config)
+                let appearance = makeStripeAppearance()
+                if let appearance {
+                    SpreedlyStripeAPMCheckout.present(config: config, appearance: appearance)
+                } else {
+                    SpreedlyStripeAPMCheckout.present(config: config)
+                }
             }
         } catch {
             await MainActor.run {
@@ -377,8 +493,7 @@ struct StripeAPMPaymentFlowView: View {
 
     // MARK: - Payment Result Handling
 
-    // Step 4 result: SDK polled status and published result. Show success/pending/error.
-    // Cancel arrives as isFailure with "canceled" in description — check for it.
+    // Step 4 result: SDK polled status and published result. Show success/pending/error/cancel.
     private func handlePaymentResult(_ result: PaymentResult) {
         guard stage == .checkout else {
             return
@@ -398,20 +513,45 @@ struct StripeAPMPaymentFlowView: View {
                 pendingMessage = nil
             }
             errorMessage = nil
+        } else if result.isCanceled {
+            isLoading = false
+            stage = .idle
+            errorMessage = "\(stripeAPMMethodDisplayName) payment was canceled."
+            successMessage = nil
+            pendingMessage = nil
         } else if result.isFailure {
             isLoading = false
             stage = .idle
-            let description = result.failureDetails?.getDescription() ?? "\(stripeAPMMethodDisplayName) payment failed."
-            if description.lowercased().contains("canceled") {
-                errorMessage = "\(stripeAPMMethodDisplayName) payment was canceled."
-            } else {
-                errorMessage = description
-            }
+            errorMessage = result.failureDetails?.getDescription() ?? "\(stripeAPMMethodDisplayName) payment failed."
             successMessage = nil
             pendingMessage = nil
         }
     }
 
+}
+
+// MARK: - Appearance Color Picker Row
+
+private struct StripeAppearanceColorPickerRow: View {
+    let title: String
+    @Binding var selection: Color
+    let accessibilityIdentifier: String
+    @Environment(\.spreedlyTheme) private var theme
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(theme.typography.bodyFont)
+                .foregroundColor(theme.colors.text)
+            Spacer()
+            ColorPicker("", selection: $selection)
+                .labelsHidden()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityLabel(title)
+        .accessibilityHint("Pick a color for \(title.lowercased()) in the Stripe PaymentSheet")
+    }
 }
 
 // MARK: - APM Type Row View

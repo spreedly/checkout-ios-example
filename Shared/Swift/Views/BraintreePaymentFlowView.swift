@@ -121,6 +121,12 @@ struct BraintreePaymentFlowView: View {
         }
         .navigationTitle("Braintree")
         .navigationBarTitleDisplayMode(.inline)
+        .onDisappear(perform: cleanupOnDisappear)
+    }
+
+    private func cleanupOnDisappear() {
+        paymentResultCancellable?.cancel()
+        paymentResultCancellable = nil
     }
 
     // MARK: - Header
@@ -277,7 +283,7 @@ struct BraintreePaymentFlowView: View {
         stage = .creatingPurchase
 
         let amountInCents = product.price * AppConstants.centsPerDollar
-        // Step 1: Backend purchase — POST with paypal/venmo + offsite_sync: true
+        // Step 1: Backend purchase — POST create-purchase (gateway braintree, offsite_sync + GSF)
         let paymentType = BraintreePaymentType(string: selectedPaymentType) ?? .paypal
 
         Task {
@@ -324,6 +330,9 @@ struct BraintreePaymentFlowView: View {
         paymentType: BraintreePaymentType,
         amount: String
     ) {
+        paymentResultCancellable?.cancel()
+        paymentResultCancellable = nil
+
         // Step 0: Subscribe to payment results (using .first() — only one result expected)
         paymentResultCancellable = Spreedly.shared().paymentResultPublisher
             .receive(on: DispatchQueue.main)
@@ -333,7 +342,8 @@ struct BraintreePaymentFlowView: View {
                 handleBraintreeResult(result, transactionToken: transactionToken, paymentType: paymentType)
             }
 
-        // Step 2: Build BraintreeCheckoutConfig with transactionToken + clientToken from backend
+        // Step 2: Build config — SDK always reads PayPal/Venmo options from transaction status.
+        // clientToken is an optional fallback when status omits client_token.
         let config = BraintreeCheckoutConfig(
             transactionToken: transactionToken,
             paymentType: paymentType,
@@ -346,40 +356,56 @@ struct BraintreePaymentFlowView: View {
         SpreedlyBraintreeCheckout.present(config: config)
     }
 
+    /// Best-effort confirm for cancel/failure so the backend can finalize the pending transaction.
+    private func confirmNonSuccessful(
+        transactionToken: String,
+        state: String,
+        message: String,
+        paymentMethodType: String
+    ) {
+        Task {
+            let apiClient = SpreedlyConfigManager.shared.createPurchaseAPIClient()
+            _ = try? await apiClient.braintreeConfirm(
+                transactionToken: transactionToken,
+                state: state,
+                paymentMethodType: paymentMethodType,
+                message: message
+            )
+        }
+    }
+
     // Step 4 result: SDK returned nonce + deviceData (or cancel/error).
-    // On success: send nonce to backend → confirm.json (Step 5). This extra step is unique to Braintree.
+    // On success: send nonce to backend → confirm (Step 5). Cancel/fail also notify backend (best-effort).
     private func handleBraintreeResult(_ result: PaymentResult, transactionToken: String, paymentType: BraintreePaymentType) {
-        stage = .confirming
+        let confirmPaymentType = paymentType.rawValueString
 
         if result.isSuccess, let nonce = result.nonce {
+            stage = .confirming
             Task {
                 do {
-                    // Step 5: Confirm — send nonce to backend → POST confirm.json
                     let apiClient = SpreedlyConfigManager.shared.createPurchaseAPIClient()
                     let response = try await apiClient.braintreeConfirm(
                         transactionToken: transactionToken,
                         state: "Successful",
-                        nonce: nonce,
-                        paymentMethodType: paymentType.rawValueString
+                        paymentMethodType: confirmPaymentType,
+                        nonce: nonce
                     )
                     await MainActor.run {
                         isLoading = false
                         stage = .idle
                         if let txn = response.transaction {
                             if txn.succeeded {
-                                successMessage = "Payment successful. The transaction has been completed."
+                                successMessage = "Payment successful. The transaction has been completed successfully."
                                 pendingMessage = nil
                                 errorMessage = nil
-                            } else if txn.state == "processing" {
-                                pendingMessage = "Payment is being processed. Final confirmation may take a moment."
-                                successMessage = nil
-                                errorMessage = nil
-                            } else if txn.state == "pending" {
-                                pendingMessage = "Payment submitted. Awaiting final confirmation from the payment provider."
-                                successMessage = nil
+                            } else if txn.state == "processing" || txn.state == "pending" {
+                                successMessage = "Payment is being processed. Final confirmation may take a moment."
+                                pendingMessage = nil
                                 errorMessage = nil
                             } else {
-                                errorMessage = "Confirmation returned state: \(txn.state ?? "unknown"). Message: \(txn.message ?? "none")"
+                                let state = txn.state ?? ""
+                                let message = txn.message ?? ""
+                                errorMessage = "Confirmation returned state: \(state). Message: \(message)"
                                 pendingMessage = nil
                                 successMessage = nil
                             }
@@ -402,15 +428,34 @@ struct BraintreePaymentFlowView: View {
         } else if result.isCanceled {
             isLoading = false
             stage = .idle
-            errorMessage = "\(braintreeMethodDisplayName) payment was canceled."
+            let message = "\(braintreeMethodDisplayName) payment was canceled."
+            errorMessage = message
             pendingMessage = nil
             successMessage = nil
+            confirmNonSuccessful(
+                transactionToken: transactionToken,
+                state: "Cancelled",
+                message: message,
+                paymentMethodType: confirmPaymentType
+            )
         } else {
             isLoading = false
             stage = .idle
-            errorMessage = result.failureDetails?.getDescription() ?? "\(braintreeMethodDisplayName) payment failed."
+            let message: String
+            if let sdkMessage = result.failureDetails?.message, !sdkMessage.isEmpty {
+                message = sdkMessage
+            } else {
+                message = "\(braintreeMethodDisplayName) payment failed."
+            }
+            errorMessage = message
             pendingMessage = nil
             successMessage = nil
+            confirmNonSuccessful(
+                transactionToken: transactionToken,
+                state: "Failed",
+                message: message,
+                paymentMethodType: confirmPaymentType
+            )
         }
     }
 

@@ -99,10 +99,10 @@ Your purchase request must include `attempt_3dsecure: true` for 3DS to trigger.
 2. Present the `CardFormDropIn` payment form
 3. Enter a test card number, future expiry, and any CVV
 4. Tap "Pay"
-5. Observe the result via Combine:
-   - `.completed` with a `token` means success
-   - `.failed` with an error indicates a problem — check the error type
-   - `.canceled` means the user dismissed the form
+5. Subscribe to results before presenting and read the boolean flags on `PaymentResult`:
+   - `result.isSuccess` with a non-nil `result.token` means tokenization succeeded
+   - `result.isFailure` — inspect `result.failureDetails` for the error type
+   - `result.isCanceled` means the user dismissed the form
 
 ```swift
 let config = SpreedlyConfig(
@@ -114,6 +114,16 @@ let config = SpreedlyConfig(
 )
 Spreedly.setup(config: config)
 
+let cancellable = Spreedly.shared().subscribeToPaymentResults { result in
+    if result.isSuccess, let token = result.token {
+        // Send token to your backend to create the purchase
+    } else if result.isFailure {
+        // Show error using result.failureDetails
+    } else if result.isCanceled {
+        // User dismissed the form
+    }
+}
+
 // Present CardFormDropIn in your SwiftUI view
 CardFormDropIn()
 ```
@@ -124,18 +134,19 @@ See [Express Checkout](express-checkout.md) for the full integration.
 
 1. Initialize the SDK
 2. Add `SPLTextField` fields to your layout for card number, expiry, and CVV
-3. Fill in test card data
-4. Call `Spreedly.shared().createCreditCard(...)` with the form fields
-5. Verify `.completed` via Combine publishers
+3. Subscribe to `subscribeToPaymentResults` before submitting
+4. Fill in test card data and call `Spreedly.shared().createCreditCard(...)`. The synchronous return is a `PaymentProcessingResult` (use `isProcessing` / `isValidationFailed`); the final `PaymentResult` arrives on the subscription
+5. Verify `result.isSuccess` with a non-nil `result.token`
 
 See [Custom Payment Forms](custom-payment-forms.md) for the full integration.
 
 ### Recaching (CVV Update)
 
 1. Initialize the SDK
-2. Present `SpreedlyCVVRecachingView` with a saved payment method token
-3. Enter any 3-digit CVV
-4. Submit and verify `.completed` result
+2. Subscribe to `Spreedly.shared().subscribeToRecacheResults { ... }` (separate channel from card tokenization)
+3. Present `SpreedlyCVVRecachingView` with a `RecacheConfig`, a saved `paymentMethodToken`, and any submit-time options (e.g. `allowBlankName: false`)
+4. Enter any 3-digit CVV and submit
+5. Verify `result.isSuccess` with a non-nil `result.token` on the recache subscription. Validation feedback during input arrives through the view's `onProcessingResult` (`isProcessing` / `isValidationFailed`)
 
 See [Recaching](recaching.md) for configuration details.
 
@@ -195,7 +206,7 @@ let config = StripeAPMConfig(
 )
 ```
 
-4. Present the Stripe PaymentSheet via `SpreedlyStripeAPMCheckout.present()`
+4. Present the Stripe PaymentSheet via `SpreedlyStripeAPMCheckout.present(config:)`
 5. Select an APM (e.g., iDEAL) and complete the test payment
 6. Verify `PaymentResult` received via Combine publisher
 
@@ -219,17 +230,19 @@ See [Braintree APM](braintree-apm.md) for the full integration.
 
 | Scenario | How to Trigger | Expected Result |
 |----------|---------------|-----------------|
-| Validation error | Submit with empty card number | `.validationError` with field-level details |
-| Invalid card number | Enter `1234567890123456` (fails Luhn) | `.validationError` — Luhn check fails |
-| Expired card | Use a past expiry date (e.g., `01/20`) | `.validationError` — expiry in the past |
-| Account inactive | Use a real card in test environment | `.accountInactive` error |
-| Network error | Disconnect from network before submitting | `.networkError` — no connectivity |
-| Invalid credentials | Use wrong `environmentKey` | `.unauthorized` error on API call |
+| Validation error | Submit with empty card number | Synchronous `PaymentProcessingResult.isValidationFailed == true`; inspect `invalidFields` for field-level details |
+| Invalid card number | Enter `1234567890123456` (fails Luhn) | `PaymentProcessingResult.isValidationFailed` — Luhn check fails on `.number` |
+| Expired card | Use a past expiry date (e.g., `01/20`) | `PaymentProcessingResult.isValidationFailed` — expiry in the past |
+| Account inactive | Use a real card in test environment | Async `PaymentResult.isFailure` with `failureDetails.errorType == .apiError` |
+| Network error | Disconnect from network before submitting | Async `PaymentResult.isFailure` with `failureDetails.errorType == .networkError` |
+| Invalid credentials | Use wrong `environmentKey` | Async `PaymentResult.isFailure` with `failureDetails.errorType == .apiError` and an auth-related `failureDetails.statusCode` |
+
+`createCreditCard(...)` and related calls return `PaymentProcessingResult` synchronously (for client-side validation and the "processing" handoff). The final outcome is delivered asynchronously as a `PaymentResult` through `subscribeToPaymentResults` / `paymentDelegate` (or `subscribeToRecacheResults` / `recacheDelegate` for recaching).
 
 ### Verifying Error Handling
 
-1. **Field-level errors**: Clear the card number field and tap Pay. Verify the SDK highlights the invalid field and shows a user-friendly message.
-2. **General errors**: Use invalid credentials. Verify `PaymentResult.failed` includes an actionable error type.
+1. **Field-level errors**: Clear the card number field and tap Pay. The synchronous `PaymentProcessingResult.invalidFields` lists the offending `FormFieldType` values — surface them to the user.
+2. **General errors**: Use invalid credentials. Verify `PaymentResult.isFailure == true` and inspect `failureDetails` for `errorType` and `getDescription()`.
 3. **Network recovery**: Disconnect, trigger an error, reconnect, and retry. The SDK should recover on the next attempt.
 
 See [Error Handling](error-handling.md) for the full error type catalog and retry guidance.
@@ -269,7 +282,7 @@ Before switching to production:
 - [ ] All payment flows tested with test cards and test credentials
 - [ ] Error handling verified for validation, network, and auth errors
 - [ ] `environmentKey` switched from test to production
-- [ ] `logLevel` set to `.none` (or `.error` at most)
+- [ ] Log level set to `.none` (or `.error` at most) via `Spreedly.setLogLevel(.none)`
 - [ ] Stripe APM uses `pk_live_...` (not `pk_test_...`)
 - [ ] Braintree gateway switched from sandbox to production
 - [ ] Forter portal verified in production (not sandbox)
@@ -291,7 +304,7 @@ The SDK provides `SecurityManager.shared.setOverrideAssessment(_:)` in DEBUG bui
 ```swift
 #if DEBUG
 // Force a "compromised" state for testing
-let compromised = SecurityAssessment(level: .compromised, signals: ["sandbox_broken", "dylib_injection"])
+let compromised = SecurityAssessment(level: .compromised, signals: [])
 SecurityManager.shared.setOverrideAssessment(compromised)
 
 // Now initialize with blocking enabled
@@ -307,23 +320,25 @@ SecurityManager.shared.setOverrideAssessment(nil)
 #endif
 ```
 
+> The DEBUG override is only available in debug builds (release builds always use real device assessment). Pass an empty `signals` array when you only need to trigger the blocked state for UI testing; the SDK does not require specific signal names from your test code.
+
 ### What to Verify
 
 | Scenario | Expected Behavior |
 |----------|-------------------|
-| `CardFormDropIn` presented on blocked device | Sheet auto-dismisses, `PaymentResult.failure` published |
-| `CVVRecachingView` presented on blocked device | View auto-dismisses, `PaymentResult.failure` published |
-| APM `present()` called on blocked device | Returns immediately, `PaymentResult.failure` published |
-| 3DS `DoChallengeIfNeeded` on blocked device | Auto-dismisses, `ThreeDSChallengeResult.failure` published |
+| `CardFormDropIn` presented on blocked device | Sheet auto-dismisses; `PaymentResult.isFailure == true` published on `subscribeToPaymentResults` / `paymentDelegate` |
+| `SpreedlyCVVRecachingView` presented on blocked device | View auto-dismisses; **failure publishes on `subscribeToPaymentResults` / `paymentDelegate`, not the recache channel** |
+| APM `present(config:)` called on blocked device | Returns immediately; `PaymentResult.isFailure == true` published |
+| 3DS `DoChallengeIfNeeded` on blocked device | Auto-dismisses; `ThreeDSChallengeResult.isFailure == true` published |
 | `SPLTextField` rendered on blocked device | Renders invisible (zero-size frame) |
 | `Spreedly.shared()` on blocked device | Returns non-functional instance; all network calls fail |
 | Recovery: call `initializeSDK()` after clearing override | `isDeviceTrusted` returns `true`, SDK operational |
 
 ### Telemetry Verification
 
-When a device is blocked, verify these events fire:
+When a device is blocked, verify these events fire (Datadog or your configured logger):
 
-- `security_check_completed` — with `is_compromised: true` and the signal names
+- `security_check_completed` — with `is_compromised: true`
 - `sdk_init_blocked` — with `reason: "device_compromised"`
 
 See [Security — Runtime Integrity](security.md#runtime-integrity) for full details on per-component behavior.

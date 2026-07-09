@@ -1343,10 +1343,22 @@ static char ThreeDSErrorContainerKey;
 
 #pragma mark - Cleanup
 
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [self cleanupThreeDSDelegate];
+}
+
 - (void)dealloc {
+    [self cleanupThreeDSDelegate];
     if (self.gatewaySpecificTriggerObserver) {
         [[NSNotificationCenter defaultCenter] removeObserver:self.gatewaySpecificTriggerObserver];
         self.gatewaySpecificTriggerObserver = nil;
+    }
+}
+
+- (void)cleanupThreeDSDelegate {
+    if ([Spreedly shared].threeDSChallengeDelegate == self) {
+        [Spreedly shared].threeDSChallengeDelegate = nil;
     }
 }
 

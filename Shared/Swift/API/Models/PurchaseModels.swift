@@ -159,14 +159,25 @@ public struct HerokuCreatePurchaseTransaction: Codable {
     }
 }
 
-// MARK: - Heroku Braintree purchase (flat body + channel)
-public struct HerokuBraintreePurchaseRequest: Codable {
+// MARK: - Heroku Braintree purchase (create-purchase)
+public struct HerokuBraintreeCreatePurchaseRequest: Codable {
+    public let gateway: String
+    public let transaction: HerokuBraintreeCreatePurchaseTransaction
+
+    public init(transaction: HerokuBraintreeCreatePurchaseTransaction) {
+        self.gateway = "braintree"
+        self.transaction = transaction
+    }
+}
+
+public struct HerokuBraintreeCreatePurchaseTransaction: Codable {
     public let amount: Double
     public let currencyCode: String
     public let redirectUrl: String
     public let callbackUrl: String
     public let channel: String
-    public let paymentMethodType: String
+    public let paymentMethod: BraintreeOffsitePaymentMethod
+    public let gatewaySpecificFields: BraintreeGatewaySpecificFields?
 
     private enum CodingKeys: String, CodingKey {
         case amount
@@ -174,7 +185,8 @@ public struct HerokuBraintreePurchaseRequest: Codable {
         case redirectUrl = "redirect_url"
         case callbackUrl = "callback_url"
         case channel
-        case paymentMethodType = "payment_method_type"
+        case paymentMethod = "payment_method"
+        case gatewaySpecificFields = "gateway_specific_fields"
     }
 
     public init(
@@ -183,32 +195,42 @@ public struct HerokuBraintreePurchaseRequest: Codable {
         redirectUrl: String,
         callbackUrl: String,
         channel: String = "app",
-        paymentMethodType: String
+        paymentMethodType: String,
+        gatewaySpecificFields: BraintreeGatewaySpecificFields?
     ) {
         self.amount = NSDecimalNumber(decimal: amount).doubleValue
         self.currencyCode = currencyCode
         self.redirectUrl = redirectUrl
         self.callbackUrl = callbackUrl
         self.channel = channel
-        self.paymentMethodType = paymentMethodType
+        self.paymentMethod = BraintreeOffsitePaymentMethod(paymentMethodType: paymentMethodType)
+        self.gatewaySpecificFields = gatewaySpecificFields
     }
 }
 
-// MARK: - Heroku confirm (Stripe / Braintree): state, nonce, payment_method_type
+// MARK: - Heroku confirm (Stripe / Braintree): state, nonce, message, payment_method_type
 public struct HerokuConfirmRequest: Codable {
     public let state: String
-    public let nonce: String
+    public let nonce: String?
+    public let message: String?
     public let paymentMethodType: String
 
     private enum CodingKeys: String, CodingKey {
         case state
         case nonce
+        case message
         case paymentMethodType = "payment_method_type"
     }
 
-    public init(state: String, nonce: String, paymentMethodType: String) {
+    public init(
+        state: String,
+        nonce: String? = nil,
+        message: String? = nil,
+        paymentMethodType: String
+    ) {
         self.state = state
         self.nonce = nonce
+        self.message = message
         self.paymentMethodType = paymentMethodType
     }
 }

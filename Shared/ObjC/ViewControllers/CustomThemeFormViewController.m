@@ -896,6 +896,9 @@
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    if ([Spreedly shared].paymentDelegate == self) {
+        [Spreedly shared].paymentDelegate = nil;
+    }
     [[Spreedly shared] reset];
     
     // Stop keyboard scroll timer

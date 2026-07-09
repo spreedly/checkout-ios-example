@@ -95,7 +95,16 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
     [self updateStartButtonState];
 }
 
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [self cleanupPaymentDelegate];
+}
+
 - (void)dealloc {
+    [self cleanupPaymentDelegate];
+}
+
+- (void)cleanupPaymentDelegate {
     if ([Spreedly shared].paymentDelegate == self) {
         [Spreedly shared].paymentDelegate = nil;
     }
@@ -913,7 +922,17 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
                                                                    transactionToken:tx.token
                                                                   merchantDisplayName:@"Spreedly Example"
                                                                               returnURL:kStripeAPMReturnURL];
-            [SpreedlyStripeAPMCheckout presentWithConfig:config];
+            // Demo: theme the Stripe PaymentSheet to match the example app's accent.
+            // Pass `nil` to keep Stripe's defaults.
+            StripeAPMAppearanceConfig *appearance = [[StripeAPMAppearanceConfig alloc] init];
+            appearance.cornerRadius = @(10);
+            appearance.colors.primary = UIColor.systemIndigoColor;
+            appearance.primaryButton.backgroundColor = UIColor.systemIndigoColor;
+            appearance.primaryButton.textColor = UIColor.whiteColor;
+            appearance.primaryButton.cornerRadius = @(10);
+            appearance.primaryButton.height = 52;
+
+            [SpreedlyStripeAPMCheckout presentWithConfig:config appearance:appearance];
         });
     }];
 }
@@ -966,13 +985,11 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
             } else {
                 [self showSuccess:@"Payment successful. The transaction has been completed."];
             }
+        } else if (result.isCanceled) {
+            [self showError:@"Stripe APM payment was canceled."];
         } else {
             NSString *desc = [result.failureDetails getDescription] ?: @"Stripe APM payment failed.";
-            if ([desc rangeOfString:@"canceled" options:NSCaseInsensitiveSearch].location != NSNotFound) {
-                [self showError:@"Stripe APM payment was canceled."];
-            } else {
-                [self showError:desc];
-            }
+            [self showError:desc];
         }
     });
 }

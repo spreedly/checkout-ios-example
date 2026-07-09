@@ -11,21 +11,22 @@ Integrate the Spreedly iOS SDK into Objective-C projects using delegates and UIV
 3. [Setup](#setup)
 4. [Payment Delegate](#payment-delegate)
 5. [CardFormDropInViewController](#cardformdropinviewcontroller)
-6. [SPLTextFieldViewController](#spltextfieldviewcontroller)
-7. [CVVRecachingViewController](#cvvrecachingviewcontroller)
-8. [3DS Challenge](#3ds-challenge)
-9. [Gateway-Specific 3DS](#gateway-specific-3ds)
-10. [Additional Fields](#additional-fields)
-11. [Offsite Payments](#offsite-payments)
-12. [Stripe APM](#stripe-apm)
-13. [EBANX](#ebanx)
-14. [Braintree](#braintree)
-15. [Theming](#theming)
-16. [URL Handling](#url-handling)
-17. [Cleanup and Teardown](#cleanup-and-teardown)
-18. [Submit Label Values](#submit-label-values)
-19. [Telemetry Events](#telemetry-events)
-20. [Related Documentation](#related-documentation)
+6. [BankAccountFormDropInViewController](#bankaccountformdropinviewcontroller)
+7. [SPLTextFieldViewController](#spltextfieldviewcontroller)
+8. [CVVRecachingViewController](#cvvrecachingviewcontroller)
+9. [3DS Challenge](#3ds-challenge)
+10. [Gateway-Specific 3DS](#gateway-specific-3ds)
+11. [Additional Fields](#additional-fields)
+12. [Offsite Payments](#offsite-payments)
+13. [Stripe APM](#stripe-apm)
+14. [EBANX](#ebanx)
+15. [Braintree](#braintree)
+16. [Theming](#theming)
+17. [URL Handling](#url-handling)
+18. [Cleanup and Teardown](#cleanup-and-teardown)
+19. [Submit Label Values](#submit-label-values)
+20. [Telemetry Events](#telemetry-events)
+21. [Related Documentation](#related-documentation)
 
 ---
 
@@ -40,6 +41,7 @@ The Spreedly iOS SDK provides full Objective-C support through UIKit wrappers. A
 | SwiftUI | UIKit/Objective-C | Purpose |
 |---------|-------------------|---------|
 | CardFormDropIn | CardFormDropInViewController | Full payment form |
+| BankAccountFormDropIn | BankAccountFormDropInViewController | ACH bank-account form |
 | SPLTextField | SPLTextFieldViewController | Individual field |
 | SpreedlyCVVRecachingView | CVVRecachingViewController | CVV recaching |
 | DoChallengeIfNeeded | DoChallengeIfNeededViewController | 3DS challenge |
@@ -79,6 +81,9 @@ config.timestamp = timestamp;
 if (Spreedly.initializationError != nil) {
     NSLog(@"SDK blocked: %@", Spreedly.initializationError.message);
 }
+
+// After successful init + setup, the SDK is "ready" (legacy iframe ready — Spreedly.isInitialized):
+// if (!Spreedly.isInitialized) { /* wait or show loading */ }
 
 // Check device trust at any time:
 if (!Spreedly.isDeviceTrusted) {
@@ -173,6 +178,7 @@ NSArray *additionalFields = @[
 [[Spreedly shared] setParamWithParameter:ValidationParamAllowBlankName value:NO];
 [[Spreedly shared] setParamWithParameter:ValidationParamAllowExpiredDate value:NO];
 [[Spreedly shared] setParamWithParameter:ValidationParamAllowBlankDate value:NO];
+[[Spreedly shared] setParamWithParameter:ValidationParamAllowInternationalZipCodes value:YES];
 
 CardFormDropInViewController *dropInVC = [[CardFormDropInViewController alloc]
     initWithOtherFields:additionalFields
@@ -191,6 +197,18 @@ UIViewController *secureVC = [dropInVC wrapInSecureViewControllerWithPlaceholder
 ```
 
 Success and failure are delivered via `SpreedlyPaymentDelegate.paymentDidComplete:`, not via `onProcessingResult`.
+
+### Hosted field observability (optional)
+
+**Headless only** — set on each **`SPLTextFieldViewController`** before presentation (not on `CardFormDropInViewController`; express drop-in does not expose per-field callbacks):
+
+- **`onFieldStateChange`** or **`hostedFieldStateListener`** — `HostedFieldState` snapshots (`INPUT`, `FOCUS`, `BLUR`, `VALIDATION`, `PAN_MASK_CHANGED`)
+- **`onFocusChanged`** — focus enter/leave
+- **`onInputLength`** — digit counts for card/CVV
+- **`trailingIconViewFactory`** — custom PAN brand art (`.cardNumber` only)
+- **`onFieldTextChange`** or **`fieldTextChangeListener`** — per-keystroke values (opaque for PAN/CVV; see [custom-payment-forms.md](custom-payment-forms.md#spltextfield-component))
+
+Express checkout: **`onProcessingResult`** plus **`paymentDelegate`** only — see [express-checkout.md](express-checkout.md#callback-system).
 
 ### Themed CardFormDropInViewController
 
@@ -248,6 +266,7 @@ Set validation parameters before creating the view controller. Reads use `[[Spre
 - `ValidationParamAllowBlankName`
 - `ValidationParamAllowExpiredDate`
 - `ValidationParamAllowBlankDate`
+- `ValidationParamAllowInternationalZipCodes` (default `YES` — set `NO` for US numeric ZIP only)
 
 ### Screen Prevention
 
@@ -260,6 +279,63 @@ dropInVC.onProcessingResult = ^(PaymentProcessingResult *result) { /* ... */ };
 UIViewController *secureDropInVC = [dropInVC wrapInSecureViewControllerWithPlaceholderText:@"Payment information is protected"];
 [self presentViewController:secureDropInVC animated:YES completion:nil];
 ```
+
+---
+
+## BankAccountFormDropInViewController
+
+> **ACH preview — do not use in production.** ACH bank-account tokenization is a preview feature. The APIs documented here are available in the SDK but have not completed Spreedly QA and may change in a future release.
+
+UIKit wrapper for the ACH bank-account drop-in form. Renders routing/account fields with secure entry, optional bank name, account type, and holder type, all theme-aware.
+
+### Basic usage
+
+```objc
+BankAccountFieldConfig *config = [[BankAccountFieldConfig alloc]
+    initWithNameDisplayMode:DropInNameDisplayModeSingleField
+    showBankName:NO
+    bankNameLabel:nil
+    bankNameRequired:NO
+    showAccountType:YES
+    accountTypeLabel:nil
+    showAccountHolderType:YES
+    accountHolderTypeLabel:nil];
+
+BankAccountFormDropInViewController *bankVC = [[BankAccountFormDropInViewController alloc]
+    initWithFieldConfig:config
+    onProcessingResult:^(PaymentProcessingResult *result) {
+        if (result.isProcessing) {
+            // Show loading
+        } else if (result.isValidationFailed) {
+            NSLog(@"Validation failed: %@", [result getDescription]);
+        }
+    }];
+
+UIViewController *secureBankVC = [bankVC wrapInSecureViewControllerWithPlaceholderText:@""];
+[self presentViewController:secureBankVC animated:YES completion:nil];
+```
+
+Success/failure are delivered through `SpreedlyPaymentDelegate.paymentDidComplete:` (same channel as cards).
+
+### Headless ACH (no SDK form)
+
+```objc
+NSDictionary *additionalFields = @{ @"full_name": @"Jane Doe", @"email": @"jane@example.com" };
+PaymentProcessingResult *result = [[Spreedly shared]
+    createBankAccountObjCWithAdditionalFields:additionalFields
+    bankAccountType:@"checking"
+    bankAccountHolderType:@"personal"
+    bankName:@"Chase Bank"
+    metadata:@{ @"order_id": @"12345" }
+    allowBlankName:nil
+    shouldRetain:nil];
+```
+
+Pass an empty string for `bankAccountType` / `bankAccountHolderType` to omit them. Routing and account fields must still be entered through `SPLTextField` (or `BankAccountFormDropInViewController`) so the SDK can collect them as secure input.
+
+> **Working example:** Spreedly's iOS sample app ships a headless ACH demo under the Objective-C target. The demo builds the form with `SPLTextFieldViewController` for routing/account/name and a plain `UITextField` for the optional bank name, then calls `createBankAccountObjCWithAdditionalFields:...`.
+
+For full ACH integration details, see [ach-bank-account.md](ach-bank-account.md).
 
 ---
 
@@ -307,12 +383,73 @@ SPLTextFieldViewController *cvcField = [[SPLTextFieldViewController alloc]
     }];
 ```
 
+### SwiftUI vs Objective-C names
+
+SwiftUI uses `SPLTextField`; Objective-C uses `SPLTextFieldViewController` with the same behavior. See the [cross-surface name table](custom-payment-forms.md#same-names-on-swiftui-uikit-and-objective-c).
+
+| SwiftUI | Objective-C / UIKit |
+|---------|---------------------|
+| `onFieldStateChange` | `onFieldStateChange` or `hostedFieldStateListener` |
+| `onChange` | `fieldTextChangeListener` |
+| `trailingIcon` | `trailingIconViewFactory` |
+| `cardNumberFormat` | `cardNumberFormat` (on `CardFormDropInViewController`; `cardNumberFormatRawValue` still accepted) |
+| `hostedCardDisplayState.cardNumberFormat` | `[Spreedly shared].hostedCardDisplayCardNumberFormatRawValue` |
+| `Spreedly.areAllFieldsValid(fieldTypes:)` | `[Spreedly areAllFieldsValidWithFieldTypeRawValues:]` |
+| `getInvalidFieldTypes()` | `[[SpreedlyUIManager shared] getInvalidFieldTypes]` (returns `NSNumber` `FormFieldType` raw values) |
+
 ### Parameters
 
 - **onValidationChange:** Block called when validation state changes.
 - **onSubmit:** Called when user taps the keyboard submit button; use for keyboard navigation.
 - **submitLabel:** `SpreedlySubmitLabelNext` for "Next" (form navigation) or `SpreedlySubmitLabelDone` for final field.
 - **onFocus:** Called when the field gains focus.
+- **onFocusChanged:** Block with `BOOL` — `YES` on focus, `NO` on blur.
+- **onFieldStateChange:** Block with `HostedFieldState *` — merchant-safe snapshots (`INPUT`, `FOCUS`, `BLUR`, `VALIDATION`, `PAN_MASK_CHANGED`); includes **`iin`** (6–8 digit BIN prefix on card number). No raw PAN or CVV.
+- **onInputLength:** Block with digit count for card number or CVV (before secure storage).
+- **hostedFieldStateListener:** Alternative to `onFieldStateChange` — implement `HostedFieldStateListener`.
+- **fieldTextChangeListener:** Per-keystroke processed value (opaque for card/CVC). Implement **`FieldTextChangeListener`** and assign to **`fieldTextChangeListener`** (ObjC: `onFieldTextChanged:text:`). See [custom-payment-forms.md](custom-payment-forms.md#same-names-on-swiftui-uikit-and-objective-c).
+
+### Optional card brand (card number only)
+
+For `FormFieldTypeCardNumber`, set **`trailingIconViewFactory`** to a block that receives the detected scheme string (same values as `CardType`’s `rawValue`, e.g. `@"visa"`, `@"mastercard"`) and returns a sized trailing `UIView` (often an `UIImageView` using images from your bundle). The SDK calls the block again when BIN detection changes. Leave unset to keep the default built-in brand icons.
+
+### PAN mask (card number only)
+
+**Full reference:** [Headless PAN API quick reference](custom-payment-forms.md#headless-pan-api-quick-reference) — UIKit / Objective-C field properties, `HostedFieldStateListener`, `setNumberFormat` / `toggleMask`, and CustomForm-style setup.
+
+On `SPLTextFieldViewController` for card number and CVC: display follows **`toggleMask`** / **`setNumberFormat`** automatically (web / iframe parity). Optional **`forceMaskOnLifecycleStop`** on PAN. Observe mask changes via **`onFieldStateChange`** (`HostedFieldEventTypePanMaskChanged`, **`isPanMasked`**, **`panDisplayFormatRawValue`**, **`panDisplayPolicyMasked`** on card-number events) — use the snapshot for merchant UI; do not read `hostedCardDisplayState` in the same callback. See [What to read for mask UI](custom-payment-forms.md#what-to-read-for-mask-ui) and [PAN/CVV display](custom-payment-forms.md#pancvv-display-iframe-and-web-hosted-field-parity).
+
+**On the main thread** (same as legacy iframe). Use **one** `setNumberFormat` style per format change — not raw value and `WithType:` together for the same layout.
+
+| iframe string | `CardNumberFormat` | `setNumberFormatWithCardNumberFormatRawValue:` |
+|---------------|-------------------|-----------------------------------------------|
+| `prettyFormat` | pretty | `0` |
+| `plainFormat` | plain | `1` |
+| `maskedFormat` | masked | `2` |
+
+```objc
+// Option A — recommended for native ObjC (example app segmented control uses this)
+[[Spreedly shared] setNumberFormatWithCardNumberFormatRawValue:2]; // masked
+
+// Option B — iframe string names (config/backend still sends prettyFormat | plainFormat | maskedFormat)
+[[Spreedly shared] setNumberFormatWithType:@"maskedFormat"];
+
+[[Spreedly shared] toggleMask];
+```
+
+Merchant-owned reveal (recommended — call `toggleMask` from a button, not a switch):
+
+```objc
+- (IBAction)toggleMaskTapped:(id)sender {
+    [[Spreedly shared] toggleMask];
+}
+
+// Read current format / invalid fields (HostedCardDisplayState is Swift-only)
+NSInteger format = [[Spreedly shared] hostedCardDisplayCardNumberFormatRawValue];
+NSArray<NSNumber *> *invalidRaw = [[SpreedlyUIManager shared] getInvalidFieldTypes];
+```
+
+`setNumberFormat` sets PAN display layout and mask flags per format (**`.pretty`** unmasks PAN only — CVV mask preserved; **`.plain`** / **`.masked`** couple PAN + CVV). `toggleMask` switches **Plain+revealed ↔ Masked+hidden** for PAN and CVC (iframe `plainFormat` ↔ `maskedFormat`). Use **`setNumberFormat` with `pretty`** for grouped spaced digits at all times; **`toggleMask` does not select Pretty**. Masked display uses `*`. See [PAN mask and reveal](custom-payment-forms.md#pan-mask-and-reveal-card-number-only).
 
 ### Themed SPLTextFieldViewController
 
@@ -522,7 +659,9 @@ CVVRecachingViewController *recachingVC = [[CVVRecachingViewController alloc]
 
 ### Delegate for Results
 
-Set `[Spreedly shared].paymentDelegate = self` and implement `paymentDidComplete:` to receive the final recaching result. The `onProcessingResult` block receives validation and processing states; the delegate receives success or failure.
+Set `[Spreedly shared].recacheDelegate = self` and implement `recacheDidComplete:` to receive the final recaching result. The `onProcessingResult` block receives validation and processing states; the delegate receives success or failure. Use `paymentDelegate` only for tokenization and other payment flows, not for recache.
+
+> **Swift callers:** use `Spreedly.shared().subscribeToRecacheResults { result in ... }`. **ObjC callers:** use `recacheDelegate` and `recacheDidComplete:` — recache does not fire on `paymentDelegate`.
 
 ---
 
@@ -576,9 +715,9 @@ See [3ds-gateway-specific.md](3ds-gateway-specific.md) for the full flow and set
 
 ## Additional Fields
 
-Use `createCreditCardObjCWithAdditionalFields:metadata:` to create a credit card token with additional fields:
+Use `createCreditCardObjCWithAdditionalFields:metadata:` to create a credit card token with additional fields. Pass `nil` for **`eligibleForCardUpdater`** on **`createCreditCardObjCWithAdditionalFields:metadata:eligibleForCardUpdater:`** to omit the flag, or an `NSNumber` wrapping `YES` / `NO` to set it explicitly.
 
-> **Note:** `createCreditCardObjC(additionalFields:metadata:)` does **not** have a `shouldRetain` parameter, unlike the Swift `createCreditCard` method.
+> **Note:** The two-argument `createCreditCardObjCWithAdditionalFields:metadata:` does **not** have `shouldRetain` or `eligibleForCardUpdater`, unlike the Swift `createCreditCard` method. Use the three-argument overload when you need Account Updater eligibility on the request.
 
 ```objc
 NSDictionary *additionalFields = @{
@@ -608,6 +747,17 @@ if (processingResult.isValidationFailed) {
     }
 }
 ```
+
+**Account Updater (optional):**
+
+```objc
+PaymentProcessingResult *withUpdater = [[Spreedly shared]
+    createCreditCardObjCWithAdditionalFields:additionalFields
+    metadata:metadata
+    eligibleForCardUpdater:@YES];
+```
+
+> **Pre-submit gate:** Before `createCreditCardObjC...`, use `[Spreedly areAllFieldsValidWithFieldTypeRawValues:]` with the `FormFieldType` raw values you care about, or `[[SpreedlyUIManager shared] areAllFieldsValid]` for every registered field. Check `getRegisteredFieldCount` first — zero registered fields means `areAllFieldsValid` returns `YES` (“not mounted yet,” not “valid”). `getInvalidFieldTypes` lists failing fields. Works for headless `SPLTextFieldViewController` and express `CardFormDropInViewController` once fields are on screen. See [Pre-submit validation](custom-payment-forms.md#pre-submit-validation).
 
 ---
 
@@ -692,7 +842,7 @@ NSString *apmValue = [StripeAPMTypeHelper apmTypeValueForType:StripeAPMTypeIdeal
 
 ## EBANX
 
-EBANX supports Pix, Boleto Bancario, OXXO, and NuPay. See `EbanxPaymentFlowViewController` for a full example. Build `OffsitePaymentConfig` with EBANX payment types (`OffsitePaymentMethodTypePix`, `OffsitePaymentMethodTypeBoletoBancario`, `OffsitePaymentMethodTypeOxxo`, `OffsitePaymentMethodTypeNupay`). For Brazil (Pix, Boleto, NuPay), provide a `DocumentId`; for Mexico (OXXO), omit it.
+EBANX supports Pix, Boleto Bancario, OXXO, and NuPay. See the **Example app** class `EbanxPaymentFlowViewController` (not part of the SDK) for a full sample. Build `OffsitePaymentConfig` with EBANX payment types (`OffsitePaymentMethodTypePix`, `OffsitePaymentMethodTypeBoletoBancario`, `OffsitePaymentMethodTypeOxxo`, `OffsitePaymentMethodTypeNupay`). For Brazil (Pix, Boleto, NuPay), provide a `DocumentId`; for Mexico (OXXO), omit it.
 
 ```objc
 [Spreedly shared].paymentDelegate = self;
@@ -833,30 +983,51 @@ Call `BraintreeURLHandlerObjC handleOpenWithUrl:` first when using Braintree; ot
 
 ## Cleanup and Teardown
 
+The SDK has **no** `destroy()` API. When the customer leaves checkout, call `reset`, remove field view controllers, nil delegates, and cancel subscriptions. Step-by-step: [Getting Started — SDK lifecycle](getting-started.md#sdk-lifecycle) (headless checklist and common mistakes).
+
 Proper cleanup prevents memory leaks, dangling delegates, and stale validation state.
 
-### Reset Validation State
+### Reset validation and form state
 
-Call `reset` in `viewWillDisappear:` for custom form views that use `SPLTextFieldViewController`. This stops secure value collection, clears error state, and removes Combine subscriptions. It does **not** reset validation parameters (`allowBlankName`, etc.) -- reset those individually if needed:
+| API | Clears | Keeps |
+|-----|--------|-------|
+| **`resetPaymentFormPreservingDisplayConfig`** | Field values, validation, visible text, card-brand context | **`setNumberFormat` / `toggleMask`** (`hostedCardDisplayState`) |
+| **`resetPaymentState`** / **`reset`** | Everything above **plus** PAN/CVV display back to SDK defaults | Validation params (`setParam`) — re-**`setupWithConfig:`** for new signed auth |
+
+```objc
+// Clear fields but keep mask/format from your UI
+[[Spreedly shared] resetPaymentFormPreservingDisplayConfig];
+
+// Full checkout wipe (same as reset)
+[[Spreedly shared] resetPaymentState];
+```
+
+**Express drop-in:** `CardFormDropInViewController` keeps typed fields on device rotation automatically. Form reset on each open uses **`resetPaymentFormPreservingDisplayConfig`** (mask/format kept). See [When form reset preserving display config runs](custom-payment-forms.md#when-preserving-display-config-reset-runs) and [Express Checkout — Sheet lifecycle](express-checkout.md#sheet-lifecycle).
+
+Call **`resetPaymentState`** (or **`reset`**) in `viewWillDisappear:` for custom form views that use `SPLTextFieldViewController`. This stops secure value collection, clears error state, and removes Combine subscriptions. It does **not** reset validation parameters (`allowBlankName`, etc.) — reset those individually if needed:
 
 ```objc
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
-    [[Spreedly shared] reset];
+    [[Spreedly shared] resetPaymentState];
     [[Spreedly shared] setParamWithParameter:ValidationParamAllowBlankName value:NO];
     [[Spreedly shared] setParamWithParameter:ValidationParamAllowExpiredDate value:NO];
     [[Spreedly shared] setParamWithParameter:ValidationParamAllowBlankDate value:NO];
+    [[Spreedly shared] setParamWithParameter:ValidationParamAllowInternationalZipCodes value:YES];
 }
 ```
 
 ### Nil Delegates in Dealloc
 
-If your view controller sets itself as a delegate (e.g., `paymentDelegate` or `threeDSChallengeDelegate`), nil it in `dealloc` to avoid crashes from dangling references:
+If your view controller sets itself as a delegate (e.g., `paymentDelegate`, `recacheDelegate`, or `threeDSChallengeDelegate`), nil it in `dealloc` to avoid crashes from dangling references:
 
 ```objc
 - (void)dealloc {
     if ([Spreedly shared].paymentDelegate == self) {
         [Spreedly shared].paymentDelegate = nil;
+    }
+    if ([Spreedly shared].recacheDelegate == self) {
+        [Spreedly shared].recacheDelegate = nil;
     }
 }
 ```

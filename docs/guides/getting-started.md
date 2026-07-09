@@ -13,13 +13,14 @@ Set up the Spreedly iOS SDK in your project in under 15 minutes.
 5. [Required Info.plist Entries](#required-infoplist-entries)
 6. [Required App Setup](#required-app-setup)
 7. [Basic Setup](#basic-setup)
-8. [Module Dependency Table](#module-dependency-table)
-9. [Testing and Sandbox](#testing-and-sandbox)
-10. [Payment Methods at a Glance](#payment-methods-at-a-glance)
-11. [Choosing Your Integration Path](#choosing-your-integration-path)
-12. [Conditional Imports for Optional Modules](#conditional-imports-for-optional-modules)
-13. [Next Steps](#next-steps)
-14. [Related Documentation](#related-documentation)
+8. [SDK lifecycle](#sdk-lifecycle)
+9. [Module Dependency Table](#module-dependency-table)
+10. [Testing and Sandbox](#testing-and-sandbox)
+11. [Payment Methods at a Glance](#payment-methods-at-a-glance)
+12. [Choosing Your Integration Path](#choosing-your-integration-path)
+13. [Conditional Imports for Optional Modules](#conditional-imports-for-optional-modules)
+14. [Next Steps](#next-steps)
+15. [Related Documentation](#related-documentation)
 
 ---
 
@@ -68,7 +69,7 @@ struct ExampleCredentials {
 
 ### Use one package version for all Spreedly modules
 
-Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyBraintree**) are released together under **one** version (for example `1.3.7`). Use the **same** resolved version for every Spreedly product in your app.
+Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyBraintree**) are released together under **one** version. Use the **same** resolved version for every Spreedly product in your app — always pick the [latest release tag](https://github.com/spreedly/checkout-ios-package/releases) (the snippets below use **1.4.0** as an example).
 
 ### Option 1: Swift Package Manager (Recommended)
 
@@ -89,7 +90,8 @@ SPM distribution is from a separate repository: `https://github.com/spreedly/che
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.3.7"),
+    // Example minimum version — Xcode resolves to the latest compatible release, or pin an exact tag.
+    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.4.0"),
     // Optional: add when using 3DS Global (Forter) — separate repo:
     // .package(url: "https://bitbucket.org/forter-mobile/forter-ios.git", exact: "2.1.0")
 ],
@@ -139,12 +141,13 @@ Then run `pod install`.
 target 'YourApp' do
   use_frameworks!
 
-  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.7'
-  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.7'
-  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.7'
+  # Example tags — replace with a release from checkout-ios-package.
+  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.0'
+  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.0'
+  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.0'
   # Add these only if needed:
-  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.7'
-  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.3.7'
+  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.0'
+  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.0'
 end
 ```
 
@@ -162,7 +165,7 @@ If you use **SpreedlyStripeAPM** with CocoaPods, you **must** add a `post_instal
 platform :ios, '14.0'
 
 PACKAGE_REPO = 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git'
-PACKAGE_TAG  = '1.3.7'
+PACKAGE_TAG  = '1.4.0'  # example — use a checkout-ios-package release tag
 
 target 'YourApp' do
   use_frameworks!
@@ -265,8 +268,8 @@ Add these only when you need the corresponding features:
 | Feature | Package | URL | Version |
 |---------|---------|-----|---------|
 | 3DS Global | Forter3DS | `https://bitbucket.org/forter-mobile/forter-ios.git` | 2.1.0 (exact) |
-| Stripe APM | SpreedlyStripeAPM | `https://github.com/spreedly/checkout-ios-package` | 1.3.7+ |
-| Braintree (PayPal/Venmo) | SpreedlyBraintree | `https://github.com/spreedly/checkout-ios-package` | 1.3.7+ |
+| Stripe APM | SpreedlyStripeAPM | `https://github.com/spreedly/checkout-ios-package` | 1.4.0+ |
+| Braintree (PayPal/Venmo) | SpreedlyBraintree | `https://github.com/spreedly/checkout-ios-package` | 1.4.0+ |
 
 **Forter3DS (3DS Global):** Required for 3DS authentication. Add Forter3DS directly from Forter's Bitbucket repository. **Do not use** `pod 'SpreedlyForter3DS'` — use the Forter Bitbucket URL below. A dedicated `SpreedlyForter3DS` module is planned for a future release but is not yet available for standard CocoaPods usage.
 
@@ -433,7 +436,9 @@ self.window.rootViewController = secureVC;
 
 The SDK uses a two-step initialization pattern. Both steps are required before any payment operations.
 
-**Important:** `Spreedly.setup(config:)` is mandatory and must be called with `environmentKey`, `forterSiteId` (for 3DS), and signature parameters (`nonce`, `signature`, `certificateToken`, `timestamp`) before any tokenization or payment operation. This includes `createCreditCard()`, `submitOffsitePayment()`, `recachePaymentMethod()`, presenting `CardFormDropIn`, and any 3DS challenge flows. `Spreedly.initializeSDK()` alone is not sufficient.
+**Important:** `Spreedly.setup(config:)` is mandatory and must be called with `environmentKey`, `forterSiteId` (for 3DS), and signature parameters (`nonce`, `signature`, `certificateToken`, `timestamp`) before any tokenization or payment operation. This includes `createCreditCard()`, `createBankAccount()`, `submitOffsitePayment()`, `recachePaymentMethod()`, presenting `CardFormDropIn` or `BankAccountFormDropIn`, and any 3DS challenge flows. `Spreedly.initializeSDK()` alone is not sufficient.
+
+> **Ready / initialized:** `Spreedly.isInitialized` is `true` only after **`setup(config:)`** with a full signed bundle from your server (`environmentKey`, `nonce`, `signature`, `certificateToken`, `timestamp`). It is **`false`** after **`initializeSDK()`** alone. It is `false` when initialization was blocked (`Spreedly.initializationError`, `Spreedly.isDeviceTrusted`). Full lifecycle: [SDK lifecycle](#sdk-lifecycle).
 
 ### Step 1: Initialize SDK at App Launch
 
@@ -548,6 +553,155 @@ func fetchSignatureFromBackend() async throws -> SignatureParameters {
 
 Call `configureSpreedly()` before presenting any payment form or initiating any payment operation (for example, when the user navigates to checkout).
 
+---
+
+## SDK lifecycle
+
+How to initialize the SDK, show checkout, leave checkout safely, and refresh credentials — without a web-style `destroy()` API.
+
+### The one rule
+
+The SDK stays alive for your whole app session (`Spreedly.shared()`). You **start** it once, **configure** it with signed credentials from your server, **reset** payment data when the customer leaves checkout, and **call `setup(config:)` again** when you need a new nonce/signature. You do **not** tear the SDK down between checkouts.
+
+### Lifecycle in five steps
+
+```text
+1. App launch      → initializeSDK() at startup
+2. Before checkout → setup(config:) with fresh nonce/signature from YOUR server
+3. Show checkout   → CardFormDropIn (express) or SPLTextField (custom UI)
+4. Leave checkout  → reset() + your UI cleanup (see checklist below)
+5. Next checkout   → fetch new signed auth → setup(config:) again if needed
+```
+
+### Merchant checklist — every integration
+
+| When | Do this |
+|------|---------|
+| **App launch** | `Spreedly.initializeSDK()` in `App` init or `AppDelegate` |
+| **User opens checkout** | Fetch signature params from your backend, then `Spreedly.setup(config:)` with `environmentKey`, `nonce`, `signature`, `certificateToken`, `timestamp` (and `forterSiteId` if you use 3DS) |
+| **User leaves checkout** | See [Headless](#headless-custom-form-spltextfield) or [Express](#express-checkout-cardformdropin) below |
+| **New payment session** (new nonce) | Call `setup(config:)` again with the new values — no destroy step |
+| **Device blocked** (jailbreak, etc.) | Check `Spreedly.isDeviceTrusted` and `Spreedly.initializationError`; show fallback UI |
+
+### Headless custom form (`SPLTextField`)
+
+You own the screen lifecycle. When the customer leaves checkout:
+
+1. **`Spreedly.shared().reset()`** (same as `resetPaymentState()`) — clears card data, field errors, visible field text, and PAN/CVV mask state.
+2. **Cancel** your `subscribeToPaymentResults` subscription (`AnyCancellable?.cancel()`).
+3. **Remove** `SPLTextFieldViewController` children from the view hierarchy.
+4. **Nil** any delegates you set (`paymentDelegate`, `recacheDelegate`, `threeDSChallengeDelegate`) if the view controller is going away.
+
+If you changed validation rules with `setParam` (e.g. `allowBlankName`), **`reset()` does not undo those** — set them again if the next checkout needs defaults.
+
+### Express checkout (`CardFormDropIn`)
+
+The drop-in **clears card data for you** when the sheet opens and closes. You still manage credentials and optional full wipes:
+
+| Situation | What you do |
+|-----------|-------------|
+| **Normal open/close** | Present/dismiss the sheet — SDK clears values and errors automatically. Your `setNumberFormat` / `toggleMask` choices **outside** the sheet are kept. |
+| **Device rotation** (landscape ↔ portrait, sheet stays open) | Typed fields stay — no merchant API. [Express Checkout — Sheet lifecycle](express-checkout.md#sheet-lifecycle). |
+| **Clear form, keep mask/format** | **`resetPaymentFormPreservingDisplayConfig()`** — you call it, or express runs it on **sheet open**. [When it runs](custom-payment-forms.md#when-preserving-display-config-reset-runs). |
+| **Wipe everything** (fields + mask format) | Call `reset()` from your code when you need a full clean slate. |
+| **New signed auth** | `setup(config:)` with a new bundle from your server — same as headless. |
+
+You do **not** need to call `reset()` on every dismiss unless you want to clear mask/format state too.
+
+### `isInitialized` — when to use it
+
+| Value | Meaning | What to show |
+|-------|---------|--------------|
+| `false` | No signed session, `initializeSDK()` only, or init was blocked | Loading or “payments unavailable”; call `setup(config:)` with server auth; check `initializationError` when blocked |
+| `true` | Signed session configured (`setup` with full auth bundle) | You **may** show checkout |
+
+**Do not** treat `initializeSDK()` alone as “ready to pay” — `isInitialized` stays `false` until signed **`setup(config:)`**.
+
+Legacy iframe **`ready`** maps to **`isInitialized`** after signed **`setup`**, not a separate callback.
+
+### `reset()` — what changes and what does not
+
+**Cleared** (safe for the next customer on the same device):
+
+- Card number, CVV, and other secure field values
+- Validation errors on the form
+- Visible text in `SPLTextField` fields
+- PAN/CVV mask and display format (back to defaults)
+
+**Not cleared** (by design):
+
+- The SDK itself — `isInitialized` stays `true`
+- Your `environmentKey` and signing fields — use `setup(config:)` with a new nonce/signature from your server
+- Validation toggles from `setParam` — change them explicitly if needed
+- Subscriptions you created with `subscribeToPaymentResults` — **you** must cancel those
+
+### No `destroy()` (web iframe habit)
+
+iOS has no `Spreedly.destroy()`. If you integrated web iframe before:
+
+| Web iframe | iOS SDK |
+|------------|---------|
+| `ready` | `isInitialized` after signed `setup(config:)` |
+| `reload()` | `reset()` or `resetPaymentState()` |
+| Remove iframe / destroy | `reset()` + remove native fields; SDK stays in memory |
+| New signed bundle | `setup(config:)` again |
+| `removeHandlers()` | Cancel your Combine subscriptions |
+
+See [Migration from legacy iframe-ui](migration/from-legacy.md).
+
+### SwiftUI example — headless checkout
+
+```swift
+struct CheckoutView: View {
+    @State private var isConfigured = false
+    @State private var paymentCancellable: AnyCancellable?
+
+    var body: some View {
+        // SPLTextField fields…
+        Button("Pay") { Spreedly.shared().createCreditCard(...) }
+            .disabled(!isConfigured)
+    }
+    .task {
+        // Fetch nonce/signature from your server, then:
+        await configureSpreedlyWithFreshAuth()
+        isConfigured = true
+    }
+    .onAppear {
+        paymentCancellable = Spreedly.shared().subscribeToPaymentResults { result in
+            // PaymentResult — callbacks run on the main thread
+        }
+    }
+    .onDisappear {
+        paymentCancellable?.cancel()
+        paymentCancellable = nil
+        Spreedly.shared().reset()
+    }
+}
+```
+
+Objective-C: `[[Spreedly shared] reset]` in `viewWillDisappear:`, remove child field view controllers, nil delegates — [Objective-C — Cleanup and Teardown](objective-c.md#cleanup-and-teardown).
+
+### Common mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Showing checkout after `initializeSDK()` only | Call `setup(config:)` with server-signed auth first |
+| Using `isInitialized` as “credentials are valid” | Track successful `setup` in your app, or fetch auth before presenting checkout |
+| Expecting `reset()` to fetch a new nonce | Fetch from your server, then `setup(config:)` |
+| Expecting `reset()` to cancel payment subscriptions | Cancel your own `AnyCancellable` in `onDisappear` |
+| Calling `destroy()` or re-creating the SDK | Not needed — `reset()` + `setup(config:)` |
+| Headless: leaving fields mounted after dismiss | `reset()` + remove `SPLTextFieldViewController` children |
+| Express: calling `reset()` on every dismiss thinking it’s required | Optional — drop-in already clears card data on open/close |
+
+### More detail
+
+- [Custom Payment Forms](custom-payment-forms.md) — headless fields and mask APIs
+- [Express Checkout](express-checkout.md) — sheet open, dismiss, rotation
+- [Error Handling](error-handling.md) — subscriptions and delegates
+- [Troubleshooting](troubleshooting.md) — `isInitialized` false, blocked device
+
+---
+
 #### React Native Bridge Setup
 
 If you are integrating the iOS SDK through a React Native bridge, you **must** pass `sdkPlatform: .reactNative` so the SDK correctly identifies the integration surface in telemetry and in the `source` field on all payment method creation requests:
@@ -588,7 +742,7 @@ Spreedly.setup(config: config)
 ```
 
 When enabled, the SDK automatically:
-- Auto-dismisses `CardFormDropIn`, `CVVRecachingView`, and `DoChallengeIfNeeded` sheets
+- Auto-dismisses `CardFormDropIn`, `SpreedlyCVVRecachingView`, and `DoChallengeIfNeeded` sheets
 - Returns `PaymentResult.failure` / `ThreeDSChallengeResult.failure` through existing publishers
 - Blocks all network requests without leaving the device
 
@@ -618,7 +772,7 @@ For full details — per-component behavior, error handling patterns, and testin
 
 ### Logging & Observability (Optional)
 
-The SDK provides a full logging API matching the Android SDK for cross-platform parity.
+The SDK provides a full logging API with console and Datadog levels (see [Logging & Observability](#logging--observability-optional) below).
 
 **Quick preset (recommended):**
 
@@ -689,17 +843,6 @@ Spreedly.setLogger(nil)
 ```
 
 **React Native:** Set `sdkPlatform` to `.reactNative` in `SpreedlyConfig` so telemetry events and payment method `source` fields are tagged correctly. All logging APIs above work the same from the native bridge.
-
-> **SDK developers: Datadog logging behavior**
->
-> The Datadog logger defaults to `.debug` level when `DatadogConfig.clientToken` is non-empty. Diagnostic logs and structured telemetry events (e.g. `sdk_initialized`, `tokenization_success`) flow to Datadog immediately without any merchant call. If you see no logs reaching Datadog, check these in order:
->
-> 1. **Client token is empty** — `DatadogConfig.clientToken` is `""` in local builds. CI overwrites it; for local testing you must set it manually.
-> 2. **Datadog modules not linked** — the `#if canImport(DatadogCore) && canImport(DatadogLogs)` guard strips all Datadog code if the packages are missing from the target.
-> 3. **Log level set to `.none`** — calling `setDatadogLogLevel(.none)` silences all logs _and_ telemetry events because `emitEvent()` respects the same level gate.
-> 4. **Early events dropped** — telemetry events like `sdk_initialized` fire during `Spreedly.initializeSDK()`. If a caller resets the Datadog log level to `.none` before that point, these events are lost. The default `.debug` level prevents this.
->
-> These conditions apply equally to the native iOS SDK and the React Native bridge.
 
 See [Security — Logging Security](security.md#logging-security) for production recommendations and PCI compliance details.
 
@@ -988,6 +1131,7 @@ Switch between environments by changing the `environmentKey` in `SpreedlyConfig`
 | **Braintree** | PayPal, Venmo | `SpreedlyBraintree` | No | Native Braintree UI | Nonce |
 | **EBANX** | Pix, Boleto, OXXO, NuPay | `SpreedlyUI` (offsite) | Yes | Safari | Token |
 | **Offsite** | PayPal, Sprel | `SpreedlyUI` (offsite) | Yes | Safari | Token |
+| **ACH (Bank Account)** _(preview — not yet released)_ | US ABA + Canadian routing | `SpreedlyCore` + `SpreedlyUI` | Yes | `BankAccountFormDropIn` (drop-in) or custom | Token |
 | **Gateway-Specific 3DS** | Card (e.g. Worldpay) | `SpreedlyCore` | N/A | Safari (challenge) | Transaction result |
 
 ### Backend Requirements Quick Reference
@@ -1010,6 +1154,8 @@ See each gateway's integration guide for full backend request examples and SDK c
 |------|-------|
 | Pre-built payment form, minimal code | [Express Checkout](express-checkout.md) |
 | Custom field layout and brand-specific UI | [Custom Payment Forms](custom-payment-forms.md) |
+| ACH bank-account tokenization (US/Canada) _(preview — not yet released; do not use in production)_ | [ACH Bank Account](ach-bank-account.md) |
+| Migrating from web iframe-ui | [Migration from legacy iframe-ui](migration/from-legacy.md) |
 | 3D Secure authentication (multi-gateway) | [3DS Global](3ds-global.md) |
 | 3D Secure with gateway-specific flow (e.g. Worldpay) | [3DS Gateway-Specific](3ds-gateway-specific.md) |
 | PayPal / Sprel via Safari redirect | [Offsite Payments](offsite-payments.md) |
@@ -1049,7 +1195,7 @@ When you need to reset SDK state — for example, on user logout, environment sw
 Spreedly.shared().reset()
 ```
 
-This clears internal state (secure collection, validation errors, Combine subscriptions on the instance) and resets validation parameters. The SDK singleton and configuration remain intact -- you do not need to call `initializeSDK()` or `setup(config:)` again. Re-subscribe to `paymentResultPublisher` if your previous subscriptions were cancelled.
+This clears internal state (secure collection, validation errors, visible field text, and PAN/CVV mask state). Validation parameters set via `setParam` are **not** reset — restore defaults manually if needed. The SDK singleton and configuration remain intact; you do not need to call `initializeSDK()` again. Cancel your own `AnyCancellable` instances from `subscribeToPaymentResults` in `onDisappear` — `reset()` does not cancel merchant-held subscriptions.
 
 If you only need to reset validation parameters (e.g., to allow re-submission after a validation failure), use:
 
@@ -1057,6 +1203,7 @@ If you only need to reset validation parameters (e.g., to allow re-submission af
 Spreedly.shared().setParam(parameter: .allowBlankName, value: false)
 Spreedly.shared().setParam(parameter: .allowExpiredDate, value: false)
 Spreedly.shared().setParam(parameter: .allowBlankDate, value: false)
+Spreedly.shared().setParam(parameter: .allowInternationalZipCodes, value: true)
 ```
 
 This clears cached validation state without requiring full reinitialization.
@@ -1084,6 +1231,7 @@ Use this before shipping to production users. Details live in the linked guides 
 
 - **[Express Checkout Guide](express-checkout.md)** -- Integrate the pre-built `CardFormDropIn` payment form
 - **[Custom Fields Guide](custom-payment-forms.md)** -- Build custom payment forms with `SPLTextField`
+- **[Migration from legacy iframe-ui](migration/from-legacy.md)** -- Map iframe `ready`, `validate`, `fieldEvent`, and mask APIs to iOS
 
 ---
 
@@ -1093,6 +1241,8 @@ Use this before shipping to production users. Details live in the linked guides 
 |-------|-------------|
 | [express-checkout.md](express-checkout.md) | Pre-built CardFormDropIn payment form integration |
 | [custom-payment-forms.md](custom-payment-forms.md) | Building custom payment forms with SPLTextField |
+| [ach-bank-account.md](ach-bank-account.md) | ACH (US/Canada) bank-account tokenization |
+| [migration/from-legacy.md](migration/from-legacy.md) | iframe-ui to native hosted fields (state, mask, validation) |
 | [3ds-global.md](3ds-global.md) | 3DS Global (Forter) authentication flow |
 | [offsite-payments.md](offsite-payments.md) | Offsite payments (PayPal, Sprel) via Safari |
 | [stripe-apm.md](stripe-apm.md) | Stripe APM (iDEAL, Bancontact, EPS, P24, SEPA) |

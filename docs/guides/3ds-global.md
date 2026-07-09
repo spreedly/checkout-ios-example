@@ -50,7 +50,7 @@ Add 3D Secure authentication to protect against fraudulent card payments.
 
 ### Forter3DS Dependency (Required)
 
-The Forter3DS dependency **MUST** be added to your app target. Without it, the app will crash when 3DS is required.
+Add the Forter3DS dependency to your app target. Without it, `DoChallengeIfNeeded` renders a fallback "3DS unavailable" view and publishes a `ThreeDSChallengeResult` with `isFailure == true` for any transaction that requires global 3DS — the app does not crash.
 
 > **Module note:** A dedicated `SpreedlyForter3DS` module is planned for a future release. Today, merchants add the third-party `Forter3DS` framework directly (see options below).
 
@@ -88,7 +88,7 @@ targets: [
 ]
 ```
 
-**Without Forter3DS:** The app will crash with `dyld: Library not loaded: Forter3DS` when 3DS is required.
+**Without Forter3DS at runtime:** If the framework is **not linked** to your target, `DoChallengeIfNeeded` shows a "3DS unavailable" fallback view and publishes a `ThreeDSChallengeResult` with `isFailure == true`. If the framework is **linked but not embedded** in the app bundle, the dynamic loader fails to find the Forter3DS binary at app launch — verify it is added to your app target's **Frameworks, Libraries, and Embedded Content**.
 
 If Forter3DS is an optional dependency, use `#if canImport(Forter3DS)` to conditionally import it.
 
@@ -328,7 +328,9 @@ Pass `transaction.token` to `DoChallengeIfNeeded` in the app. The SDK handles co
 
 **Note:** Do **not** pass `attempt_3dsecure: true` for the global (Forter) flow. That parameter is only for gateway-specific 3DS (see [3ds-gateway-specific.md](3ds-gateway-specific.md)).
 
-> When calling purchase for global 3DS, pass `useGatewaySpecific3DS: false` (or omit it) in your backend request to ensure the Forter-based global flow is used instead of gateway-specific 3DS.
+> Global 3DS uses the Forter integration configured on your Spreedly gateway. **Do not** set `attempt_3dsecure` on the purchase request — that flag opts in to gateway-specific 3DS instead.
+>
+> `DoChallengeIfNeeded` automatically detects which flow to run based on the transaction status returned by your backend: if the status carries a `managed_order_token`, it runs the global Forter flow; if it carries a `required_action`, it runs the gateway-specific flow. Merchants generally do not need to choose between them in client code.
 
 ---
 

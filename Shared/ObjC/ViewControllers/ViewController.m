@@ -17,6 +17,8 @@
 #import "EbanxPaymentFlowViewController.h"
 #import "StripeAPMPaymentFlowViewController.h"
 #import "BraintreePaymentFlowViewController.h"
+#import "BankAccountCheckoutViewController.h"
+#import "BankAccountCustomFormViewController.h"
 #import "ThemeHelper.h"
 #import <SpreedlyCore/SpreedlyCore-Swift.h>
 
@@ -168,6 +170,18 @@
             @"subtitle": @"PayPal and Venmo payments via Braintree gateway",
             @"class": [BraintreePaymentFlowViewController class],
             @"accessibilityId": @"braintree-payment-flow-navigation-link"
+        },
+        @{
+            @"title": @"ACH Bank Account Drop-In",
+            @"subtitle": @"Preview only — ACH will not ship in 1.4.0. Do not use in production.",
+            @"class": [BankAccountCheckoutViewController class],
+            @"accessibilityId": @"bank-account-checkout-navigation-link"
+        },
+        @{
+            @"title": @"ACH Bank Account – Custom Form",
+            @"subtitle": @"Preview only — headless ACH sample; not for production in 1.4.0.",
+            @"class": [BankAccountCustomFormViewController class],
+            @"accessibilityId": @"bank-account-custom-form-navigation-link"
         }
     ];
 }

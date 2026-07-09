@@ -89,7 +89,7 @@ The SDK methods are the same as standard offsite payments:
 
 ## EBANX Purchase API (Backend)
 
-> The example app uses `PurchaseAPIClient` (see `API/PurchaseAPIClient.swift`). In production, replace this with your own backend endpoint.
+> The example app uses an in-app HTTP client to talk to a sample purchase server. In production, replace this with a call to your own backend.
 
 Your backend purchase call to Spreedly must include EBANX gateway-specific fields.
 
@@ -408,7 +408,10 @@ class EbanxPaymentViewController: UIViewController, SpreedlyPaymentDelegate {
                     } else if result.state == "processing" {
                         self.showSuccess("Payment accepted and is being processed. Final confirmation may take a few days.")
                     } else if result.state == "pending" {
-                        self.showError("Your payment is pending. Please try again shortly.")
+                        // Pending offsite payments (Pix, Boleto, NuPay, OXXO) finish
+                        // out-of-band — treat as success and let the merchant backend
+                        // poll for the final state.
+                        self.showSuccess("Payment submitted. Awaiting final confirmation from the payment provider.")
                     } else {
                         self.showError(result.failureDetails?.getDescription() ?? "EBANX checkout failed")
                     }

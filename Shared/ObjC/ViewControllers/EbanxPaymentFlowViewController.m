@@ -88,6 +88,21 @@ typedef NS_ENUM(NSInteger, EbanxStage) {
     [self updateStageIndicator];
 }
 
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [self cleanupPaymentDelegate];
+}
+
+- (void)dealloc {
+    [self cleanupPaymentDelegate];
+}
+
+- (void)cleanupPaymentDelegate {
+    if ([Spreedly shared].paymentDelegate == self) {
+        [Spreedly shared].paymentDelegate = nil;
+    }
+}
+
 #pragma mark - Currency
 
 - (NSString *)currentCurrencyCode {

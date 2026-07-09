@@ -154,6 +154,7 @@ struct EbanxPaymentFlowView: View {
         .onAppear {
             setupSubscriptions()
         }
+        .onDisappear(perform: cleanupSubscriptions)
     }
     
     // MARK: - Header
@@ -322,6 +323,11 @@ struct EbanxPaymentFlowView: View {
         paymentResultCancellable = Spreedly.shared().subscribeToPaymentResults { result in
             handlePaymentResult(result)
         }
+    }
+
+    private func cleanupSubscriptions() {
+        paymentResultCancellable?.cancel()
+        paymentResultCancellable = nil
     }
     
     // MARK: - Flow

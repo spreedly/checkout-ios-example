@@ -19,6 +19,21 @@
 
 @end
 
+/// Braintree `gateway_specific_fields.braintree` for create-purchase (matches Swift PurchaseAPIClient).
+static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodType(NSString *paymentMethodType) {
+    NSString *type = [(paymentMethodType ?: @"") lowercaseString];
+    if ([type isEqualToString:@"venmo"]) {
+        return @{
+            @"venmo_flow_type": @"multi_use",
+            @"venmo_profile_id": @"12345"
+        };
+    }
+    if ([type isEqualToString:@"paypal"]) {
+        return @{ @"paypal_flow_type": @"checkout" };
+    }
+    return nil;
+}
+
 @implementation PurchaseAPIClient
 
 - (instancetype)initWithConfig:(ServerConfig *)config {
@@ -527,12 +542,12 @@
                  paymentMethodType:(NSString *)paymentMethodType
                         completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion {
     NSString *baseURLString = [self.config.baseURL hasSuffix:@"/"] ? [self.config.baseURL substringToIndex:self.config.baseURL.length - 1] : self.config.baseURL;
-    NSString *urlString = [NSString stringWithFormat:@"%@/braintree-purchase", baseURLString];
+    NSString *urlString = [NSString stringWithFormat:@"%@/create-purchase", baseURLString];
     NSURL *url = [NSURL URLWithString:urlString];
 
     if (!url) {
         if (completion) {
-            NSError *error = [NSError errorWithDomain:@"PurchaseAPIError" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Invalid braintree-purchase API URL"}];
+            NSError *error = [NSError errorWithDomain:@"PurchaseAPIError" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Invalid create-purchase API URL"}];
             completion(nil, error);
         }
         return;
@@ -546,13 +561,26 @@
         [urlRequest setValue:[NSString stringWithFormat:@"Bearer %@", self.config.apiKey] forHTTPHeaderField:@"Authorization"];
     }
 
-    NSDictionary *requestBody = @{
+    NSMutableDictionary *transaction = [@{
         @"amount": @([amount doubleValue]),
-        @"currency_code": currencyCode ?: @"",
+        @"currency_code": currencyCode ?: @"USD",
         @"redirect_url": redirectUrl ?: @"",
         @"callback_url": callbackUrl ?: @"",
         @"channel": @"app",
-        @"payment_method_type": paymentMethodType ?: @""
+        @"payment_method": @{
+            @"payment_method_type": paymentMethodType ?: @"paypal",
+            @"offsite_sync": @YES
+        }
+    } mutableCopy];
+
+    NSDictionary *braintreeGSF = BraintreeGatewaySpecificFieldsForPaymentMethodType(paymentMethodType);
+    if (braintreeGSF != nil) {
+        transaction[@"gateway_specific_fields"] = @{ @"braintree": braintreeGSF };
+    }
+
+    NSDictionary *requestBody = @{
+        @"gateway": @"braintree",
+        @"transaction": transaction
     };
 
     NSError *jsonError = nil;
@@ -602,6 +630,7 @@
                                        state:(NSString *)state
                                        nonce:(NSString *)nonce
                                   deviceData:(NSString *)deviceData
+                                     message:(NSString *)message
                            paymentMethodType:(NSString *)paymentMethodType
                                   completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion {
     NSString *baseURLString = [self.config.baseURL hasSuffix:@"/"] ? [self.config.baseURL substringToIndex:self.config.baseURL.length - 1] : self.config.baseURL;
@@ -626,9 +655,14 @@
 
     NSMutableDictionary *requestBody = [NSMutableDictionary dictionaryWithDictionary:@{
         @"state": state ?: @"Successful",
-        @"nonce": nonce ?: @"",
         @"payment_method_type": paymentMethodType ?: @""
     }];
+    if (nonce.length > 0) {
+        requestBody[@"nonce"] = nonce;
+    }
+    if (message.length > 0) {
+        requestBody[@"message"] = message;
+    }
     if (deviceData.length > 0) {
         requestBody[@"device_data"] = deviceData;
     }

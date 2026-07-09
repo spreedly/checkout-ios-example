@@ -302,7 +302,7 @@ func handlePaymentResult(_ result: PaymentResult) {
 }
 
 // 4. Purchase on your backend, then present checkout
-// The example app uses PurchaseAPIClient (see API/PurchaseAPIClient.swift).
+// The example app uses an in-app HTTP client to talk to a sample purchase server.
 // In production, replace this with your own backend endpoint.
 func purchaseWithToken(_ paymentMethodToken: String) async {
     let response = try? await yourBackend.offsitePurchase(

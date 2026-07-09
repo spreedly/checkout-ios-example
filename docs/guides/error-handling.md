@@ -123,6 +123,8 @@ Values used in `PaymentProcessingResult.invalidFields` and for field-level valid
 | `.city` | City |
 | `.state` | State/Province |
 | `.zipCode` | Postal/ZIP code |
+| `.routingNumber` | Bank routing number (ACH) |
+| `.accountNumber` | Bank account number (ACH) |
 
 ### PaymentValidationError
 
@@ -384,6 +386,8 @@ If the challenge times out, the result will typically be a failure with a networ
 
 **Solution:** Call `Spreedly.setup(config:)` with valid credentials before any payment operation. Ensure setup runs at app launch or before presenting payment UI.
 
+**Readiness check:** `Spreedly.isInitialized` is `true` when the SDK instance exists. It is **not** proof that signed credentials are loaded — call `setup(config:)` before checkout. It stays `false` when init was blocked — use `Spreedly.initializationError` and `Spreedly.isDeviceTrusted`. See [SDK lifecycle](getting-started.md#isinitialized--when-to-use-it). **Leave checkout / reset:** [SDK lifecycle](getting-started.md#sdk-lifecycle).
+
 ### Missing Configuration (`setup` Not Called)
 
 If you call `Spreedly.shared()` without first calling `Spreedly.setup(config:)`, the SDK auto-initializes with a default (empty) configuration and logs a warning. Subsequent API calls (e.g., `createCreditCard`, `submitOffsitePayment`) will fail because the environment key is missing.
@@ -527,7 +531,7 @@ The examples use the simple `failureDetails.getDescription()` pattern for displa
 | 3DS challenge never appears | Forter3DS SDK not linked, or `#if canImport` not used | Verify `Forter3DS` is added via SPM/CocoaPods; see [3DS Global](3ds-global.md) |
 | Screen prevention blocks screenshots in Simulator | `ScreenPreventionSecureView` is active | This is expected behavior; disable in debug builds if needed; see [Security](security.md) |
 | Blank form fields / empty `SPLTextField` | `blockJailbrokenDevices` is enabled and device failed integrity checks | Check `Spreedly.isDeviceTrusted`; drop-in components auto-dismiss, but custom forms must handle this — see [Custom Payment Forms](custom-payment-forms.md#prerequisites) |
-| SDK returns `.compromisedDevice` error | Device blocked by `SecurityManager` | `Spreedly.initializationError` has the details; see [Security — Runtime Integrity](security.md#runtime-integrity) |
+| SDK blocked by device integrity check | `blockJailbrokenDevices` enabled and device failed checks | Check `Spreedly.isDeviceTrusted` and `Spreedly.initializationError` (init-time block). Runtime blocked flows publish `PaymentResult.failure` on `subscribeToPaymentResults` — see [Security — Runtime Integrity](security.md#runtime-integrity) |
 
 ### What you can share with Spreedly Support
 

@@ -67,7 +67,7 @@ NS_ASSUME_NONNULL_BEGIN
                                 apmTypes:(NSArray<NSString *> *)apmTypes
                               completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion;
 
-/// Braintree purchase (POST {baseURL}/braintree-purchase).
+/// Braintree purchase (POST {baseURL}/create-purchase, gateway "braintree").
 - (void)braintreePurchaseWithAmount:(NSDecimalNumber *)amount
                       currencyCode:(NSString *)currencyCode
                        redirectUrl:(NSString *)redirectUrl
@@ -76,10 +76,12 @@ NS_ASSUME_NONNULL_BEGIN
                         completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion;
 
 /// Braintree confirm (POST {baseURL}/transactions/{token}/confirm).
+/// Successful: nonce (+ optional deviceData). Failed/Cancelled: message (no nonce).
 - (void)braintreeConfirmWithTransactionToken:(NSString *)transactionToken
                                        state:(NSString *)state
-                                       nonce:(NSString *)nonce
+                                       nonce:(nullable NSString *)nonce
                                   deviceData:(nullable NSString *)deviceData
+                                     message:(nullable NSString *)message
                            paymentMethodType:(NSString *)paymentMethodType
                                   completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion;
 

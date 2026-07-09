@@ -77,16 +77,13 @@ Stripe APM lives in **SpreedlyStripeAPM**; PaymentSheet and its resources are pa
 
 There is no separate `StripePaymentSheet` dependency to add. SPM and CocoaPods both pull **SpreedlyStripeAPM** only; Stripe is built in. Add Stripe's own package or pod only if your app uses Stripe APIs outside Spreedly.
 
-### CocoaPods: Stripe Bundle Patcher
+### CocoaPods: Stripe Bundle Patcher {#cocoapods-stripe-bundle-patcher}
 
-**Current releases:** You do **not** need a `post_install` bundle patcher. Stripe resource bundles are generated during the Spreedly build and embedded in `SpreedlyStripeAPM.xcframework`. The `cocoapods_stripe_bundle_patcher.rb` script remains in the pod for backward compatibility; on new SDK versions it does nothing.
+If you use **SpreedlyStripeAPM** with CocoaPods, you **must** add a `post_install` block so Stripe resource bundles are copied with the names the SDK expects. Without this, the app will crash at runtime with `Fatal error: unable to find bundle named Stripe_StripePaymentSheet`.
 
-<details>
-<summary>Legacy SDK versions (older Spreedly Stripe APM + CocoaPods)</summary>
+**SPM users do not need this step** — when you add `SpreedlyStripeAPM` via SPM, `StripePaymentSheet` is resolved as a transitive dependency automatically and bundles already use the correct names.
 
-Older builds expected CocoaPods bundle names to match what an SPM-linked XCFramework looked for, so apps had to run a small `post_install` patch.
-
-**SPM users:** This was never required for SPM.
+**Why this is needed:** The Spreedly `SpreedlyStripeAPM` XCFramework is built against Stripe via SPM, which produces resource bundles named `Stripe_StripePaymentSheet`. When merchants install through CocoaPods, bundle names differ (`StripePaymentSheet_StripePaymentSheet`). The patcher renames/copies bundles so the embedded XCFramework finds them at runtime.
 
 Add the following to your Podfile (after your `pod` declarations), then run `pod install`:
 
@@ -107,13 +104,11 @@ post_install do |installer|
 end
 ```
 
-The `cocoapods_stripe_bundle_patcher.rb` script is shipped inside the `SpreedlyStripeAPM` pod via `preserve_paths`. The `installer.sandbox.pod_dir('SpreedlyStripeAPM')` call locates the script automatically — no manual file copy, submodule, or path setup needed. This works for both remote (`:git =>`) and local (`:path =>`) pod installs.
+The `cocoapods_stripe_bundle_patcher.rb` script is shipped inside the `SpreedlyStripeAPM` pod via `preserve_paths`, so `installer.sandbox.pod_dir('SpreedlyStripeAPM')` locates it automatically — no manual file copy or path setup needed. This works for both remote (`:git =>`) and local (`:path =>`) pod installs.
 
 The script patches the Pods embed script and adds a "Copy Stripe bundle for SPM" Run Script phase to your app target so all required Stripe bundles are present with SPM-expected names at runtime.
 
 **React Native (checkout-react-native):** The RN Podfile's `apply_spreedly_stripe_support` uses the same sandbox-based lookup to find the patcher script automatically.
-
-</details>
 
 ---
 
@@ -146,7 +141,8 @@ After the user completes authentication in Safari (e.g., iDEAL bank auth), they 
 ### redirect_url vs returnURL Clarification
 
 - **Backend `redirect_url`** (in the purchase API): Can be either a **Spreedly-hosted URL** (e.g. `https://spreedly.com/stripe-apm/redirect`) or your **custom scheme** (e.g. `myapp://stripe-redirect`).
-- **`StripeAPMConfig.returnURL`**: Your app's **custom URL scheme** (e.g. `myapp://stripe-redirect`). This must match the scheme registered in `Info.plist` under `CFBundleURLTypes`.
+- **`StripeAPMConfig.returnURL`**: Your app's **custom URL scheme base** (e.g. `myapp://stripe-redirect`). This must match the scheme registered in `Info.plist` under `CFBundleURLTypes`.
+- **Token appended automatically:** When the SDK presents the Stripe PaymentSheet, it appends `transaction_token={token}` as a query parameter to your `returnURL` (joined with `?` or `&` depending on the URL). Register the **base** scheme/path in `Info.plist`; the SDK handles the token parameter for you.
 - **Example app:** The Spreedly example app uses a Spreedly-hosted URL for the backend `redirect_url` and a custom scheme for `returnURL`.
 
 ---
@@ -156,7 +152,7 @@ After the user completes authentication in Safari (e.g., iDEAL bank auth), they 
 | # | Method | Module | Purpose |
 |---|--------|--------|---------|
 | 1 | Backend: create pending purchase | Merchant backend | Get `client_secret` and `transaction_token` |
-| 2 | `SpreedlyStripeAPMCheckout.present(config:)` / `present(config:from:)` | SpreedlyStripeAPM | Present Stripe PaymentSheet. The no-argument variant finds the topmost VC automatically. Use `present(config:from:)` to specify the presenting view controller. |
+| 2 | `SpreedlyStripeAPMCheckout.present(config:)` / `present(config:from:)` / `present(config:appearance:)` / `present(config:appearance:from:)` | SpreedlyStripeAPM | Present Stripe PaymentSheet. The no-argument variant finds the topmost VC automatically. Use the `from:` variant to specify the presenting view controller. Use the `appearance:` variants to theme the PaymentSheet. |
 | 3 | `SpreedlyStripeAPMCheckout.handleStripeReturnURL(_ url: URL) -> Bool` | SpreedlyStripeAPM | Handle Stripe redirect URL; returns `true` if the URL was handled |
 | 4 | `subscribeToPaymentResults` | SpreedlyCore | Receive payment result |
 | 5 | `handleOffsiteReturn(url:)` | SpreedlyCore | Handle redirect when app re-opens |
@@ -177,7 +173,7 @@ After the user completes authentication in Safari (e.g., iDEAL bank auth), they 
 
 ## Backend API
 
-> The example app uses `PurchaseAPIClient` (see `API/PurchaseAPIClient.swift`). In production, replace this with your own backend endpoint.
+> The example app uses an in-app HTTP client to talk to a sample purchase server. In production, replace this with a call to your own backend.
 
 Your backend calls Spreedly's API to create a pending purchase with `stripe_apm` payment method type:
 
@@ -316,9 +312,10 @@ struct StripeAPMPaymentView: View {
             case "pending": successMessage = "Payment submitted."
             default: successMessage = "Payment completed."
             }
+        } else if result.isCanceled {
+            errorMessage = "Payment was canceled."
         } else {
-            let msg = result.failureDetails?.getDescription() ?? "Payment failed"
-            errorMessage = msg.lowercased().contains("canceled") ? "Payment was canceled." : msg
+            errorMessage = result.failureDetails?.getDescription() ?? "Payment failed"
         }
     }
 }
@@ -393,9 +390,10 @@ class StripeAPMPaymentViewController: UIViewController, SpreedlyPaymentDelegate 
             self.stage = .idle
             if result.isSuccess {
                 self.showSuccess(result.state == "succeeded" ? "Payment completed!" : "Payment submitted.")
+            } else if result.isCanceled {
+                self.showError("Payment was canceled.")
             } else {
-                let msg = result.failureDetails?.getDescription() ?? "Payment failed"
-                self.showError(msg.contains("canceled") ? "Payment was canceled." : msg)
+                self.showError(result.failureDetails?.getDescription() ?? "Payment failed")
             }
         }
     }
@@ -485,9 +483,10 @@ typedef NS_ENUM(NSInteger, StripeAPMStage) {
         self.stage = StripeAPMStageIdle;
         if (result.isSuccess) {
             [self showSuccess:[result.state isEqualToString:@"succeeded"] ? @"Payment completed!" : @"Payment submitted."];
+        } else if (result.isCanceled) {
+            [self showError:@"Payment was canceled."];
         } else {
-            NSString *msg = [result.failureDetails getDescription] ?: @"Payment failed";
-            [self showError:[msg rangeOfString:@"canceled" options:NSCaseInsensitiveSearch].location != NSNotFound ? @"Payment was canceled." : msg];
+            [self showError:[result.failureDetails getDescription] ?: @"Payment failed"];
         }
     });
 }
@@ -503,14 +502,75 @@ typedef NS_ENUM(NSInteger, StripeAPMStage) {
 
 ---
 
+## Theming the PaymentSheet
+
+Stripe's PaymentSheet has its own UI. To match your app's branding, build a `StripeAPMAppearanceConfig` and pass it to one of the appearance-aware `present` overloads.
+
+The config mirrors the publicly stable subset of Stripe's `PaymentSheet.Appearance`: corner radius, border widths, colors (primary, background, text, danger, etc.), primary-button styling (background/text/disabled/success colors, corner radius, border, font, shadow, height), shadow, and font (family + size scale factor).
+
+Anything you don't set keeps Stripe's default. Passing `nil` (or using the original overloads) gives you the unmodified Stripe defaults.
+
+### Swift
+
+```swift
+let appearance = StripeAPMAppearanceConfig()
+
+// Top-level
+appearance.cornerRadius = 8                 // NSNumber-bridged for ObjC; assign Swift literal
+appearance.borderWidth = 1.5
+
+// Colors
+appearance.colors.primary = .systemPurple
+appearance.colors.background = .systemBackground
+appearance.colors.danger = .systemRed
+
+// Primary button
+appearance.primaryButton.backgroundColor = .systemPurple
+appearance.primaryButton.textColor = .white
+appearance.primaryButton.cornerRadius = 8
+appearance.primaryButton.height = 52
+
+// Shadow
+appearance.shadow.color = .black
+appearance.shadow.opacity = 0.1
+
+// Font (family only — size/weight are ignored; use sizeScaleFactor to scale)
+appearance.font.base = UIFont(name: "AvenirNext-Regular", size: 17) ?? .systemFont(ofSize: 17)
+appearance.font.sizeScaleFactor = 1.1
+
+SpreedlyStripeAPMCheckout.present(config: config, appearance: appearance)
+```
+
+### Objective-C
+
+```objc
+StripeAPMAppearanceConfig *appearance = [[StripeAPMAppearanceConfig alloc] init];
+appearance.cornerRadius = @(8);
+appearance.colors.primary = UIColor.systemPurpleColor;
+appearance.primaryButton.backgroundColor = UIColor.systemPurpleColor;
+appearance.primaryButton.height = 52;
+
+[SpreedlyStripeAPMCheckout presentWithConfig:config appearance:appearance];
+```
+
+### Notes
+
+- `NSNumber?`-typed properties (`cornerRadius`, `selectedBorderWidth`, `primaryButton.cornerRadius`) accept Swift number literals via implicit `NSNumber` bridging and `NSNumber *` from ObjC. Set them to `nil` to inherit Stripe's adaptive default.
+- `font.base`'s **family** is used; Stripe ignores its size and weight. Use `font.sizeScaleFactor` to scale all sizes.
+- The disabled-shadow helper is available via `StripeAPMAppearanceShadow.disabled()` (mirrors Stripe's `Shadow.disabled`).
+- Experimental and iOS-26-only appearance fields from Stripe (e.g. `iconStyle`, `sheetCornerRadius`, `navigationBarStyle.glass`) are intentionally not exposed — they're marked `@_spi` or version-gated in Stripe's SDK and the surface may change.
+
+---
+
 ## Result States
 
-| state | Meaning | UX |
-|-------|---------|-----|
-| `"succeeded"` | Payment completed, funds received | Show success |
-| `"processing"` | Payment accepted, funds pending (e.g., SEPA debit) | Show "Payment accepted, confirmation pending" |
-| `"pending"` | Payment submitted, awaiting final status | Show "Payment submitted" |
-| `"failed"` / `"gateway_processing_failed"` | Payment failed | Show error, offer retry |
+| Result property | Meaning | UX |
+|-----------------|---------|-----|
+| `isSuccess`, state `"succeeded"` | Payment completed, funds received | Show success |
+| `isSuccess`, state `"processing"` | Payment accepted, funds pending (e.g., SEPA debit) | Show "Payment accepted, confirmation pending" |
+| `isSuccess`, state `"pending"` | Payment submitted, awaiting final status | Show "Payment submitted" |
+| `isCanceled` | User dismissed the Stripe PaymentSheet without completing payment | Show "Payment was canceled." |
+| `isFailure` | Payment failed (network error, Stripe error, or backend failure) | Show error, offer retry |
 
 ---
 
@@ -534,9 +594,9 @@ typedef NS_ENUM(NSInteger, StripeAPMStage) {
 
 | Issue | Solution |
 |-------|----------|
-| Crash: `Fatal error: unable to find bundle named Stripe_StripePaymentSheet` | On current SDKs, Stripe is embedded in `SpreedlyStripeAPM` — link that product from `checkout-ios-package` only, then clean and rebuild. **Legacy:** Very old CocoaPods setups may still need the [bundle patcher](#cocoapods-stripe-bundle-patcher) (see collapsed “Legacy SDK versions” there). |
-| **CocoaPods:** Added `SpreedlyStripeAPM` but still get bundle error | Upgrade to a current SDK (embedded bundles). **Legacy:** Open the [CocoaPods Stripe Bundle Patcher](#cocoapods-stripe-bundle-patcher) section and use the legacy `post_install` if you must stay on an older release. |
-| **Reinstalled Pods but still crashes** with the same bundle error | Clean build folder, clear Derived Data, `pod deintegrate` / fresh `pod install` if needed. **Legacy:** Same bundle error on old releases — add the patcher from [CocoaPods Stripe Bundle Patcher](#cocoapods-stripe-bundle-patcher). |
+| Crash: `Fatal error: unable to find bundle named Stripe_StripePaymentSheet` | **SPM:** Link `SpreedlyStripeAPM` from `checkout-ios-package`, then clean and rebuild. **CocoaPods:** Add the required [bundle patcher](#cocoapods-stripe-bundle-patcher) `post_install` block, then `pod install` and rebuild. |
+| **CocoaPods:** Added `SpreedlyStripeAPM` but still get bundle error | Add the [CocoaPods Stripe Bundle Patcher](#cocoapods-stripe-bundle-patcher) `post_install` to your Podfile (required for CocoaPods). Confirm `SpreedlyStripeAPM` is in the target and run a clean build. |
+| **Reinstalled Pods but still crashes** with the same bundle error | Clean build folder, clear Derived Data, `pod deintegrate` / fresh `pod install`. Verify the [bundle patcher](#cocoapods-stripe-bundle-patcher) `post_install` is present and runs without errors. |
 | App Store rejection `ITMS-90683` (missing `NSCameraUsageDescription`) | Add `NSCameraUsageDescription` to your app's `Info.plist`. The Stripe SDK's `StripePaymentSheet` module includes card scanning functionality that references camera APIs internally. Apple's static analysis detects these references even if card scanning is never presented to the user. Without this key, App Store and TestFlight submissions will be rejected. |
 | `CFBundleDisplayName must be non-nil` | Set `CFBundleDisplayName` in your app's `Info.plist` with a string value (e.g. your app name). |
 | User not redirected back to app after bank auth | Ensure `redirect_url` in the purchase request matches your custom URL scheme (e.g. `myapp://stripe-redirect`), and that `returnURL` in `StripeAPMConfig` matches. Register the scheme in `Info.plist` under `CFBundleURLTypes`. |

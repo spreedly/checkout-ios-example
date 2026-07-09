@@ -14,7 +14,7 @@
 #import "RetainPaymentMethodModels.h"
 #import "ThemeHelper.h"
 
-@interface CustomFormViewController () <UIScrollViewDelegate, SpreedlyPaymentDelegate>
+@interface CustomFormViewController () <UIScrollViewDelegate, SpreedlyPaymentDelegate, FieldTextChangeListener>
 
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIView *contentView;
@@ -27,6 +27,17 @@
 @property (nonatomic, strong) UIButton *payButton;
 @property (nonatomic, strong) UIView *resultContainer;
 @property (nonatomic, strong) UILabel *errorLabel;
+@property (nonatomic, strong) UILabel *fieldStateInspectorTitleLabel;
+@property (nonatomic, strong) UILabel *fieldInspectorCaptionLabel;
+@property (nonatomic, strong) UILabel *wiringLabel;
+@property (nonatomic, strong) UILabel *lastEventLabel;
+@property (nonatomic, strong) UILabel *eventLogLabel;
+@property (nonatomic, strong) UILabel *fieldStatusLabel;
+@property (nonatomic, strong) UILabel *fieldStatusHintLabel;
+@property (nonatomic, copy) NSString *lastCardInspectorBody;
+@property (nonatomic, copy) NSString *lastCvcInspectorBody;
+@property (nonatomic, strong) NSMutableArray<NSString *> *hostedFieldEventLog;
+@property (nonatomic, strong) UILabel *aggregateValidationLabel;
 @property (nonatomic, strong) UIActivityIndicatorView *loadingIndicator;
 @property (nonatomic, strong) NSArray<NSLayoutConstraint *> *layoutConstraints;
 
@@ -38,6 +49,10 @@
 @property (nonatomic, strong) UISwitch *allowBlankNameSwitch;
 @property (nonatomic, strong) UISwitch *allowExpiredDateSwitch;
 @property (nonatomic, strong) UISwitch *allowBlankDateSwitch;
+@property (nonatomic, strong) UISwitch *enableAutofillSwitch;
+@property (nonatomic, strong) UISegmentedControl *panFormatSegmentedControl;
+@property (nonatomic, strong) UIButton *resetPaymentStateButton;
+@property (nonatomic, strong) UIButton *toggleMaskButton;
 @property (nonatomic, strong) UISegmentedControl *yearFormatSegmentedControl;
 
 @property (nonatomic, strong) PaymentResult *paymentResult;
@@ -56,6 +71,20 @@
 @property (nonatomic, strong) UIButton *saveCardCheckbox;
 @property (nonatomic, strong) UILabel *saveCardLabel;
 
+- (NSString *)formFieldTypeDisplayName:(FormFieldType)type;
+- (NSString *)hostedFieldEventDescription:(HostedFieldEventType)eventType;
+- (NSString *)logYesNo:(BOOL)value;
+- (NSString *)cardNumberFormatLabelForRawValue:(NSInteger)rawValue;
+- (NSString *)inspectorBodyForCardState:(HostedFieldState *)state;
+- (NSString *)inspectorBodyForCvcState:(HostedFieldState *)state;
+- (void)refreshCombinedFieldInspectorText;
+- (void)refreshAggregateValidationReadout;
+- (void)appendHostedFieldEventLog:(HostedFieldState *)state;
+- (void)logHostedFieldStateChange:(HostedFieldState *)state;
+- (void)attachHostedFieldCallbacksToField:(SPLTextFieldViewController *)field;
+- (NSString *)merchantPanAssetNameForSchemeRawValue:(NSString *)schemeRaw;
+- (UIView *)merchantPanTrailingBrandViewForSchemeRawValue:(NSString *)schemeRaw;
+
 @end
 
 @implementation CustomFormViewController
@@ -73,7 +102,9 @@
     
     [self setupUI];
     [self setupConstraints];
-    
+    if (self.panFormatSegmentedControl) {
+        self.panFormatSegmentedControl.selectedSegmentIndex = (NSInteger)[Spreedly shared].hostedCardDisplayCardNumberFormatRawValue;
+    }
     // Set scroll view delegate
     self.scrollView.delegate = self;
     
@@ -84,6 +115,26 @@
         self.errorMessage = Spreedly.initializationError.message ?: @"SDK blocked by security check";
         [self updateUI];
     }
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(keyboardWillShow)
+                                                 name:UIKeyboardWillShowNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(keyboardWillHide)
+                                                 name:UIKeyboardWillHideNotification
+                                               object:nil];
+
+    (void)[self.cardHolderNameField becomeFirstResponder];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    [self refreshAggregateValidationReadout];
 }
 
 - (void)resetUI {
@@ -170,6 +221,78 @@
     
     // Config Container
     self.configContainer = [self createConfigContainer];
+    
+    self.fieldStateInspectorTitleLabel = [[UILabel alloc] init];
+    self.fieldStateInspectorTitleLabel.text = @"Field state inspector";
+    self.fieldStateInspectorTitleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+    self.fieldStateInspectorTitleLabel.textColor = [ThemeHelper textColor];
+    self.fieldStateInspectorTitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.fieldStateInspectorTitleLabel.accessibilityIdentifier = @"custom-form-field-state-inspector-title";
+    [self.contentView addSubview:self.fieldStateInspectorTitleLabel];
+
+    self.fieldInspectorCaptionLabel = [[UILabel alloc] init];
+    self.fieldInspectorCaptionLabel.text = @"Updates from onFieldStateChange. Use snapshot fields — not hostedCardDisplayState in the callback.";
+    self.fieldInspectorCaptionLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2];
+    self.fieldInspectorCaptionLabel.textColor = [UIColor secondaryLabelColor];
+    self.fieldInspectorCaptionLabel.numberOfLines = 0;
+    self.fieldInspectorCaptionLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.contentView addSubview:self.fieldInspectorCaptionLabel];
+
+    self.wiringLabel = [[UILabel alloc] init];
+    self.wiringLabel.text = @"Hosted fields: enableAutofill toggle; PAN + CVC follow setNumberFormat / toggleMask (iframe parity)";
+    self.wiringLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2];
+    self.wiringLabel.textColor = [UIColor secondaryLabelColor];
+    self.wiringLabel.numberOfLines = 0;
+    self.wiringLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.wiringLabel.accessibilityIdentifier = @"custom-form-wiring-readout";
+    [self.contentView addSubview:self.wiringLabel];
+
+    self.lastEventLabel = [[UILabel alloc] init];
+    self.lastEventLabel.text = @"Last event: —";
+    self.lastEventLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
+    self.lastEventLabel.textColor = [UIColor secondaryLabelColor];
+    self.lastEventLabel.numberOfLines = 0;
+    self.lastEventLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.lastEventLabel.accessibilityIdentifier = @"custom-form-last-event-readout";
+    [self.contentView addSubview:self.lastEventLabel];
+
+    self.eventLogLabel = [[UILabel alloc] init];
+    self.eventLogLabel.text = @"Event log (last 5)\n  (no events yet)";
+    self.eventLogLabel.font = [UIFont monospacedSystemFontOfSize:11 weight:UIFontWeightRegular];
+    self.eventLogLabel.textColor = [UIColor secondaryLabelColor];
+    self.eventLogLabel.numberOfLines = 0;
+    self.eventLogLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.eventLogLabel.accessibilityIdentifier = @"custom-form-event-log";
+    [self.contentView addSubview:self.eventLogLabel];
+
+    self.hostedFieldEventLog = [NSMutableArray array];
+
+    self.fieldStatusLabel = [[UILabel alloc] init];
+    self.fieldStatusLabel.text = @"Card number\n  (waiting for input…)\n\nCVC\n  (waiting for input…)";
+    self.fieldStatusLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
+    self.fieldStatusLabel.textColor = [UIColor secondaryLabelColor];
+    self.fieldStatusLabel.numberOfLines = 0;
+    self.fieldStatusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.fieldStatusLabel.accessibilityIdentifier = @"custom-form-field-state-inspector";
+    [self.contentView addSubview:self.fieldStatusLabel];
+
+    self.fieldStatusHintLabel = [[UILabel alloc] init];
+    self.fieldStatusHintLabel.text = @"onChange: edit a field to see values (card/CVC stay opaque).";
+    self.fieldStatusHintLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2];
+    self.fieldStatusHintLabel.textColor = [UIColor secondaryLabelColor];
+    self.fieldStatusHintLabel.numberOfLines = 0;
+    self.fieldStatusHintLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.fieldStatusHintLabel.accessibilityIdentifier = @"custom-form-onchange-readout";
+    [self.contentView addSubview:self.fieldStatusHintLabel];
+
+    self.aggregateValidationLabel = [[UILabel alloc] init];
+    self.aggregateValidationLabel.text = @"";
+    self.aggregateValidationLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2];
+    self.aggregateValidationLabel.textColor = [UIColor secondaryLabelColor];
+    self.aggregateValidationLabel.numberOfLines = 0;
+    self.aggregateValidationLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.aggregateValidationLabel.accessibilityIdentifier = @"custom-form-aggregate-validation-readout";
+    [self.contentView addSubview:self.aggregateValidationLabel];
     
     // Form Container
     self.formContainer = [self createFormContainer];
@@ -356,6 +479,66 @@
     [container addSubview:self.allowBlankDateSwitch];
     [self.allowBlankDateSwitch setOn:self.allowBlankDate];
     [self.allowBlankDateSwitch addTarget:self action:@selector(toggleAllowBlankDate) forControlEvents:UIControlEventValueChanged];
+
+    UILabel *enableAutofillLabel = [[UILabel alloc] init];
+    enableAutofillLabel.text = @"Enable autofill";
+    enableAutofillLabel.font = [ThemeHelper screenBodyFont];
+    enableAutofillLabel.textColor = [ThemeHelper textColor];
+    enableAutofillLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    enableAutofillLabel.accessibilityIdentifier = @"custom-form-enable-autofill-label";
+    [container addSubview:enableAutofillLabel];
+
+    self.enableAutofillSwitch = [[UISwitch alloc] init];
+    self.enableAutofillSwitch.onTintColor = [ThemeHelper primaryColor];
+    self.enableAutofillSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+    self.enableAutofillSwitch.accessibilityIdentifier = @"custom-form-enable-autofill-toggle";
+    self.enableAutofillSwitch.accessibilityHint = @"Toggle Wallet and edit-menu autofill on hosted fields";
+    [self.enableAutofillSwitch setOn:YES];
+    [self.enableAutofillSwitch addTarget:self action:@selector(enableAutofillToggled:) forControlEvents:UIControlEventValueChanged];
+    [container addSubview:self.enableAutofillSwitch];
+
+    UILabel *enableAutofillHelpLabel = [[UILabel alloc] init];
+    enableAutofillHelpLabel.text = @"Off clears Wallet hints and suppresses AutoFill on hosted fields.";
+    enableAutofillHelpLabel.font = [ThemeHelper screenCaptionFont];
+    enableAutofillHelpLabel.textColor = [ThemeHelper textSecondaryColor];
+    enableAutofillHelpLabel.numberOfLines = 0;
+    enableAutofillHelpLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:enableAutofillHelpLabel];
+
+    UILabel *panFormatHelpLabel = [[UILabel alloc] init];
+    panFormatHelpLabel.text = @"Pretty: grouped spaced digits (focus and blur). Plain: all digits visible. Masked: every digit * while typing. toggleMask() toggles plain ↔ masked (first tap from Pretty default → masked).";
+    panFormatHelpLabel.font = [ThemeHelper screenBodyFont];
+    panFormatHelpLabel.textColor = [ThemeHelper textColor];
+    panFormatHelpLabel.numberOfLines = 0;
+    panFormatHelpLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:panFormatHelpLabel];
+
+    self.panFormatSegmentedControl = [[UISegmentedControl alloc] initWithItems:@[@"Pretty", @"Plain", @"Masked"]];
+    self.panFormatSegmentedControl.selectedSegmentIndex = 0;
+    self.panFormatSegmentedControl.translatesAutoresizingMaskIntoConstraints = NO;
+    self.panFormatSegmentedControl.accessibilityIdentifier = @"custom-form-pan-format-segmented";
+    [self.panFormatSegmentedControl addTarget:self action:@selector(panFormatChanged:) forControlEvents:UIControlEventValueChanged];
+    [container addSubview:self.panFormatSegmentedControl];
+
+    self.toggleMaskButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.toggleMaskButton setTitle:@"toggleMask()" forState:UIControlStateNormal];
+    self.toggleMaskButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    [self.toggleMaskButton setTitleColor:[ThemeHelper primaryColor] forState:UIControlStateNormal];
+    self.toggleMaskButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.toggleMaskButton.accessibilityIdentifier = @"custom-form-toggle-mask-button";
+    self.toggleMaskButton.accessibilityHint = @"Toggles Pretty masked ↔ Plain revealed for PAN and CVC";
+    [self.toggleMaskButton addTarget:self action:@selector(toggleMaskTapped) forControlEvents:UIControlEventTouchUpInside];
+    [container addSubview:self.toggleMaskButton];
+
+    self.resetPaymentStateButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.resetPaymentStateButton setTitle:@"resetPaymentState()" forState:UIControlStateNormal];
+    self.resetPaymentStateButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    [self.resetPaymentStateButton setTitleColor:[ThemeHelper primaryColor] forState:UIControlStateNormal];
+    self.resetPaymentStateButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.resetPaymentStateButton.accessibilityIdentifier = @"custom-form-reset-payment-state-button";
+    self.resetPaymentStateButton.accessibilityHint = @"Full reset: clears fields, validation, and hosted PAN/CVV display to SDK defaults.";
+    [self.resetPaymentStateButton addTarget:self action:@selector(resetPaymentStateTapped) forControlEvents:UIControlEventTouchUpInside];
+    [container addSubview:self.resetPaymentStateButton];
     
     // Year Format Segmented Control
     UILabel *yearFormatLabel = [[UILabel alloc] init];
@@ -400,13 +583,39 @@
         
         [self.allowBlankDateSwitch.topAnchor constraintEqualToAnchor:expiredDateLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
         [self.allowBlankDateSwitch.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [enableAutofillLabel.topAnchor constraintEqualToAnchor:blankDateLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [enableAutofillLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [enableAutofillLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.enableAutofillSwitch.leadingAnchor constant:-[ThemeHelper spacingSM]],
+        [enableAutofillLabel.centerYAnchor constraintEqualToAnchor:self.enableAutofillSwitch.centerYAnchor],
+
+        [self.enableAutofillSwitch.topAnchor constraintEqualToAnchor:blankDateLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.enableAutofillSwitch.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [enableAutofillHelpLabel.topAnchor constraintEqualToAnchor:enableAutofillLabel.bottomAnchor constant:[ThemeHelper spacingXS]],
+        [enableAutofillHelpLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [enableAutofillHelpLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [panFormatHelpLabel.topAnchor constraintEqualToAnchor:enableAutofillHelpLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [panFormatHelpLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [panFormatHelpLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.panFormatSegmentedControl.topAnchor constraintEqualToAnchor:panFormatHelpLabel.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [self.panFormatSegmentedControl.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.panFormatSegmentedControl.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.toggleMaskButton.topAnchor constraintEqualToAnchor:self.panFormatSegmentedControl.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.toggleMaskButton.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+
+        [self.resetPaymentStateButton.topAnchor constraintEqualToAnchor:self.toggleMaskButton.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.resetPaymentStateButton.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
         
-        [yearFormatLabel.topAnchor constraintEqualToAnchor:self.allowBlankDateSwitch.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [yearFormatLabel.topAnchor constraintEqualToAnchor:self.resetPaymentStateButton.bottomAnchor constant:[ThemeHelper spacingMD]],
         [yearFormatLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
         [yearFormatLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.yearFormatSegmentedControl.leadingAnchor constant:-[ThemeHelper spacingSM]],
         [yearFormatLabel.centerYAnchor constraintEqualToAnchor:self.yearFormatSegmentedControl.centerYAnchor],
         
-        [self.yearFormatSegmentedControl.topAnchor constraintEqualToAnchor:self.allowBlankDateSwitch.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.yearFormatSegmentedControl.topAnchor constraintEqualToAnchor:self.resetPaymentStateButton.bottomAnchor constant:[ThemeHelper spacingMD]],
         [self.yearFormatSegmentedControl.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
         [self.yearFormatSegmentedControl.widthAnchor constraintEqualToConstant:200],
         [self.yearFormatSegmentedControl.bottomAnchor constraintEqualToAnchor:container.bottomAnchor constant:-[ThemeHelper spacingMD]]
@@ -437,6 +646,42 @@
     }
 }
 
+- (void)panFormatChanged:(UISegmentedControl *)sender {
+    [[Spreedly shared] setNumberFormatWithCardNumberFormatRawValue:(NSInteger)sender.selectedSegmentIndex];
+}
+
+- (void)toggleMaskTapped {
+    [[Spreedly shared] toggleMask];
+}
+
+- (void)resetPaymentStateTapped {
+    [[Spreedly shared] resetPaymentState];
+    self.cardHolderNameIsValid = NO;
+    self.cardNumberIsValid = NO;
+    self.cvcIsValid = NO;
+    self.expirationDateIsValid = NO;
+    [self updatePayButtonState];
+}
+
+- (BOOL)hostedFieldsEnableAutofill {
+    return self.enableAutofillSwitch.isOn;
+}
+
+- (void)applyEnableAutofillToHostedFields {
+    BOOL enabled = [self hostedFieldsEnableAutofill];
+    self.cardHolderNameField.enableAutofill = enabled;
+    self.cardNumberField.enableAutofill = enabled;
+    self.cvcField.enableAutofill = enabled;
+    if (self.expirationDateField) {
+        self.expirationDateField.enableAutofill = enabled;
+    }
+}
+
+- (void)enableAutofillToggled:(UISwitch *)sender {
+    (void)sender;
+    [self applyEnableAutofillToHostedFields];
+}
+
 - (UIView *)createFormContainer {
     UIView *container = [[UIView alloc] init];
     container.backgroundColor = [ThemeHelper surfaceColor];
@@ -454,6 +699,7 @@
     } onSubmit:^{
         (void)[self.cardNumberField becomeFirstResponder];
     } submitLabel:SpreedlySubmitLabelNext onFocus: nil];
+    self.cardHolderNameField.enableAutofill = [self hostedFieldsEnableAutofill];
     
     [self addChildViewController:self.cardHolderNameField];
     self.cardHolderNameField.view.translatesAutoresizingMaskIntoConstraints = NO;
@@ -467,11 +713,17 @@
     } onSubmit:^{
         (void)[self.cvcField becomeFirstResponder];
     } submitLabel:SpreedlySubmitLabelNext onFocus: nil];
+    self.cardNumberField.enableAutofill = [self hostedFieldsEnableAutofill];
     
     [self addChildViewController:self.cardNumberField];
     self.cardNumberField.view.translatesAutoresizingMaskIntoConstraints = NO;
     [container addSubview:self.cardNumberField.view];
     [self.cardNumberField didMoveToParentViewController:self];
+    __weak typeof(self) weakSelf = self;
+    self.cardNumberField.trailingIconViewFactory = ^UIView *(NSString *schemeRaw) {
+        return [weakSelf merchantPanTrailingBrandViewForSchemeRawValue:schemeRaw];
+    };
+    [self attachHostedFieldCallbacksToField:self.cardNumberField];
     
     if (@available(iOS 17.0, *)) {
         self.cvcField = [[SPLTextFieldViewController alloc] initWithField:FormFieldTypeCvc title:@"Security Code (CVC)" isRequired:YES placeholder:nil keyboardType:UIKeyboardTypeNumberPad textContentType:UITextContentTypeCreditCardSecurityCode onValidationChange:^(BOOL valid) {
@@ -489,10 +741,12 @@
             (void)[self.expirationDateField becomeFirstResponder];
         } submitLabel:SpreedlySubmitLabelNext onFocus:nil];
     }
+    self.cvcField.enableAutofill = [self hostedFieldsEnableAutofill];
     [self addChildViewController:self.cvcField];
     self.cvcField.view.translatesAutoresizingMaskIntoConstraints = NO;
     [container addSubview:self.cvcField.view];
     [self.cvcField didMoveToParentViewController:self];
+    [self attachHostedFieldCallbacksToField:self.cvcField];
     
     // Create expiration date field with current year format
     [self createExpirationDateFieldInContainer:container belowView:self.cvcField.view];
@@ -550,6 +804,7 @@
     } onSubmit:^{
         (void)[self.cardNumberField becomeFirstResponder];
     } submitLabel:SpreedlySubmitLabelNext onFocus:nil];
+    self.cardHolderNameField.enableAutofill = [self hostedFieldsEnableAutofill];
     
     [self addChildViewController:self.cardHolderNameField];
     self.cardHolderNameField.view.translatesAutoresizingMaskIntoConstraints = NO;
@@ -612,6 +867,7 @@
         } submitLabel:SpreedlySubmitLabelDone onFocus:nil];
     }
     self.expirationDateField.yearFormat = yearFormat;
+    self.expirationDateField.enableAutofill = [self hostedFieldsEnableAutofill];
     [self addChildViewController:self.expirationDateField];
     self.expirationDateField.view.translatesAutoresizingMaskIntoConstraints = NO;
     [container addSubview:self.expirationDateField.view];
@@ -671,8 +927,39 @@
         [self.configContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
         [self.configContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
         
-        // Form Container
-        [self.formContainer.topAnchor constraintEqualToAnchor:self.configContainer.bottomAnchor constant:[ThemeHelper spacingLG]],
+        [self.fieldStateInspectorTitleLabel.topAnchor constraintEqualToAnchor:self.configContainer.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.fieldStateInspectorTitleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.fieldStateInspectorTitleLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.fieldInspectorCaptionLabel.topAnchor constraintEqualToAnchor:self.fieldStateInspectorTitleLabel.bottomAnchor constant:4],
+        [self.fieldInspectorCaptionLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.fieldInspectorCaptionLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.wiringLabel.topAnchor constraintEqualToAnchor:self.fieldInspectorCaptionLabel.bottomAnchor constant:6],
+        [self.wiringLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.wiringLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.lastEventLabel.topAnchor constraintEqualToAnchor:self.wiringLabel.bottomAnchor constant:6],
+        [self.lastEventLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.lastEventLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.eventLogLabel.topAnchor constraintEqualToAnchor:self.lastEventLabel.bottomAnchor constant:4],
+        [self.eventLogLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.eventLogLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.fieldStatusLabel.topAnchor constraintEqualToAnchor:self.eventLogLabel.bottomAnchor constant:8],
+        [self.fieldStatusLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.fieldStatusLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.aggregateValidationLabel.topAnchor constraintEqualToAnchor:self.fieldStatusLabel.bottomAnchor constant:4],
+        [self.aggregateValidationLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.aggregateValidationLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.fieldStatusHintLabel.topAnchor constraintEqualToAnchor:self.aggregateValidationLabel.bottomAnchor constant:4],
+        [self.fieldStatusHintLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.fieldStatusHintLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.formContainer.topAnchor constraintEqualToAnchor:self.fieldStatusHintLabel.bottomAnchor constant:[ThemeHelper spacingSM]],
         [self.formContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
         [self.formContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
         
@@ -711,6 +998,7 @@
     BOOL isFormValid = [self isFormValid];
     self.payButton.enabled = isFormValid && !self.isLoading;
     self.payButton.backgroundColor = isFormValid && !self.isLoading ? [ThemeHelper primaryColor] : [[ThemeHelper primaryColor] colorWithAlphaComponent:0.6];
+    [self refreshAggregateValidationReadout];
 }
 
 - (BOOL)isFormValid {
@@ -761,6 +1049,25 @@
 - (void)createCreditCardPayment {
     // Capture UI values on the main thread before making the API call
     dispatch_async(dispatch_get_main_queue(), ^{
+        NSArray<NSNumber *> *fieldTypes = @[
+            @(FormFieldTypeFullName),
+            @(FormFieldTypeCardNumber),
+            @(FormFieldTypeCvc),
+            @(FormFieldTypeExpirationDate)
+        ];
+        [self refreshAggregateValidationReadout];
+        BOOL allValid = [Spreedly areAllFieldsValidWithFieldTypeRawValues:fieldTypes];
+
+        if (!allValid) {
+            self.isLoading = NO;
+            [self.loadingIndicator stopAnimating];
+            [self.payButton setTitle:@"PAY NOW" forState:UIControlStateNormal];
+            self.errorMessage = @"Fix invalid fields before paying.";
+            [self updateUI];
+            [self updatePayButtonState];
+            return;
+        }
+
         // Create additional fields - SPLTextFieldViewController with FormFieldTypeFullName
         // automatically stores the value in the secure container, so we don't need to
         // manually extract it. Pass empty dictionary and let the SDK handle it.
@@ -1003,6 +1310,9 @@
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    if ([Spreedly shared].paymentDelegate == self) {
+        [Spreedly shared].paymentDelegate = nil;
+    }
     [[Spreedly shared] reset];
     // unregister for keyboard notifications while not visible.
     [[NSNotificationCenter defaultCenter] removeObserver:self
@@ -1118,24 +1428,6 @@
 }
 
 
-- (void)viewWillAppear:(BOOL)animated
-{
-    [super viewWillAppear:animated];
-    // register for keyboard notifications
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                         selector:@selector(keyboardWillShow)
-                                             name:UIKeyboardWillShowNotification
-                                           object:nil];
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                         selector:@selector(keyboardWillHide)
-                                             name:UIKeyboardWillHideNotification
-                                           object:nil];
-    
-    // Focus the first field (card holder name) when view appears
-    (void)[self.cardHolderNameField becomeFirstResponder];
-}
-
 #pragma mark - SpreedlyPaymentDelegate
 
 - (void)paymentDidComplete:(PaymentResult *)result {
@@ -1195,6 +1487,339 @@
             return;
         }
     }];
+}
+
+- (NSString *)formFieldTypeDisplayName:(FormFieldType)type {
+    switch (type) {
+        case FormFieldTypeCardNumber:
+            return @"Card number";
+        case FormFieldTypeFullName:
+            return @"Cardholder name";
+        case FormFieldTypeFirstName:
+            return @"First name";
+        case FormFieldTypeLastName:
+            return @"Last name";
+        case FormFieldTypeExpirationMonth:
+            return @"Expiry month";
+        case FormFieldTypeExpirationYear:
+            return @"Expiry year";
+        case FormFieldTypeExpirationDate:
+            return @"Expiry date";
+        case FormFieldTypeCvc:
+            return @"Security code (CVC)";
+        case FormFieldTypeAddressLine1:
+            return @"Address line 1";
+        case FormFieldTypeAddressLine2:
+            return @"Address line 2";
+        case FormFieldTypeCity:
+            return @"City";
+        case FormFieldTypeState:
+            return @"State";
+        case FormFieldTypeZipCode:
+            return @"ZIP code";
+        default:
+            return [NSString stringWithFormat:@"Field (%ld)", (long)type];
+    }
+}
+
+- (NSString *)hostedFieldEventDescription:(HostedFieldEventType)eventType {
+    switch (eventType) {
+        case HostedFieldEventTypeInput:
+            return @"user typed";
+        case HostedFieldEventTypeFocus:
+            return @"gained focus";
+        case HostedFieldEventTypeBlur:
+            return @"left the field";
+        case HostedFieldEventTypeValidation:
+            return @"VALIDATION";
+        case HostedFieldEventTypePanMaskChanged:
+            return @"PAN_MASK_CHANGED";
+        default:
+            return @"UNKNOWN";
+    }
+}
+
+- (NSString *)logYesNo:(BOOL)value {
+    return value ? @"yes" : @"no";
+}
+
+- (NSString *)cardNumberFormatLabelForRawValue:(NSInteger)rawValue {
+    switch (rawValue) {
+        case 0: return @"pretty";
+        case 1: return @"plain";
+        case 2: return @"masked";
+        default: return @"unknown";
+    }
+}
+
+- (void)logHostedFieldStateChange:(HostedFieldState *)state {
+    [self updateHostedFieldStatusFromState:state];
+    [self appendHostedFieldEventLog:state];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self refreshAggregateValidationReadout];
+    });
+}
+
+- (void)attachHostedFieldCallbacksToField:(SPLTextFieldViewController *)field {
+    __weak typeof(self) weakSelf = self;
+    field.onFieldStateChange = ^(HostedFieldState *state) {
+        [weakSelf logHostedFieldStateChange:state];
+    };
+    field.fieldTextChangeListener = self;
+}
+
+- (void)onFieldTextChanged:(FormFieldType)fieldType text:(NSString *)text {
+    (void)text;
+    if (fieldType != FormFieldTypeCardNumber && fieldType != FormFieldTypeCvc) {
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.fieldStatusHintLabel.text = [NSString stringWithFormat:
+            @"onChange: %@ (opaque — not logged)",
+            [self formFieldTypeDisplayName:fieldType]];
+    });
+}
+
+- (NSString *)merchantPanAssetNameForSchemeRawValue:(NSString *)schemeRaw {
+    NSString *scheme = schemeRaw.lowercaseString ?: @"";
+    if ([scheme isEqualToString:@"visa"]) {
+        return @"MerchantDemoPanVisa";
+    }
+    if ([scheme isEqualToString:@"mastercard"] || [scheme isEqualToString:@"mastercard2series"]) {
+        return @"MerchantDemoPanMastercard";
+    }
+    if ([scheme isEqualToString:@"americanexpress"]) {
+        return @"MerchantDemoPanAmex";
+    }
+    if ([scheme isEqualToString:@"discover"]) {
+        return @"MerchantDemoPanDiscover";
+    }
+    return @"MerchantDemoPanOther";
+}
+
+- (NSString *)merchantPanPlaceholderLabelForSchemeRawValue:(NSString *)schemeRaw {
+    NSString *scheme = schemeRaw.lowercaseString ?: @"";
+    if ([scheme isEqualToString:@"visa"]) {
+        return @"VISA";
+    }
+    if ([scheme isEqualToString:@"mastercard"] || [scheme isEqualToString:@"mastercard2series"]) {
+        return @"MC";
+    }
+    if ([scheme isEqualToString:@"americanexpress"]) {
+        return @"AMEX";
+    }
+    if ([scheme isEqualToString:@"discover"]) {
+        return @"DISC";
+    }
+    if ([scheme isEqualToString:@"unknown"] || scheme.length == 0) {
+        return @"?";
+    }
+    if (scheme.length <= 5) {
+        return scheme.uppercaseString;
+    }
+    return [[scheme.uppercaseString substringToIndex:4] stringByAppendingString:@"…"];
+}
+
+- (UIColor *)merchantPanPlaceholderTintForSchemeRawValue:(NSString *)schemeRaw {
+    NSString *scheme = schemeRaw.lowercaseString ?: @"";
+    if ([scheme isEqualToString:@"visa"]) {
+        return [UIColor colorWithRed:0.07 green:0.20 blue:0.72 alpha:1.0];
+    }
+    if ([scheme isEqualToString:@"mastercard"] || [scheme isEqualToString:@"mastercard2series"]) {
+        return [UIColor colorWithRed:0.96 green:0.52 blue:0.10 alpha:1.0];
+    }
+    if ([scheme isEqualToString:@"americanexpress"]) {
+        return [UIColor colorWithRed:0.0 green:0.55 blue:0.65 alpha:1.0];
+    }
+    if ([scheme isEqualToString:@"discover"]) {
+        return [UIColor colorWithRed:1.0 green:0.42 blue:0.18 alpha:1.0];
+    }
+    if ([scheme isEqualToString:@"unknown"]) {
+        return [UIColor.secondaryLabelColor colorWithAlphaComponent:0.35];
+    }
+    return [UIColor colorWithRed:0.2 green:0.45 blue:0.95 alpha:1.0];
+}
+
+- (UIView *)merchantPanTrailingBrandViewForSchemeRawValue:(NSString *)schemeRaw {
+    NSString *assetName = [self merchantPanAssetNameForSchemeRawValue:schemeRaw];
+    UIImage *image = [UIImage imageNamed:assetName];
+    if (image) {
+        UIImageView *imageView = [[UIImageView alloc] initWithImage:image];
+        imageView.contentMode = UIViewContentModeScaleAspectFit;
+        imageView.translatesAutoresizingMaskIntoConstraints = NO;
+        imageView.accessibilityIdentifier = @"custom-form-merchant-pan-brand-image";
+        [NSLayoutConstraint activateConstraints:@[
+            [imageView.widthAnchor constraintEqualToConstant:40],
+            [imageView.heightAnchor constraintEqualToConstant:24]
+        ]];
+        return imageView;
+    }
+
+    UIView *container = [[UIView alloc] init];
+    container.translatesAutoresizingMaskIntoConstraints = NO;
+    container.accessibilityIdentifier = @"custom-form-merchant-pan-brand-placeholder";
+
+    UIView *badge = [[UIView alloc] init];
+    badge.backgroundColor = [self merchantPanPlaceholderTintForSchemeRawValue:schemeRaw];
+    badge.layer.cornerRadius = 4;
+    badge.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel *badgeLabel = [[UILabel alloc] init];
+    badgeLabel.text = [self merchantPanPlaceholderLabelForSchemeRawValue:schemeRaw];
+    badgeLabel.font = [UIFont systemFontOfSize:8 weight:UIFontWeightBold];
+    badgeLabel.textColor = UIColor.whiteColor;
+    badgeLabel.textAlignment = NSTextAlignmentCenter;
+    badgeLabel.numberOfLines = 2;
+    badgeLabel.adjustsFontSizeToFitWidth = YES;
+    badgeLabel.minimumScaleFactor = 0.5;
+    badgeLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel *demoLabel = [[UILabel alloc] init];
+    demoLabel.text = @"demo";
+    demoLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2];
+    demoLabel.textColor = UIColor.secondaryLabelColor;
+    demoLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+    [badge addSubview:badgeLabel];
+    [container addSubview:badge];
+    [container addSubview:demoLabel];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [badge.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
+        [badge.centerYAnchor constraintEqualToAnchor:container.centerYAnchor],
+        [badge.widthAnchor constraintEqualToConstant:40],
+        [badge.heightAnchor constraintEqualToConstant:24],
+
+        [badgeLabel.leadingAnchor constraintEqualToAnchor:badge.leadingAnchor constant:2],
+        [badgeLabel.trailingAnchor constraintEqualToAnchor:badge.trailingAnchor constant:-2],
+        [badgeLabel.topAnchor constraintEqualToAnchor:badge.topAnchor constant:2],
+        [badgeLabel.bottomAnchor constraintEqualToAnchor:badge.bottomAnchor constant:-2],
+
+        [demoLabel.leadingAnchor constraintEqualToAnchor:badge.trailingAnchor constant:4],
+        [demoLabel.centerYAnchor constraintEqualToAnchor:container.centerYAnchor],
+        [demoLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
+
+        [container.heightAnchor constraintEqualToConstant:24]
+    ]];
+    return container;
+}
+
+- (NSString *)inspectorEventToken:(HostedFieldEventType)eventType {
+    switch (eventType) {
+        case HostedFieldEventTypeInput:
+            return @"INPUT";
+        case HostedFieldEventTypeFocus:
+            return @"FOCUS";
+        case HostedFieldEventTypeBlur:
+            return @"BLUR";
+        case HostedFieldEventTypeValidation:
+            return @"VALIDATION";
+        case HostedFieldEventTypePanMaskChanged:
+            return @"PAN_MASK_CHANGED";
+        default:
+            return @"UNKNOWN";
+    }
+}
+
+- (NSString *)inspectorBodyForCardState:(HostedFieldState *)state {
+    NSMutableString *body = [NSMutableString string];
+    [body appendFormat:@"  Event: %@\n", [self hostedFieldEventDescription:state.eventType]];
+    [body appendFormat:@"  Valid: %@    Focused: %@    Empty: %@\n",
+     [self logYesNo:state.isValid], [self logYesNo:state.isFocused], [self logYesNo:state.isEmpty]];
+    [body appendString:@"  — PAN display (snapshot) —\n"];
+    NSString *format = state.panDisplayFormatRawValue != nil
+        ? [self cardNumberFormatLabelForRawValue:state.panDisplayFormatRawValue.intValue]
+        : @"—";
+    NSString *policy = state.panDisplayPolicyMasked != nil
+        ? [self logYesNo:state.panDisplayPolicyMasked.boolValue]
+        : @"—";
+    [body appendFormat:@"  Format: %@    Policy masked: %@    Digits hidden: %@\n",
+     format, policy, [self logYesNo:state.isPanMasked]];
+    NSString *brand = state.cardSchemeRawValue.length > 0 ? state.cardSchemeRawValue : @"—";
+    NSString *panDigits = state.numberLength != nil ? state.numberLength.stringValue : @"0";
+    NSString *iin = state.iin.length > 0 ? state.iin : @"—";
+    [body appendFormat:@"  Brand: %@    PAN digit count: %@\n", brand, panDigits];
+    [body appendFormat:@"  IIN: %@", iin];
+    return body;
+}
+
+- (NSString *)inspectorBodyForCvcState:(HostedFieldState *)state {
+    NSMutableString *body = [NSMutableString string];
+    [body appendFormat:@"  Event: %@\n", [self hostedFieldEventDescription:state.eventType]];
+    [body appendFormat:@"  Valid: %@    Focused: %@    Empty: %@\n",
+     [self logYesNo:state.isValid], [self logYesNo:state.isFocused], [self logYesNo:state.isEmpty]];
+    NSString *cvvDigits = state.cvvLength != nil ? state.cvvLength.stringValue : @"0";
+    [body appendFormat:@"  CVV digit count: %@", cvvDigits];
+    return body;
+}
+
+- (void)refreshCombinedFieldInspectorText {
+    NSString *cardSection = self.lastCardInspectorBody ?: @"  (waiting for input…)";
+    NSString *cvcSection = self.lastCvcInspectorBody ?: @"  (waiting for input…)";
+    self.fieldStatusLabel.text = [NSString stringWithFormat:@"Card number\n%@\n\nCVC\n%@",
+                                  cardSection, cvcSection];
+}
+
+- (void)updateHostedFieldStatusFromState:(HostedFieldState *)state {
+    if (state.fieldType != FormFieldTypeCardNumber && state.fieldType != FormFieldTypeCvc) {
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (state.fieldType == FormFieldTypeCardNumber) {
+            self.lastCardInspectorBody = [self inspectorBodyForCardState:state];
+        } else if (state.fieldType == FormFieldTypeCvc) {
+            self.lastCvcInspectorBody = [self inspectorBodyForCvcState:state];
+        }
+        [self refreshCombinedFieldInspectorText];
+    });
+}
+
+- (void)refreshAggregateValidationReadout {
+    NSArray<NSNumber *> *fieldTypes = @[
+        @(FormFieldTypeFullName),
+        @(FormFieldTypeCardNumber),
+        @(FormFieldTypeCvc),
+        @(FormFieldTypeExpirationDate)
+    ];
+    BOOL allValid = [Spreedly areAllFieldsValidWithFieldTypeRawValues:fieldTypes];
+    NSArray<NSNumber *> *invalidRaw = [[SpreedlyUIManager shared] getInvalidFieldTypes];
+    NSInteger registered = [[SpreedlyUIManager shared] getRegisteredFieldCount];
+    NSMutableArray<NSString *> *invalidNames = [NSMutableArray array];
+    for (NSNumber *raw in invalidRaw) {
+        [invalidNames addObject:[self formFieldTypeDisplayName:(FormFieldType)raw.integerValue]];
+    }
+    NSString *invalidText = invalidNames.count > 0
+        ? [invalidNames componentsJoinedByString:@", "]
+        : @"none";
+    self.aggregateValidationLabel.text = [NSString stringWithFormat:
+        @"Form valid: %@ · invalid: %@ · registered: %ld",
+        [self logYesNo:allValid], invalidText, (long)registered];
+}
+
+- (void)appendHostedFieldEventLog:(HostedFieldState *)state {
+    if (state.fieldType != FormFieldTypeCardNumber && state.fieldType != FormFieldTypeCvc) {
+        return;
+    }
+    NSString *fieldLabel = state.fieldType == FormFieldTypeCardNumber ? @"card" : @"cvc";
+    NSString *event = [self inspectorEventToken:state.eventType];
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    formatter.dateFormat = @"HH:mm:ss";
+    NSString *time = [formatter stringFromDate:[NSDate date]];
+    NSString *line = [NSString stringWithFormat:@"%@ · %@ · %@", event, fieldLabel, time];
+    self.lastEventLabel.text = [NSString stringWithFormat:@"Last event: %@", line];
+    self.lastEventLabel.textColor = [event isEqualToString:@"PAN_MASK_CHANGED"]
+        ? [UIColor systemOrangeColor]
+        : [UIColor secondaryLabelColor];
+    [self.hostedFieldEventLog insertObject:line atIndex:0];
+    while (self.hostedFieldEventLog.count > 5) {
+        [self.hostedFieldEventLog removeLastObject];
+    }
+    if (self.hostedFieldEventLog.count == 0) {
+        self.eventLogLabel.text = @"Event log (last 5)\n  (no events yet)";
+    } else {
+        self.eventLogLabel.text = [NSString stringWithFormat:@"Event log (last 5)\n%@",
+                                   [self.hostedFieldEventLog componentsJoinedByString:@"\n"]];
+    }
 }
 
 @end 
