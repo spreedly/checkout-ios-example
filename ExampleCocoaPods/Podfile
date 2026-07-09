@@ -2,9 +2,9 @@ platform :ios, '14.0'
 
 # Toggle between local checkout-ios-package and remote GitHub release.
 # Set USE_LOCAL_PACKAGE = true and update LOCAL_PACKAGE path for local dev.
-LOCAL_PACKAGE = '../checkout-ios-package'
+LOCAL_PACKAGE = '../../checkout-ios-package'
 REMOTE_PACKAGE = 'https://github.com/spreedly/checkout-ios-package.git'
-PACKAGE_TAG = '1.4.0'
+PACKAGE_TAG = '1.4.1'
 USE_LOCAL_PACKAGE = false
 
 def spreedly_pods

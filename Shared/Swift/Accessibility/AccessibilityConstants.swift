@@ -1,11 +1,18 @@
 //
-//  SPLAccessibilityIdentifiers.swift
+//  AccessibilityConstants.swift
 //  MerchantExample
 //
-//
+//  Created by Vinay Naikade on 24/06/25.
 //
 
 import Foundation
+
+/// PAN/CVC display format help copy for the example app mask/format demo section.
+public enum HostedCardDisplayFormatCopy {
+    public static let maskToggleCaption =
+        "Pretty: grouped spaced digits (focus and blur). Plain: all digits visible. Masked: every digit * while typing. toggleMask() toggles plain ↔ masked (first tap from Pretty default → masked)."
+    public static let sectionLabel = "Card display format (setNumberFormat)"
+}
 
 /// Centralized accessibility identifiers for the MerchantExample app
 /// This helps reduce duplication and makes UI testing easier
@@ -23,9 +30,51 @@ public enum AccessibilityIdentifiers {
         public static let offsitePaymentFlowLink = "offsite-payment-flow-navigation-link"
         public static let ebanxPaymentFlowLink = "ebanx-payment-flow-navigation-link"
         public static let stripeAPMPaymentFlowLink = "stripe-apm-payment-flow-navigation-link"
+        public static let bankAccountCheckoutLink = "bank-account-checkout-navigation-link"
+        public static let bankAccountCustomFormLink = "bank-account-custom-form-navigation-link"
         public static let aboutSection = "about-section"
     }
     
+    // MARK: - Bank Account Checkout View (ACH)
+    public enum BankAccountCheckout {
+        public static let title = "bank-account-checkout-title"
+        public static let description = "bank-account-checkout-description"
+        public static let showFormButton = "show-bank-account-form-button"
+        public static let successIcon = "bank-account-success-icon"
+        public static let successTitle = "bank-account-success-title"
+        public static let transactionTokenText = "bank-account-transaction-token-text"
+        public static let errorMessage = "bank-account-error-message"
+        public static let loadingProgressView = "bank-account-loading-progress-view"
+        public static let nameDisplayModePicker = "bank-account-name-display-mode-picker"
+        public static let showBankNameToggle = "bank-account-show-bank-name-toggle"
+        public static let showAccountTypeToggle = "bank-account-show-account-type-toggle"
+        public static let showAccountHolderTypeToggle = "bank-account-show-account-holder-type-toggle"
+    }
+
+    // MARK: - Bank Account Custom Form View (Headless ACH)
+    public enum BankAccountCustomForm {
+        public static let title = "bank-account-custom-form-title"
+        public static let description = "bank-account-custom-form-description"
+        public static let componentsTitle = "bank-account-custom-form-components-title"
+        public static let nameComponent = "bank-account-custom-form-name-component"
+        public static let bankNameComponent = "bank-account-custom-form-bank-name-component"
+        public static let routingNumberComponent = "bank-account-custom-form-routing-number-component"
+        public static let accountNumberComponent = "bank-account-custom-form-account-number-component"
+        public static let configurationTitle = "bank-account-custom-form-configuration-title"
+        public static let nameDisplayModePicker = "bank-account-custom-form-name-display-mode-picker"
+        public static let showBankNameToggle = "bank-account-custom-form-show-bank-name-toggle"
+        public static let allowBlankNameToggle = "bank-account-custom-form-allow-blank-name-toggle"
+        public static let accountTypePicker = "bank-account-custom-form-account-type-picker"
+        public static let holderTypePicker = "bank-account-custom-form-holder-type-picker"
+        public static let bankNameField = "bank-account-custom-form-bank-name-field"
+        public static let fieldsSection = "bank-account-custom-form-fields-section"
+        public static let payButton = "bank-account-custom-form-pay-button"
+        public static let successIcon = "bank-account-custom-form-success-icon"
+        public static let successTitle = "bank-account-custom-form-success-title"
+        public static let tokenText = "bank-account-custom-form-token-text"
+        public static let errorMessage = "bank-account-custom-form-error-message"
+    }
+
     // MARK: - Basic Checkout View
     public enum BasicCheckout {
         public static let title = "basic-checkout-title"
@@ -43,6 +92,7 @@ public enum AccessibilityIdentifiers {
         public static let allowBlankNameToggle = "allow-blank-name-toggle"
         public static let allowExpiredDateToggle = "allow-expired-date-toggle"
         public static let allowBlankDateToggle = "allow-blank-date-toggle"
+        public static let enableAutofillToggle = "basic-checkout-enable-autofill-toggle"
         public static let yearFormatPicker = "year-format-picker"
         public static let yearFormatLabel = "year-format-label"
         public static let yearFormatPickerContainer = "year-format-picker-container"
@@ -110,8 +160,18 @@ public enum AccessibilityIdentifiers {
         public static let allowBlankNameToggle = "custom-form-allow-blank-name-toggle"
         public static let allowExpiredDateToggle = "custom-form-allow-expired-date-toggle"
         public static let allowBlankDateToggle = "custom-form-allow-blank-date-toggle"
+        public static let eligibleForCardUpdaterToggle = "custom-form-eligible-for-card-updater-toggle"
+        public static let enableAutofillToggle = "custom-form-enable-autofill-toggle"
         public static let combinedExpiryDateToggle = "custom-form-combined-expiry-date-toggle"
         public static let yearFormatPicker = "custom-form-year-format-picker"
+        public static let themeConfigurationTitle = "custom-form-theme-configuration-title"
+        public static let useCustomThemeToggle = "custom-form-use-custom-theme-toggle"
+        public static let currentTheme = "custom-form-current-theme"
+        public static let customThemeColorsLabel = "custom-form-custom-theme-colors-label"
+        public static let blueThemeButton = "custom-form-blue-theme-button"
+        public static let greenThemeButton = "custom-form-green-theme-button"
+        public static let purpleThemeButton = "custom-form-purple-theme-button"
+        public static let resetThemeButton = "custom-form-reset-theme-button"
         public static let configurationSection = "custom-form-configuration-section"
         public static let cardHolderNameLabel = "custom-form-card-holder-name-label"
         public static let cardHolderNameField = "custom-form-card-holder-name-field"
@@ -253,6 +313,13 @@ public enum AccessibilityIdentifiers {
         public static let title = "stripe-apm-payment-title"
         public static let description = "stripe-apm-payment-description"
         public static let apmSectionTitle = "stripe-apm-payment-apm-section-title"
+        public static let appearanceSectionTitle = "stripe-apm-payment-appearance-section-title"
+        public static let useCustomAppearanceToggle = "stripe-apm-payment-use-custom-appearance-toggle"
+        public static let primaryColorPicker = "stripe-apm-payment-primary-color-picker"
+        public static let backgroundColorPicker = "stripe-apm-payment-background-color-picker"
+        public static let buttonBackgroundColorPicker = "stripe-apm-payment-button-background-color-picker"
+        public static let buttonTextColorPicker = "stripe-apm-payment-button-text-color-picker"
+        public static let cornerRadiusStepper = "stripe-apm-payment-corner-radius-stepper"
         public static let startButton = "stripe-apm-payment-start-button"
         public static let successIcon = "stripe-apm-payment-success-icon"
         public static let successTitle = "stripe-apm-payment-success-title"
@@ -296,9 +363,42 @@ public enum AccessibilityHints {
         public static let offsitePaymentFlowLink = "Navigate to offsite payment flow screen"
         public static let ebanxPaymentFlowLink = "Navigate to EBANX payment flow screen"
         public static let stripeAPMPaymentFlowLink = "Navigate to Stripe APM payment flow screen"
+        public static let bankAccountCheckoutLink = "Navigate to ACH bank account drop-in form demo"
+        public static let bankAccountCustomFormLink = "Navigate to headless ACH bank account custom form demo"
         public static let aboutSection = "Information about the Spreedly SDK examples"
     }
     
+    // MARK: - Bank Account Checkout View (ACH)
+    public enum BankAccountCheckout {
+        public static let title = "ACH bank account drop-in demonstration"
+        public static let description = "Shows the pre-built BankAccountFormDropIn that tokenizes US/Canadian bank accounts"
+        public static let showFormButton = "Open the bank account form sheet"
+        public static let successIcon = "Bank account tokenization succeeded"
+        public static let successTitle = "Bank account tokenized"
+        public static let transactionTokenText = "Tokenization token returned by Spreedly"
+        public static let errorMessage = "Bank account tokenization failed"
+        public static let loadingProgressView = "Bank account request in flight"
+        public static let nameDisplayModePicker = "Pick single full-name or separate first and last name fields"
+        public static let showBankNameToggle = "Toggle the optional bank name field"
+        public static let showAccountTypeToggle = "Toggle the checking versus savings selector"
+        public static let showAccountHolderTypeToggle = "Toggle the personal versus business selector"
+    }
+
+    // MARK: - Bank Account Custom Form View (Headless ACH)
+    public enum BankAccountCustomForm {
+        public static let title = "Headless ACH bank account custom form"
+        public static let description = "Shows headless ACH built field-by-field with SPLTextFields and Spreedly.shared().createBankAccount(...)"
+        public static let componentsTitle = "List of headless ACH form components used"
+        public static let configurationTitle = "Configuration options for the headless ACH form"
+        public static let payButton = "Tokenize the bank account using createBankAccount"
+        public static let errorMessage = "Tokenization or validation error from the ACH form"
+        public static let nameDisplayModePicker = "Pick single full-name or separate first and last name fields"
+        public static let showBankNameToggle = "Toggle the optional bank name field"
+        public static let allowBlankNameToggle = "Toggle whether the account holder name is required"
+        public static let accountTypePicker = "Choose checking or savings account"
+        public static let holderTypePicker = "Choose personal or business account holder"
+    }
+
     // MARK: - Basic Checkout View
     public enum BasicCheckout {
         public static let title = "Basic checkout component demonstration"
@@ -316,6 +416,7 @@ public enum AccessibilityHints {
         public static let allowBlankNameToggle = "Toggle to allow or require card holder name"
         public static let allowExpiredDateToggle = "Toggle to allow or prevent expired card dates"
         public static let allowBlankDateToggle = "Toggle to allow or require expiration date"
+        public static let enableAutofillToggle = "Toggle Wallet and edit-menu autofill on hosted fields in the drop-in"
         public static let yearFormatPicker = "Choose between 2-digit or 4-digit year format"
         public static let yearFormatLabel = "Label for year format selection"
         public static let yearFormatPickerContainer = "Container for year format picker"
@@ -383,8 +484,18 @@ public enum AccessibilityHints {
         public static let allowBlankNameToggle = "Toggle to allow or require card holder name"
         public static let allowExpiredDateToggle = "Toggle to allow or prevent expired card dates"
         public static let allowBlankDateToggle = "Toggle to allow or require expiration date"
+        public static let eligibleForCardUpdaterToggle = "Toggle to opt this card into automatic card updater enrollment"
+        public static let enableAutofillToggle = "Toggle Wallet and edit-menu autofill on hosted fields"
         public static let combinedExpiryDateToggle = "Toggle to enable or disable combined expiry date field"
         public static let yearFormatPicker = "Choose between 2-digit or 4-digit year format"
+        public static let themeConfigurationTitle = "Section title for theme configuration options"
+        public static let useCustomThemeToggle = "Toggle to enable or disable custom theme on headless fields"
+        public static let currentTheme = "Current selected theme indicator"
+        public static let customThemeColorsLabel = "Label for custom theme color options"
+        public static let blueThemeButton = "Button to apply blue light and dark themes"
+        public static let greenThemeButton = "Button to apply green light and dark themes"
+        public static let purpleThemeButton = "Button to apply purple light and dark themes"
+        public static let resetThemeButton = "Button to reset headless fields to the default theme"
         public static let configurationSection = "Configuration options for the custom form"
         public static let cardHolderNameLabel = "Label for card holder name field"
         public static let cardHolderNameField = "Enter the name as it appears on the card"
@@ -524,6 +635,13 @@ public enum AccessibilityHints {
         public static let title = "Stripe APM payment flow screen"
         public static let description = "Create a Stripe APM pending purchase and complete checkout via PaymentSheet"
         public static let apmSectionTitle = "Section title for Stripe APM type selection"
+        public static let appearanceSectionTitle = "Section title for Stripe PaymentSheet appearance options"
+        public static let useCustomAppearanceToggle = "Toggle to apply custom Stripe PaymentSheet appearance"
+        public static let primaryColorPicker = "Color picker for Stripe PaymentSheet primary brand color"
+        public static let backgroundColorPicker = "Color picker for Stripe PaymentSheet background color"
+        public static let buttonBackgroundColorPicker = "Color picker for Stripe PaymentSheet pay button background"
+        public static let buttonTextColorPicker = "Color picker for Stripe PaymentSheet pay button text color"
+        public static let cornerRadiusStepper = "Stepper for Stripe PaymentSheet corner radius"
         public static let startButton = "Tap to start Stripe APM payment flow"
         public static let successIcon = "Success indicator icon"
         public static let successTitle = "Stripe APM checkout success message"
@@ -567,9 +685,40 @@ public enum AccessibilityLabels {
         public static let offsitePaymentFlowLink = "Offsite Payment Flow"
         public static let ebanxPaymentFlowLink = "EBANX Payment Flow"
         public static let stripeAPMPaymentFlowLink = "Stripe APM Payment Flow"
+        public static let bankAccountCheckoutLink = "ACH Bank Account Drop-In"
+        public static let bankAccountCustomFormLink = "ACH Bank Account – Custom Form"
         public static let aboutSection = "About Spreedly SDK for iOS"
     }
     
+    // MARK: - Bank Account Checkout View (ACH)
+    public enum BankAccountCheckout {
+        public static let title = "ACH Bank Account Drop-In"
+        public static let showFormButton = "Show Bank Account Form"
+        public static let successIcon = "Success"
+        public static let successTitle = "Bank Account Tokenized"
+        public static let transactionTokenText = "Tokenization Token"
+        public static let nameDisplayModePicker = "Name Display Mode"
+        public static let showBankNameToggle = "Show Bank Name Field"
+        public static let showAccountTypeToggle = "Show Account Type Selector"
+        public static let showAccountHolderTypeToggle = "Show Account Holder Type Selector"
+    }
+
+    // MARK: - Bank Account Custom Form View (Headless ACH)
+    public enum BankAccountCustomForm {
+        public static let title = "Headless ACH Bank Account Form"
+        public static let componentsTitle = "Form Components"
+        public static let configurationTitle = "Configuration Options"
+        public static let nameDisplayModePicker = "Name Display Mode"
+        public static let accountTypePicker = "Account Type"
+        public static let holderTypePicker = "Account Holder Type"
+        public static let showBankNameToggle = "Show Bank Name Field"
+        public static let allowBlankNameToggle = "Allow Blank Name"
+        public static let payButton = "Pay Now"
+        public static let successIcon = "Success"
+        public static let successTitle = "Bank Account Tokenized"
+        public static let tokenText = "Payment Token"
+    }
+
     // MARK: - Basic Checkout View
     public enum BasicCheckout {
         public static let title = "Basic Checkout Component"
@@ -584,6 +733,7 @@ public enum AccessibilityLabels {
         public static let allowBlankNameToggle = "Allow Blank Name"
         public static let allowExpiredDateToggle = "Allow Expired Date"
         public static let allowBlankDateToggle = "Allow Blank Date"
+        public static let enableAutofillToggle = "Enable autofill"
         public static let yearFormatLabel = "Year Format"
         public static let yearFormatTwoDigit = "YY"
         public static let yearFormatFourDigit = "YYYY"
@@ -631,6 +781,15 @@ public enum AccessibilityLabels {
         public static let expiryDateLabel = "Expiry Date"
         public static let expiryMonthLabel = "Expiry Month"
         public static let expiryYearLabel = "Expiry Year"
+        public static let eligibleForCardUpdaterToggle = "Eligible for Card Updater"
+        public static let enableAutofillToggle = "Enable autofill"
+        public static let themeConfigurationTitle = "Theme Configuration"
+        public static let useCustomThemeToggle = "Use Custom Theme"
+        public static let customThemeColorsLabel = "Custom Theme Colors"
+        public static let blueThemeButton = "Apply blue theme"
+        public static let greenThemeButton = "Apply green theme"
+        public static let purpleThemeButton = "Apply purple theme"
+        public static let resetThemeButton = "Reset to default theme"
     }
     
     // MARK: - Custom Theme Form View
@@ -725,6 +884,13 @@ public enum AccessibilityLabels {
         public static let title = "Stripe APM Payment Flow"
         public static let description = "Create Stripe APM pending purchase and complete checkout"
         public static let apmSectionTitle = "Select Stripe APM types"
+        public static let appearanceSectionTitle = "PaymentSheet appearance"
+        public static let useCustomAppearanceToggle = "Customize PaymentSheet appearance"
+        public static let primaryColorPicker = "Primary color"
+        public static let backgroundColorPicker = "Background color"
+        public static let buttonBackgroundColorPicker = "Pay button background"
+        public static let buttonTextColorPicker = "Pay button text"
+        public static let cornerRadiusStepper = "Corner radius"
         public static let startButton = "Start Stripe APM Flow"
         public static let successIcon = "Success"
         public static let successTitle = "Success"
