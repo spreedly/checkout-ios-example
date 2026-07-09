@@ -40,16 +40,16 @@ struct BraintreePurchaseTransaction: Codable {
     }
 }
 
-struct BraintreeOffsitePaymentMethod: Codable {
-    let paymentMethodType: String
-    let offsiteSync: Bool
+public struct BraintreeOffsitePaymentMethod: Codable {
+    public let paymentMethodType: String
+    public let offsiteSync: Bool
 
     private enum CodingKeys: String, CodingKey {
         case paymentMethodType = "payment_method_type"
         case offsiteSync = "offsite_sync"
     }
 
-    init(paymentMethodType: String) {
+    public init(paymentMethodType: String) {
         self.paymentMethodType = paymentMethodType
         self.offsiteSync = true
     }
@@ -57,18 +57,32 @@ struct BraintreeOffsitePaymentMethod: Codable {
 
 // MARK: - Gateway specific fields
 
-struct BraintreeGatewaySpecificFields: Codable {
-    let braintree: BraintreeFields
+public struct BraintreeGatewaySpecificFields: Codable {
+    public let braintree: BraintreeFields
 
-    struct BraintreeFields: Codable {
-        let paypalFlowType: String?
-        let venmoFlowType: String?
-        let venmoProfileId: String?
+    public init(braintree: BraintreeFields) {
+        self.braintree = braintree
+    }
+
+    public struct BraintreeFields: Codable {
+        public let paypalFlowType: String?
+        public let venmoFlowType: String?
+        public let venmoProfileId: String?
 
         private enum CodingKeys: String, CodingKey {
             case paypalFlowType = "paypal_flow_type"
             case venmoFlowType = "venmo_flow_type"
             case venmoProfileId = "venmo_profile_id"
+        }
+
+        public init(
+            paypalFlowType: String? = nil,
+            venmoFlowType: String? = nil,
+            venmoProfileId: String? = nil
+        ) {
+            self.paypalFlowType = paypalFlowType
+            self.venmoFlowType = venmoFlowType
+            self.venmoProfileId = venmoProfileId
         }
     }
 }

@@ -142,6 +142,7 @@ struct OffsitePaymentFlowView: View {
         .onAppear {
             setupSubscriptions()
         }
+        .onDisappear(perform: cleanupSubscriptions)
     }
     
     private var headerSection: some View {
@@ -277,6 +278,11 @@ struct OffsitePaymentFlowView: View {
         paymentResultCancellable = Spreedly.shared().subscribeToPaymentResults { result in
             handlePaymentResult(result)
         }
+    }
+
+    private func cleanupSubscriptions() {
+        paymentResultCancellable?.cancel()
+        paymentResultCancellable = nil
     }
     
     // Step 1: Tokenization — generate signature, build config, create payment method

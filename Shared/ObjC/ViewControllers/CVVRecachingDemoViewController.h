@@ -11,7 +11,7 @@
 
 // Note: This is the demo/example view controller
 // The SDK's CVVRecachingViewController is in SpreedlyUI module
-@interface CVVRecachingDemoViewController : UIViewController <SpreedlyPaymentDelegate>
+@interface CVVRecachingDemoViewController : UIViewController <SpreedlyRecacheDelegate>
 
 @end
 

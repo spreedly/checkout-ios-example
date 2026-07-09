@@ -52,9 +52,9 @@ When you present `DoChallengeIfNeeded`, the SDK manages two internal phases auto
 | **Device fingerprint** | Hidden WKWebView (background, non-interactive) | No — runs silently |
 | **Challenge** | `ASWebAuthenticationSession` | Yes — system-managed secure browser with visible URL bar |
 
-**Device fingerprint:** The SDK injects a hidden 1×1 WKWebView to collect device fingerprint data. This is non-interactive and follows industry standard practice for 3DS device data collection.
+**Device fingerprint:** The SDK injects a hidden 1×1 WKWebView to collect device fingerprint data. This is non-interactive and follows industry standard practice for 3DS device data collection. **Braintree exception:** when the transaction's `gateway_type` is `braintree`, the SDK skips the device fingerprint phase entirely and routes directly to the challenge step — no hidden WebView is loaded for Braintree transactions.
 
-**Challenge (`ASWebAuthenticationSession`):** When the gateway requires user interaction (e.g. OTP entry or biometric verification), the SDK presents `ASWebAuthenticationSession` — Apple's endorsed API for web-based authentication. The browser shows the bank's domain (anti-phishing) and stays in-app; **no `Info.plist` registration, redirect URL, or `onOpenURL` handler is needed**. Challenge completion is detected by status polling (every 2 seconds), which dismisses the session automatically.
+**Challenge (`ASWebAuthenticationSession`):** When the gateway requires user interaction (e.g. OTP entry or biometric verification), the SDK presents `ASWebAuthenticationSession` — Apple's endorsed API for web-based authentication. The browser shows the bank's domain (anti-phishing) and stays in-app; **no `Info.plist` registration, redirect URL, or `onOpenURL` handler is needed**. The SDK detects challenge completion in the background and dismisses the session automatically.
 
 **User cancellation:** If the user taps **"Cancel"** in the authentication session during the challenge, the SDK treats it as a failure and emits `ThreeDSChallengeResult` with `isFailure == true`. The error message will contain `"3DS challenge canceled by user"`. Handle this in your `isFailure` branch.
 
@@ -123,7 +123,7 @@ After your backend returns a purchase/authorize response:
 
 - If `response.errors` is non-empty: surface the error and stop the flow.
 - If `transaction` is missing: treat it as an error and stop the flow.
-- If `transaction.state == "pending"` or `transaction.scaAuthentication?.requiredAction == "device_fingerprint"`: present the challenge UI.
+- If `transaction.state == "pending"` or `transaction.scaAuthentication?.requiredAction == "device_fingerprint"`: present the challenge UI. For Braintree transactions the SDK will skip device fingerprint and go directly to the challenge step.
 - If `transaction.state == "succeeded"`: show success immediately and skip the challenge UI.
 
 When showing error messages during gateway-specific flows, use your normal error handling to decide what to display to the user.
@@ -174,6 +174,17 @@ GatewaySpecific3DSIntegration.finalizeTransaction(
 ```
 
 **For Objective-C**, use `GatewaySpecific3DSObjCBridge.finalizeTransactionForTransactionToken:completeResponseData:error:` instead — it accepts raw `NSData` from `/complete.json` and handles decoding internally.
+
+### Completion safety net
+
+After `GatewaySpecific3DSTriggerCompletion` fires, the SDK also watches the transaction status in the background with a reasonable timeout. If your backend calls `/complete.json` but you skip `finalizeTransaction`, the SDK still resolves the flow:
+
+- If the transaction reaches `succeeded`, the SDK emits `ThreeDSChallengeResult.success`.
+- If the transaction reaches `pending + challenge`, the SDK starts the challenge presentation automatically (a presenting view controller must still be available).
+- If the transaction reaches `gateway_processing_failed` / `failed`, the SDK emits `ThreeDSChallengeResult.failed`.
+- If the poll times out without a terminal state, the SDK emits an error suggesting `finalizeTransaction` for explicit control.
+
+Calling `finalizeTransaction` (or the ObjC bridge equivalent) cancels the safety-net poll immediately, so the explicit path always wins. **The safety net is a fallback — `finalizeTransaction` remains the recommended integration.**
 
 ---
 
@@ -612,9 +623,11 @@ Set the delegate before presenting. Use `NSNotificationCenter` to observe `Gatew
 
 ---
 
-## Device Fingerprint Polling
+## Device Fingerprint Phase
 
-The SDK polls `status.json` every 2 seconds for up to approximately 20 seconds (10 attempts). If it times out or receives a Worldpay postMessage, it emits `GatewaySpecific3DSTriggerCompletion` so you can call `/complete.json` on your backend.
+The SDK collects device fingerprint data in the background with a short timeout. When fingerprinting is ready (or the timeout elapses), the SDK posts `GatewaySpecific3DSTriggerCompletion` so you can call `/complete.json` on your backend.
+
+**Note (Braintree):** Braintree transactions skip device fingerprint entirely and proceed directly to the challenge step, so this polling phase is not entered for Braintree.
 
 ---
 

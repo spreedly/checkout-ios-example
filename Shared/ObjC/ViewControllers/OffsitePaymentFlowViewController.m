@@ -89,6 +89,21 @@ typedef NS_ENUM(NSInteger, OffsiteStage) {
     [self updateStageIndicator];
 }
 
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [self cleanupPaymentDelegate];
+}
+
+- (void)dealloc {
+    [self cleanupPaymentDelegate];
+}
+
+- (void)cleanupPaymentDelegate {
+    if ([Spreedly shared].paymentDelegate == self) {
+        [Spreedly shared].paymentDelegate = nil;
+    }
+}
+
 - (NSArray<OffsiteProduct *> *)buildProducts {
     return @[
         [self productWithId:@"prod_1" name:@"Wireless Earbuds" price:@"99" description:@"Premium wireless earbuds" iconName:@"airpods"],

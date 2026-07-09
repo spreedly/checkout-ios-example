@@ -113,6 +113,24 @@ Spreedly.setup(config: SpreedlyConfig(
 ))
 ```
 
+### `Spreedly.isInitialized` is false
+
+**Cause:** The SDK instance was never created, or initialization was blocked (device integrity).
+
+**Fix:** Call `initializeSDK()` then `setup(config:)` with a valid `environmentKey` and signed fields from your server. If the device is untrusted, check `Spreedly.initializationError` and show fallback UI. See [SDK lifecycle — `isInitialized`](getting-started.md#isinitialized--when-to-use-it).
+
+### Checkout UI enabled but payments fail (credentials)
+
+**Cause:** `setup(config:)` was not called with a fresh nonce/signature for this session (or only `initializeSDK()` was called).
+
+**Fix:** Fetch signature parameters from your backend **before** each checkout, then `setup(config:)` until `isInitialized` is `true`. See [SDK lifecycle](getting-started.md#sdk-lifecycle).
+
+### Do I need `destroy()` or `Spreedly.destroy()`?
+
+**Cause:** Expecting a web iframe-style teardown API.
+
+**Fix:** There is no `destroy()`. When the customer leaves checkout: **`reset()`**, cancel your payment subscriptions, remove field view controllers. For a new nonce/signature: **`setup(config:)`** again. See [SDK lifecycle — No destroy](getting-started.md#no-destroy-web-iframe-habit) and [Common mistakes](getting-started.md#common-mistakes).
+
 ### Card form is blank or fields don't appear
 
 **Cause:** The `CardFormDropIn` view has zero height because it's not given enough space in the layout.
@@ -267,7 +285,7 @@ SPLThemeConfig *config = [[SPLThemeConfig alloc]
 
 **Cause:** `SpreedlyKeys.xcconfig` contains secrets and is gitignored. CI needs to generate it.
 
-**Fix:** Use a `ci_post_clone.sh` script to generate the xcconfig from environment variables.
+**Fix:** Generate the xcconfig from environment variables in your CI build step.
 ### Package.resolved desync
 
 **Cause:** Local `Package.resolved` doesn't match what CI resolves.

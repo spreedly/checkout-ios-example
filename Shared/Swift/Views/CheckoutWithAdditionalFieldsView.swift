@@ -47,6 +47,7 @@ struct CheckoutWithAdditionalFieldsView: View {
     @State private var allowExpiredDate: Bool = false
     @State private var allowBlankDate: Bool = false
     @State private var yearFormat: YearFormat = .fourDigit
+    @State private var enableAutofill: Bool = true
 
     // Step 3: Define additional fields — these are passed to CardFormDropIn via `otherFields`
     // Each FormField has: id (unique key), title (label), type (determines validation & keyboard), isRequired
@@ -155,7 +156,7 @@ struct CheckoutWithAdditionalFieldsView: View {
                         .stroke(cardBorderColor, lineWidth: 1)
                 )
                 .shadow(color: cardShadowColor, radius: 4, x: 0, y: 0)
-                
+
                 // Configuration toggles
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Configuration Options:")
@@ -329,6 +330,7 @@ struct CheckoutWithAdditionalFieldsView: View {
             CardFormDropIn(
                 otherFields: additionalFields,
                 yearFormat: yearFormat,
+                displayConfig: CardFormDropInDisplayConfig(enableAutofill: enableAutofill),
                 onProcessingResult: { processingResult in
                     if processingResult.isProcessing {
                         isLoading = true
@@ -413,6 +415,7 @@ struct CheckoutWithAdditionalFieldsView: View {
     private var cardShadowColor: Color {
         colorScheme == .dark ? Color.black.opacity(0.5) : Color(hex: "#AFB4B5").opacity(0.8)
     }
+
 }
 
 #Preview {

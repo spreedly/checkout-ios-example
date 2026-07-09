@@ -1,15 +1,17 @@
 # Migration guides
 
-This directory holds migration guides for Spreedly iOS SDK major-version upgrades. Pick the file matching your upgrade path.
+Pick the guide that matches your upgrade path.
 
-## Naming convention
+## From web iframe-ui
 
-Each guide is named `vN-to-vN+1.md`, where `N` is the previous major and `N+1` is the new major:
-
-| File | Covers |
+| Guide | Covers |
 |---|---|
-| `v1-to-v2.md` | Migrating an integration from `1.x` to `2.0.0` |
-| `v2-to-v3.md` | Migrating an integration from `2.x` to `3.0.0` |
+| [from-legacy.md](from-legacy.md) | iframe-ui / iFrame v1 → native **`SPLTextField`** or **`CardFormDropIn`**: `HostedFieldState` (including **`iin`** prefix on card number), `setNumberFormat` / `toggleMask`, headless vs express matrix, **not the same as iframe** gaps (`luhnValid`, `setValue`), mapping tables, and code samples |
+| [Headless PAN API quick reference](../custom-payment-forms.md#headless-pan-api-quick-reference) | SwiftUI, UIKit, and Objective-C cheat sheet — field params, global mask APIs, `HostedFieldState`, pay/validate (headless only) |
+
+## Major-version upgrades
+
+When a new **major** iOS SDK version ships, migration guides are published here as `vN-to-vN+1.md` and linked from [`CHANGELOG.md`](../../CHANGELOG.md). Until a guide exists for your target major, use the CHANGELOG **Breaking Changes** section and re-run your integration tests after bumping the package version.
 
 ## What you'll find in a guide
 

@@ -24,7 +24,7 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
     ThemeOptionPurple = 3
 };
 
-@interface CVVRecachingDemoViewController () <UIScrollViewDelegate, SpreedlyPaymentDelegate>
+@interface CVVRecachingDemoViewController () <UIScrollViewDelegate, SpreedlyRecacheDelegate, SpreedlyPaymentDelegate>
 
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIView *contentView;
@@ -107,10 +107,9 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
     // Set scroll view delegate
     self.scrollView.delegate = self;
     
-    // MARK: - Set Up Payment Result Delegate
-    // Delegate receives recaching results via paymentDidComplete: method
+    [Spreedly.shared setRecacheDelegate:self];
     [Spreedly.shared setPaymentDelegate:self];
-    
+
     // MARK: - Fetch Payment Methods from API
     [self fetchPaymentMethods];
 }
@@ -121,8 +120,22 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
     [self updateRecacheButtonState];
 }
 
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [self cleanupSpreedlyDelegates];
+}
+
 - (void)dealloc {
-    // Cleanup if needed
+    [self cleanupSpreedlyDelegates];
+}
+
+- (void)cleanupSpreedlyDelegates {
+    if ([Spreedly shared].recacheDelegate == self) {
+        [Spreedly shared].recacheDelegate = nil;
+    }
+    if ([Spreedly shared].paymentDelegate == self) {
+        [Spreedly shared].paymentDelegate = nil;
+    }
 }
 
 - (void)fetchPaymentMethods {
@@ -578,11 +591,11 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
         [self.cancelButtonTextField.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
         [self.cancelButtonTextField.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
         [self.cancelButtonTextField.heightAnchor constraintEqualToConstant:44],
-        
+
         [allowBlankNameLabel.topAnchor constraintEqualToAnchor:self.cancelButtonTextField.bottomAnchor constant:[ThemeHelper spacingMD]],
         [allowBlankNameLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
         [allowBlankNameLabel.centerYAnchor constraintEqualToAnchor:self.allowBlankNameSwitch.centerYAnchor],
-        
+
         [self.allowBlankNameSwitch.topAnchor constraintEqualToAnchor:self.cancelButtonTextField.bottomAnchor constant:[ThemeHelper spacingMD]],
         [self.allowBlankNameSwitch.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
         
@@ -1353,10 +1366,13 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
 }
 
 - (void)recacheButtonTapped {
-    // MARK: - Recache Button Action
-    // Prepares configuration and presents SDK's CVV recaching UI
-    
     if (!self.selectedCard) {
+        return;
+    }
+
+    if (!Spreedly.isDeviceTrusted) {
+        self.errorMessage = @"Device integrity check failed. Recache is not available on this device.";
+        [self updateUI];
         return;
     }
     
@@ -1431,7 +1447,7 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
                        onProcessingResult:^(PaymentProcessingResult *result) {
                 // MARK: - Processing Result Callback
                 // Called during recaching: isValidationFailed = validation error, isProcessing = request started
-                // Final success/failure comes via paymentDidComplete: delegate method
+                // Final success/failure comes via recacheDidComplete: delegate method
                 __weak typeof(self) weakSelf = self;
                 dispatch_async(dispatch_get_main_queue(), ^{
                     __strong typeof(weakSelf) strongSelf = weakSelf;
@@ -1443,7 +1459,7 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
                     } else if (result.isProcessing) {
                         // Processing started - final result comes via delegate
                     } else if (result.isSuccess) {
-                        // Dismiss UI - final result handled in paymentDidComplete:
+                        // Dismiss UI - final result handled in recacheDidComplete:
                         [strongSelf dismissViewControllerAnimated:YES completion:nil];
                     }
                 });
@@ -1464,7 +1480,7 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
                        onProcessingResult:^(PaymentProcessingResult *result) {
                 // MARK: - Processing Result Callback
                 // Called during recaching: isValidationFailed = validation error, isProcessing = request started
-                // Final success/failure comes via paymentDidComplete: delegate method
+                // Final success/failure comes via recacheDidComplete: delegate method
                 __weak typeof(self) weakSelf = self;
                 dispatch_async(dispatch_get_main_queue(), ^{
                     __strong typeof(weakSelf) strongSelf = weakSelf;
@@ -1476,7 +1492,7 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
                     } else if (result.isProcessing) {
                         // Processing started - final result comes via delegate
                     } else if (result.isSuccess) {
-                        // Dismiss UI - final result handled in paymentDidComplete:
+                        // Dismiss UI - final result handled in recacheDidComplete:
                         [strongSelf dismissViewControllerAnimated:YES completion:nil];
                     }
                 });
@@ -1695,9 +1711,30 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
 
 #pragma mark - SpreedlyPaymentDelegate
 
-// MARK: - Payment Result Delegate Method
-// Called when recaching completes with final PaymentResult (success or failure)
 - (void)paymentDidComplete:(PaymentResult *)result {
+    if (!result.isFailure) {
+        return;
+    }
+    // Blocked-device recache failures publish on the payment channel, not recache.
+    self.isLoading = NO;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.loadingIndicator stopAnimating];
+        self.paymentResult = result;
+        if (self.presentedViewController) {
+            [self.presentedViewController dismissViewControllerAnimated:YES completion:nil];
+        }
+        if (result.failureDetails) {
+            self.errorMessage = [result.failureDetails getDescription];
+        } else {
+            self.errorMessage = @"Recache blocked or payment failed";
+        }
+        [self updateUI];
+    });
+}
+
+#pragma mark - SpreedlyRecacheDelegate
+
+- (void)recacheDidComplete:(PaymentResult *)result {
     self.isLoading = NO;
     
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -1706,7 +1743,7 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
         if (result.isSuccess) {
             // MARK: - Recaching Success
             // Payment method token updated with new CVV - ready for transactions
-            
+
             // Clear error state FIRST before setting success
             self.errorMessage = nil;
             

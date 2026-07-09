@@ -197,7 +197,7 @@ public class PurchaseAPIClient {
         return try await postHeroku(path: "create-purchase", body: body)
     }
 
-    /// Heroku Braintree purchase: POST braintree-purchase (flat body + channel "app")
+    /// Heroku Braintree purchase: POST create-purchase (gateway "braintree").
     public func braintreePurchase(
         amount: Decimal,
         currencyCode: String,
@@ -205,25 +205,60 @@ public class PurchaseAPIClient {
         callbackUrl: String,
         paymentMethodType: String
     ) async throws -> PurchaseResponse {
-        let body = HerokuBraintreePurchaseRequest(
+        let gatewaySpecificFields = Self.braintreeGatewaySpecificFields(for: paymentMethodType)
+        let transaction = HerokuBraintreeCreatePurchaseTransaction(
             amount: amount,
             currencyCode: currencyCode,
             redirectUrl: redirectUrl,
             callbackUrl: callbackUrl,
             channel: "app",
-            paymentMethodType: paymentMethodType
+            paymentMethodType: paymentMethodType,
+            gatewaySpecificFields: gatewaySpecificFields
         )
-        return try await postHeroku(path: "braintree-purchase", body: body)
+        let body = HerokuBraintreeCreatePurchaseRequest(transaction: transaction)
+        return try await postHeroku(path: "create-purchase", body: body)
     }
 
-    /// Heroku Braintree confirm: POST transactions/{token}/confirm (no device_data)
+    private static func braintreeGatewaySpecificFields(
+        for paymentMethodType: String
+    ) -> BraintreeGatewaySpecificFields? {
+        switch paymentMethodType.lowercased() {
+        case "venmo":
+            return BraintreeGatewaySpecificFields(
+                braintree: BraintreeGatewaySpecificFields.BraintreeFields(
+                    paypalFlowType: nil,
+                    venmoFlowType: "multi_use",
+                    venmoProfileId: "12345"
+                )
+            )
+        case "paypal":
+            return BraintreeGatewaySpecificFields(
+                braintree: BraintreeGatewaySpecificFields.BraintreeFields(
+                    paypalFlowType: "checkout",
+                    venmoFlowType: nil,
+                    venmoProfileId: nil
+                )
+            )
+        default:
+            return nil
+        }
+    }
+
+    /// Heroku Braintree confirm: POST transactions/{token}/confirm (no device_data).
+    /// Successful: `nonce` + `paymentMethodType`. Failed/Cancelled: `message` + `paymentMethodType` (no nonce).
     public func braintreeConfirm(
         transactionToken: String,
         state: String,
-        nonce: String,
-        paymentMethodType: String
+        paymentMethodType: String,
+        nonce: String? = nil,
+        message: String? = nil
     ) async throws -> PurchaseResponse {
-        let body = HerokuConfirmRequest(state: state, nonce: nonce, paymentMethodType: paymentMethodType)
+        let body = HerokuConfirmRequest(
+            state: state,
+            nonce: nonce,
+            message: message,
+            paymentMethodType: paymentMethodType
+        )
         return try await postHeroku(path: "transactions/\(transactionToken)/confirm", body: body)
     }
 

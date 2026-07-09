@@ -30,6 +30,8 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
 @property (nonatomic, strong) UILabel *descriptionLabel;
 @property (nonatomic, strong) UIView *fieldsContainer;
 @property (nonatomic, strong) UIStackView *fieldsStackView;
+@property (nonatomic, strong) UILabel *fieldStatusHintLabel;
+@property (nonatomic, strong) UILabel *fieldStatusLabel;
 @property (nonatomic, strong) UIView *configContainer;
 @property (nonatomic, strong) UIView *themeConfigurationContainer;
 @property (nonatomic, strong) UIButton *showFormButton;
@@ -40,6 +42,10 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
 @property (nonatomic, strong) UISwitch *allowBlankNameSwitch;
 @property (nonatomic, strong) UISwitch *allowExpiredDateSwitch;
 @property (nonatomic, strong) UISwitch *allowBlankDateSwitch;
+@property (nonatomic, strong) UISwitch *enableAutofillSwitch;
+@property (nonatomic, strong) UISegmentedControl *panFormatSegmentedControl;
+@property (nonatomic, strong) UIButton *toggleMaskButton;
+@property (nonatomic, strong) UIButton *resetPaymentStateButton;
 @property (nonatomic, strong) UISegmentedControl *yearFormatSegmentedControl;
 @property (nonatomic, strong) UISegmentedControl *nameDisplayModeSegmentedControl;
 
@@ -90,6 +96,13 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
     
     // Set up payment result delegate
     [Spreedly.shared setPaymentDelegate:self];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    if ([Spreedly shared].paymentDelegate == self) {
+        [Spreedly shared].paymentDelegate = nil;
+    }
 }
 
 - (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
@@ -173,6 +186,23 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
     
     // Fields Container
     self.fieldsContainer = [self createFieldsContainer];
+
+    self.fieldStatusHintLabel = [[UILabel alloc] init];
+    self.fieldStatusHintLabel.text = @"Open the drop-in and type in card number or CVC — brand and digit counts appear below (HostedFieldState).";
+    self.fieldStatusHintLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2];
+    self.fieldStatusHintLabel.textColor = [UIColor secondaryLabelColor];
+    self.fieldStatusHintLabel.numberOfLines = 0;
+    self.fieldStatusHintLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.contentView addSubview:self.fieldStatusHintLabel];
+
+    self.fieldStatusLabel = [[UILabel alloc] init];
+    self.fieldStatusLabel.text = @"Type in card number or CVC to see brand and digit counts.";
+    self.fieldStatusLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
+    self.fieldStatusLabel.textColor = [UIColor secondaryLabelColor];
+    self.fieldStatusLabel.numberOfLines = 0;
+    self.fieldStatusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.fieldStatusLabel.accessibilityIdentifier = @"basicCheckoutHostedFieldStatus";
+    [self.contentView addSubview:self.fieldStatusLabel];
     
     // Config Container
     self.configContainer = [self createConfigContainer];
@@ -589,6 +619,64 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
     [self.allowBlankDateSwitch addTarget:self action:@selector(allowBlankDateToggled:) forControlEvents:UIControlEventValueChanged];
     [container addSubview:self.allowBlankDateSwitch];
     
+    UILabel *enableAutofillLabel = [[UILabel alloc] init];
+    enableAutofillLabel.text = @"Enable autofill";
+    enableAutofillLabel.font = [ThemeHelper screenBodyFont];
+    enableAutofillLabel.textColor = [ThemeHelper textColor];
+    enableAutofillLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    enableAutofillLabel.accessibilityIdentifier = @"basicCheckoutEnableAutofillLabel";
+    [container addSubview:enableAutofillLabel];
+    
+    self.enableAutofillSwitch = [[UISwitch alloc] init];
+    self.enableAutofillSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+    self.enableAutofillSwitch.accessibilityIdentifier = @"basic-checkout-enable-autofill-toggle";
+    self.enableAutofillSwitch.accessibilityHint = @"Toggle Wallet and edit-menu autofill on hosted fields in the drop-in";
+    [self.enableAutofillSwitch setOn:YES];
+    [container addSubview:self.enableAutofillSwitch];
+
+    UILabel *enableAutofillHelpLabel = [[UILabel alloc] init];
+    enableAutofillHelpLabel.text = @"Maps to CardFormDropInDisplayConfig.enableAutofill.";
+    enableAutofillHelpLabel.font = [ThemeHelper screenCaptionFont];
+    enableAutofillHelpLabel.textColor = [ThemeHelper textSecondaryColor];
+    enableAutofillHelpLabel.numberOfLines = 0;
+    enableAutofillHelpLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:enableAutofillHelpLabel];
+
+    UILabel *panFormatHelpLabel = [[UILabel alloc] init];
+    panFormatHelpLabel.text = @"Pretty: grouped spaced digits (focus and blur). Plain: all digits visible. Masked: every digit * while typing. toggleMask() toggles plain ↔ masked (first tap from Pretty default → masked).";
+    panFormatHelpLabel.font = [ThemeHelper screenBodyFont];
+    panFormatHelpLabel.textColor = [ThemeHelper textColor];
+    panFormatHelpLabel.numberOfLines = 0;
+    panFormatHelpLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:panFormatHelpLabel];
+
+    self.panFormatSegmentedControl = [[UISegmentedControl alloc] initWithItems:@[@"Pretty", @"Plain", @"Masked"]];
+    self.panFormatSegmentedControl.selectedSegmentIndex = (NSInteger)[Spreedly shared].hostedCardDisplayCardNumberFormatRawValue;
+    self.panFormatSegmentedControl.translatesAutoresizingMaskIntoConstraints = NO;
+    self.panFormatSegmentedControl.accessibilityIdentifier = @"basic-checkout-pan-format-segmented";
+    [self.panFormatSegmentedControl addTarget:self action:@selector(panFormatChanged:) forControlEvents:UIControlEventValueChanged];
+    [container addSubview:self.panFormatSegmentedControl];
+
+    self.toggleMaskButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.toggleMaskButton setTitle:@"toggleMask()" forState:UIControlStateNormal];
+    self.toggleMaskButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    [self.toggleMaskButton setTitleColor:[ThemeHelper primaryColor] forState:UIControlStateNormal];
+    self.toggleMaskButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.toggleMaskButton.accessibilityIdentifier = @"basic-checkout-toggle-mask-button";
+    self.toggleMaskButton.accessibilityHint = @"Toggles Pretty masked ↔ Plain revealed for PAN and CVC";
+    [self.toggleMaskButton addTarget:self action:@selector(toggleMaskTapped) forControlEvents:UIControlEventTouchUpInside];
+    [container addSubview:self.toggleMaskButton];
+
+    self.resetPaymentStateButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.resetPaymentStateButton setTitle:@"resetPaymentState()" forState:UIControlStateNormal];
+    self.resetPaymentStateButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    [self.resetPaymentStateButton setTitleColor:[ThemeHelper primaryColor] forState:UIControlStateNormal];
+    self.resetPaymentStateButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.resetPaymentStateButton.accessibilityIdentifier = @"basic-checkout-reset-payment-state-button";
+    self.resetPaymentStateButton.accessibilityHint = @"Clears hosted fields and PAN/CVV display defaults before opening the drop-in.";
+    [self.resetPaymentStateButton addTarget:self action:@selector(resetPaymentStateTapped) forControlEvents:UIControlEventTouchUpInside];
+    [container addSubview:self.resetPaymentStateButton];
+    
     // Year Format Segmented Control
     UILabel *yearFormatLabel = [[UILabel alloc] init];
     yearFormatLabel.text = @"Year Format:";
@@ -646,11 +734,36 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
         [self.allowBlankDateSwitch.topAnchor constraintEqualToAnchor:expiredDateLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
         [self.allowBlankDateSwitch.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
         
-        [yearFormatLabel.topAnchor constraintEqualToAnchor:self.allowBlankDateSwitch.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [enableAutofillLabel.topAnchor constraintEqualToAnchor:self.allowBlankDateSwitch.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [enableAutofillLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [enableAutofillLabel.centerYAnchor constraintEqualToAnchor:self.enableAutofillSwitch.centerYAnchor],
+        
+        [self.enableAutofillSwitch.topAnchor constraintEqualToAnchor:self.allowBlankDateSwitch.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.enableAutofillSwitch.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [enableAutofillHelpLabel.topAnchor constraintEqualToAnchor:enableAutofillLabel.bottomAnchor constant:[ThemeHelper spacingXS]],
+        [enableAutofillHelpLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [enableAutofillHelpLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [panFormatHelpLabel.topAnchor constraintEqualToAnchor:enableAutofillHelpLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [panFormatHelpLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [panFormatHelpLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.panFormatSegmentedControl.topAnchor constraintEqualToAnchor:panFormatHelpLabel.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [self.panFormatSegmentedControl.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.panFormatSegmentedControl.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.toggleMaskButton.topAnchor constraintEqualToAnchor:self.panFormatSegmentedControl.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.toggleMaskButton.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+
+        [self.resetPaymentStateButton.topAnchor constraintEqualToAnchor:self.toggleMaskButton.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.resetPaymentStateButton.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        
+        [yearFormatLabel.topAnchor constraintEqualToAnchor:self.resetPaymentStateButton.bottomAnchor constant:[ThemeHelper spacingMD]],
         [yearFormatLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
         [yearFormatLabel.centerYAnchor constraintEqualToAnchor:self.yearFormatSegmentedControl.centerYAnchor],
         
-        [self.yearFormatSegmentedControl.topAnchor constraintEqualToAnchor:self.allowBlankDateSwitch.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.yearFormatSegmentedControl.topAnchor constraintEqualToAnchor:self.resetPaymentStateButton.bottomAnchor constant:[ThemeHelper spacingMD]],
         [self.yearFormatSegmentedControl.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
         
         [nameDisplayModeLabel.topAnchor constraintEqualToAnchor:self.yearFormatSegmentedControl.bottomAnchor constant:[ThemeHelper spacingMD]],
@@ -695,8 +808,16 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
         [self.fieldsContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
         [self.fieldsContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
         
+        [self.fieldStatusHintLabel.topAnchor constraintEqualToAnchor:self.fieldsContainer.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [self.fieldStatusHintLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.fieldStatusHintLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.fieldStatusLabel.topAnchor constraintEqualToAnchor:self.fieldStatusHintLabel.bottomAnchor constant:4],
+        [self.fieldStatusLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.fieldStatusLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
         // Config Container
-        [self.configContainer.topAnchor constraintEqualToAnchor:self.fieldsContainer.bottomAnchor constant:[ThemeHelper spacingLG]],
+        [self.configContainer.topAnchor constraintEqualToAnchor:self.fieldStatusLabel.bottomAnchor constant:[ThemeHelper spacingLG]],
         [self.configContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
         [self.configContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
         
@@ -738,6 +859,18 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
 
 - (void)allowBlankDateToggled:(UISwitch *)sender {
     [[Spreedly shared] setParamWithParameter:ValidationParamAllowBlankDate value:sender.isOn];
+}
+
+- (void)panFormatChanged:(UISegmentedControl *)sender {
+    [[Spreedly shared] setNumberFormatWithCardNumberFormatRawValue:(NSInteger)sender.selectedSegmentIndex];
+}
+
+- (void)toggleMaskTapped {
+    [[Spreedly shared] toggleMask];
+}
+
+- (void)resetPaymentStateTapped {
+    [[Spreedly shared] resetPaymentState];
 }
 
 - (void)nameDisplayModeChanged:(UISegmentedControl *)sender {
@@ -1005,11 +1138,57 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
             }
         }];
     }
+
+    dropInVC.enableAutofill = self.enableAutofillSwitch.isOn;
     
     // Wrap DropIn in secure protection for screen prevention
     UIViewController *secureDropInVC = [dropInVC wrapInSecureViewControllerWithPlaceholderText:@""];
     
     [self presentViewController:secureDropInVC animated:YES completion:nil];
+}
+
+- (NSString *)hostedFieldEventName:(HostedFieldEventType)eventType {
+    switch (eventType) {
+        case HostedFieldEventTypeInput:
+            return @"INPUT";
+        case HostedFieldEventTypeFocus:
+            return @"FOCUS";
+        case HostedFieldEventTypeBlur:
+            return @"BLUR";
+        case HostedFieldEventTypeValidation:
+            return @"VALIDATION";
+        default:
+            return @"UNKNOWN";
+    }
+}
+
+- (void)logHostedFieldStateChange:(HostedFieldState *)state {
+    [self updateHostedFieldStatusFromState:state];
+}
+
+- (void)updateHostedFieldStatusFromState:(HostedFieldState *)state {
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    switch (state.fieldType) {
+        case FormFieldTypeCardNumber:
+            if (state.cardSchemeRawValue.length > 0) {
+                [parts addObject:[NSString stringWithFormat:@"Brand: %@", state.cardSchemeRawValue]];
+            }
+            if (state.numberLength != nil) {
+                [parts addObject:[NSString stringWithFormat:@"PAN digits: %@", state.numberLength]];
+            }
+            break;
+        case FormFieldTypeCvc:
+            if (state.cvvLength != nil) {
+                [parts addObject:[NSString stringWithFormat:@"CVV digits: %@", state.cvvLength]];
+            }
+            break;
+        default:
+            break;
+    }
+    if (parts.count == 0) {
+        return;
+    }
+    self.fieldStatusLabel.text = [parts componentsJoinedByString:@" · "];
 }
 
 - (void)updateUI {

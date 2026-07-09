@@ -13,5 +13,6 @@ enum ValidationParamReset {
         spreedly.setParam(parameter: .allowBlankName, value: false)
         spreedly.setParam(parameter: .allowExpiredDate, value: false)
         spreedly.setParam(parameter: .allowBlankDate, value: false)
+        spreedly.setParam(parameter: .allowInternationalZipCodes, value: true)
     }
 }

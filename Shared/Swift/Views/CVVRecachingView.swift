@@ -39,7 +39,8 @@ struct CVVRecachingView: View {
 
     // MARK: - Payment Result State
     @State private var paymentResult: PaymentResult?
-    @State private var cancellable: AnyCancellable? // Must cancel on view disappear
+    @State private var recacheCancellable: AnyCancellable?
+    @State private var paymentCancellable: AnyCancellable?
     
     // MARK: - Payment Methods Loading State
     @State private var isLoadingCards: Bool = false
@@ -87,13 +88,21 @@ struct CVVRecachingView: View {
                                 additionalContent: {
                                     if let token = result.token {
                                         return AnyView(
-                                            Text("Updated Token: \(Spreedly.maskedToken(token))")
-                                                .font(theme.typography.captionFont)
-                                                .foregroundColor(theme.colors.textSecondary)
-                                                .fixedSize(horizontal: false, vertical: true)
-                                                .accessibilityIdentifier(AccessibilityIdentifiers.CVVRecaching.updatedTokenText)
-                                                .accessibilityLabel(AccessibilityLabels.CVVRecaching.updatedTokenText)
-                                                .accessibilityHint(AccessibilityHints.CVVRecaching.updatedTokenText)
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text("Updated Token: \(Spreedly.maskedToken(token))")
+                                                    .font(theme.typography.captionFont)
+                                                    .foregroundColor(theme.colors.textSecondary)
+                                                    .fixedSize(horizontal: false, vertical: true)
+                                                    .accessibilityIdentifier(AccessibilityIdentifiers.CVVRecaching.updatedTokenText)
+                                                    .accessibilityLabel(AccessibilityLabels.CVVRecaching.updatedTokenText)
+                                                    .accessibilityHint(AccessibilityHints.CVVRecaching.updatedTokenText)
+                                                if let updatedAt = result.paymentMethodUpdatedAt {
+                                                    Text("Updated At: \(updatedAt)")
+                                                        .font(theme.typography.captionFont)
+                                                        .foregroundColor(theme.colors.textSecondary)
+                                                        .fixedSize(horizontal: false, vertical: true)
+                                                }
+                                            }
                                         )
                                     } else {
                                         return AnyView(EmptyView())
@@ -152,7 +161,7 @@ struct CVVRecachingView: View {
                         allowBlankDate: allowBlankDate,
                         onProcessingResult: { processingResult in
                             // Called during recaching: isProcessing = request started, isValidationFailed = validation error
-                            // Final success/failure comes via payment result subscription
+                            // Final success/failure comes via recache result subscription
                             if processingResult.isProcessing {
                                 isLoading = true
                             } else if processingResult.isValidationFailed {
@@ -189,7 +198,7 @@ struct CVVRecachingView: View {
                         allowBlankDate: allowBlankDate,
                         onProcessingResult: { processingResult in
                             // Called during recaching: isProcessing = request started, isValidationFailed = validation error
-                            // Final success/failure comes via payment result subscription
+                            // Final success/failure comes via recache result subscription
                             if processingResult.isProcessing {
                                 isLoading = true
                             } else if processingResult.isValidationFailed {
@@ -205,9 +214,7 @@ struct CVVRecachingView: View {
                 }
             }
             .onAppear {
-                // MARK: - Payment Result Subscription
-                // Subscribe to receive final recaching outcome (must be set up before triggering recache)
-                cancellable = Spreedly.shared().subscribeToPaymentResults { result in
+                recacheCancellable = Spreedly.shared().subscribeToRecacheResults { result in
                     paymentResult = result
                     isLoading = false
                     if result.isSuccess {
@@ -225,15 +232,28 @@ struct CVVRecachingView: View {
                         showCVVRecachingView = false
                     }
                 }
-                
+
+                // Blocked-device recache failures publish on the payment channel, not recache.
+                paymentCancellable = Spreedly.shared().subscribeToPaymentResults { result in
+                    guard result.isFailure else { return }
+                    paymentResult = result
+                    isLoading = false
+                    showCVVRecachingView = false
+                    if let failureDetails = result.failureDetails {
+                        errorMessage = failureDetails.getDescription()
+                    } else {
+                        errorMessage = "Recache blocked or payment failed"
+                    }
+                }
+
                 // Fetch payment methods on view appear
                 fetchPaymentMethods()
             }
             .onDisappear {
-                // MARK: - Cleanup
-                // Cancel subscription to prevent memory leaks
-                cancellable?.cancel()
-                cancellable = nil
+                recacheCancellable?.cancel()
+                recacheCancellable = nil
+                paymentCancellable?.cancel()
+                paymentCancellable = nil
                 ValidationParamReset.reset()
             }
         }
@@ -925,6 +945,10 @@ struct CVVRecachingView: View {
 
     private var recacheButton: some View {
         Button(action: {
+            guard Spreedly.isDeviceTrusted else {
+                errorMessage = "Device integrity check failed. Recache is not available on this device."
+                return
+            }
             errorMessage = nil
             isLoading = true
             // Generate signature for Spreedly configuration before showing recaching UI

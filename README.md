@@ -6,7 +6,7 @@ Demonstrates integrating the [Spreedly iOS SDK](https://github.com/spreedly/chec
 
 Each variant contains a **SwiftUI (Swift)** target and a **UIKit (Objective-C)** target, showing both language integration paths.
 
-**SDK Version:** 1.3.8
+**SDK Version:** 1.4.0
 
 ## Prerequisites
 
@@ -134,13 +134,6 @@ checkout-ios-example/
 - [Getting Started Guide](docs/guides/getting-started.md)
 - [SDK Distribution](https://github.com/spreedly/checkout-ios-package)
 
-## Support
+## License
 
-- **Spreedly Documentation**: [docs.spreedly.com](https://docs.spreedly.com/)
-- **Support Portal**: [spreedly.com/support](https://spreedly.com/support/)
-
-## Legal
-
-- [Terms of Service](https://legal.spreedly.com/#terms)
-- [Privacy Policy](https://legal.spreedly.com/#privacy-policy)
-- [License](LICENSE) (Apache 2.0)
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.

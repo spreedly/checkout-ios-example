@@ -33,12 +33,14 @@ Privacy requirements and data handling for the Spreedly iOS SDK. The SDK process
 ### Privacy Manifest (PrivacyInfo.xcprivacy)
 
 The SDK includes a `PrivacyInfo.xcprivacy` file that declares:
-- **NSPrivacyCollectedDataTypes**: Empty array (no data collection)
-- **NSPrivacyTracking**: Not used
+- **NSPrivacyCollectedDataTypes**: Empty array — the SDK does not collect any data that is **linked to the user's identity**
+- **NSPrivacyTracking**: Not used — the SDK does not perform tracking as defined by Apple's [App Tracking Transparency](https://developer.apple.com/app-store/user-privacy-and-data-use/)
 - **NSPrivacyTrackingDomains**: Not used
 - **NSPrivacyAccessedAPITypes**: Declares only required APIs for core functionality
 
-This manifest is automatically included in the SDK distribution and ensures compliance with Apple's App Privacy requirements.
+The operational telemetry described above (SDK version, region, carrier, ephemeral session ID, etc.) is **not linked to the user's identity** and is used only for SDK reliability monitoring. Under Apple's App Store privacy framework, this is "Data Not Linked to You" and does not need to be declared in `NSPrivacyCollectedDataTypes`.
+
+If your app reports App Store privacy nutrition labels, declare any payment-related data your **app** sends to Spreedly (such as card data for tokenization) under your own privacy disclosures, not the SDK's manifest.
 
 ### Platform Compliance
 

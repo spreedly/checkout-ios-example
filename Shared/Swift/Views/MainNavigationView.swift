@@ -208,6 +208,38 @@ struct MainNavigationView: View {
                                 .accessibilityLabel("Braintree Payment Flow")
                                 .accessibilityHint("Navigate to Braintree PayPal and Venmo payment example")
                                 .accessibilityAddTraits(.isButton)
+                                
+                                NavigationLink(destination: BankAccountCheckoutView()) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("ACH Bank Account Drop-In")
+                                            .font(headerFont)
+                                            .foregroundColor(textColor)
+                                        Text("Preview only — ACH will not ship in 1.4.0. Do not use in production.")
+                                            .font(subheadingFont)
+                                            .foregroundColor(textColor)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .accessibilityIdentifier(AccessibilityIdentifiers.Navigation.bankAccountCheckoutLink)
+                                .accessibilityLabel(AccessibilityLabels.Navigation.bankAccountCheckoutLink)
+                                .accessibilityHint(AccessibilityHints.Navigation.bankAccountCheckoutLink)
+                                .accessibilityAddTraits(.isButton)
+
+                                NavigationLink(destination: BankAccountCustomFormView()) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("ACH Bank Account – Custom Form")
+                                            .font(headerFont)
+                                            .foregroundColor(textColor)
+                                        Text("Preview only — headless ACH sample; not for production in 1.4.0.")
+                                            .font(subheadingFont)
+                                            .foregroundColor(textColor)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .accessibilityIdentifier(AccessibilityIdentifiers.Navigation.bankAccountCustomFormLink)
+                                .accessibilityLabel(AccessibilityLabels.Navigation.bankAccountCustomFormLink)
+                                .accessibilityHint(AccessibilityHints.Navigation.bankAccountCustomFormLink)
+                                .accessibilityAddTraits(.isButton)
                             }
                             
                             Section(header: Text("About")) {
@@ -246,6 +278,8 @@ struct MainNavigationView: View {
                     .padding(.bottom, 16)
                 }
                 .onAppear {
+                    // Hub screen: wipe checkout when landing here (launch or pop back from any example).
+                    Spreedly.shared().resetPaymentState()
                     ValidationParamReset.reset()
                 }
             }

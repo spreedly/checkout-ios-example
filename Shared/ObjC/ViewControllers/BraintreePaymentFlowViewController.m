@@ -93,7 +93,16 @@ static const NSInteger kBraintreeStageLineTagBase   = 1200;
     [self updatePayButtonState];
 }
 
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [self cleanupPaymentDelegate];
+}
+
 - (void)dealloc {
+    [self cleanupPaymentDelegate];
+}
+
+- (void)cleanupPaymentDelegate {
     if ([Spreedly shared].paymentDelegate == self) {
         [Spreedly shared].paymentDelegate = nil;
     }
@@ -800,6 +809,22 @@ static const NSInteger kBraintreeStageLineTagBase   = 1200;
     self.errorLabel.text = @"";
 }
 
+- (void)confirmNonSuccessfulWithTransactionToken:(NSString *)transactionToken
+                                           state:(NSString *)state
+                                         message:(NSString *)message
+                               paymentMethodType:(NSString *)paymentMethodType {
+    PurchaseAPIClient *client = [[SpreedlyConfigManager shared] createPurchaseAPIClient];
+    [client braintreeConfirmWithTransactionToken:transactionToken
+                                           state:state
+                                           nonce:nil
+                                      deviceData:nil
+                                         message:message
+                               paymentMethodType:paymentMethodType
+                                      completion:^(__unused PurchaseResponse * _Nullable response, __unused NSError * _Nullable error) {
+        // Best-effort: backend notification failure does not affect user experience.
+    }];
+}
+
 #pragma mark - SpreedlyPaymentDelegate
 
 - (void)paymentDidComplete:(PaymentResult *)result {
@@ -812,12 +837,14 @@ static const NSInteger kBraintreeStageLineTagBase   = 1200;
 
         if (result.isSuccess && result.nonce.length > 0) {
             __weak typeof(self) weakSelf = self;
+            NSString *confirmPaymentType = paymentType;
             PurchaseAPIClient *client = [[SpreedlyConfigManager shared] createPurchaseAPIClient];
             [client braintreeConfirmWithTransactionToken:transactionToken
                                                    state:@"Successful"
                                                    nonce:result.nonce
                                               deviceData:result.deviceData
-                                       paymentMethodType:paymentType
+                                                 message:nil
+                                       paymentMethodType:confirmPaymentType
                                               completion:^(PurchaseResponse * _Nullable response, NSError * _Nullable error) {
                 __strong typeof(weakSelf) self = weakSelf;
                 if (!self) return;
@@ -838,31 +865,43 @@ static const NSInteger kBraintreeStageLineTagBase   = 1200;
                     }
                     PurchaseTransaction *tx = response.transaction;
                     if (tx.succeeded) {
-                        [self showSuccess:@"Payment successful. The transaction has been completed."];
-                    } else if ([tx.state isEqualToString:@"processing"]) {
-                        [self showPending:@"Payment is being processed. Final confirmation may take a moment."];
-                    } else if ([tx.state isEqualToString:@"pending"]) {
-                        [self showPending:@"Payment submitted. Awaiting final confirmation from the payment provider."];
+                        [self showSuccess:@"Payment successful. The transaction has been completed successfully."];
+                    } else if ([tx.state isEqualToString:@"processing"] || [tx.state isEqualToString:@"pending"]) {
+                        [self showSuccess:@"Payment is being processed. Final confirmation may take a moment."];
                     } else {
-                        [self showError:[NSString stringWithFormat:@"Confirmation returned state: %@. Message: %@", tx.state ?: @"unknown", tx.message ?: @"none"]];
+                        [self showError:[NSString stringWithFormat:@"Confirmation returned state: %@. Message: %@",
+                                         tx.state ?: @"", tx.message ?: @""]];
                     }
                 });
             }];
         } else if (result.isCanceled) {
+            NSString *cancelMsg = [NSString stringWithFormat:@"%@ payment was canceled.",
+                                   [self braintreeMethodDisplayName]];
+            [self confirmNonSuccessfulWithTransactionToken:transactionToken
+                                                     state:@"Cancelled"
+                                                   message:cancelMsg
+                                         paymentMethodType:paymentType];
             self.isLoading = NO;
             self.stage = BraintreeStageIdle;
             self.pendingTransactionToken = nil;
             self.pendingPaymentType = nil;
             [self updatePayButtonState];
-            [self showError:[NSString stringWithFormat:@"%@ payment was canceled.", [self braintreeMethodDisplayName]]];
+            [self showError:cancelMsg];
         } else {
+            NSString *methodName = [self braintreeMethodDisplayName];
+            NSString *sdkMessage = result.failureDetails.message;
+            NSString *desc = (sdkMessage.length > 0)
+                ? sdkMessage
+                : [NSString stringWithFormat:@"%@ payment failed.", methodName];
+            [self confirmNonSuccessfulWithTransactionToken:transactionToken
+                                                     state:@"Failed"
+                                                   message:desc
+                                         paymentMethodType:paymentType];
             self.isLoading = NO;
             self.stage = BraintreeStageIdle;
             self.pendingTransactionToken = nil;
             self.pendingPaymentType = nil;
             [self updatePayButtonState];
-            NSString *methodName = [self braintreeMethodDisplayName];
-            NSString *desc = [result.failureDetails getDescription] ?: [NSString stringWithFormat:@"%@ payment failed.", methodName];
             [self showError:desc];
         }
     });

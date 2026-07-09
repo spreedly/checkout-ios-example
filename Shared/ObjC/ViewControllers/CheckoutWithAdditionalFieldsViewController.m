@@ -21,6 +21,8 @@
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *descriptionLabel;
 @property (nonatomic, strong) UIView *fieldsContainer;
+@property (nonatomic, strong) UILabel *fieldStatusHintLabel;
+@property (nonatomic, strong) UILabel *fieldStatusLabel;
 @property (nonatomic, strong) UIView *configContainer;
 @property (nonatomic, strong) UIButton *showFormButton;
 @property (nonatomic, strong) UIView *resultContainer;
@@ -54,6 +56,13 @@
     
     // Set up payment result delegate
     [Spreedly.shared setPaymentDelegate:self];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    if ([Spreedly shared].paymentDelegate == self) {
+        [Spreedly shared].paymentDelegate = nil;
+    }
 }
 
 - (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
@@ -140,6 +149,23 @@
     UIView *additionalFieldsContainer = [self createInfoContainerWithTitle:@"Additional Fields:" 
                                                                     items:@[@"• Address Line 1 (Required)", @"• Address Line 2 (Optional)", @"• City (Required)", @"• State (Required)", @"• ZIP Code (Required)"]
                                                                     backgroundColor:[ThemeHelper primaryColor]];
+
+    self.fieldStatusHintLabel = [[UILabel alloc] init];
+    self.fieldStatusHintLabel.text = @"Open the drop-in and type in card number or CVC — brand and digit counts appear below (HostedFieldState).";
+    self.fieldStatusHintLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2];
+    self.fieldStatusHintLabel.textColor = [UIColor secondaryLabelColor];
+    self.fieldStatusHintLabel.numberOfLines = 0;
+    self.fieldStatusHintLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.contentView addSubview:self.fieldStatusHintLabel];
+
+    self.fieldStatusLabel = [[UILabel alloc] init];
+    self.fieldStatusLabel.text = @"Type in card number or CVC to see brand and digit counts.";
+    self.fieldStatusLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote];
+    self.fieldStatusLabel.textColor = [UIColor secondaryLabelColor];
+    self.fieldStatusLabel.numberOfLines = 0;
+    self.fieldStatusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.fieldStatusLabel.accessibilityIdentifier = @"additionalFieldsHostedFieldStatus";
+    [self.contentView addSubview:self.fieldStatusLabel];
     
     // Config Container
     self.configContainer = [self createConfigContainer];
@@ -404,9 +430,17 @@
         [additionalFieldsContainer.topAnchor constraintEqualToAnchor:self.fieldsContainer.bottomAnchor constant:[ThemeHelper spacingSM]],
         [additionalFieldsContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
         [additionalFieldsContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.fieldStatusHintLabel.topAnchor constraintEqualToAnchor:additionalFieldsContainer.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [self.fieldStatusHintLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.fieldStatusHintLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.fieldStatusLabel.topAnchor constraintEqualToAnchor:self.fieldStatusHintLabel.bottomAnchor constant:4],
+        [self.fieldStatusLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.fieldStatusLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
         
         // Config Container
-        [self.configContainer.topAnchor constraintEqualToAnchor:additionalFieldsContainer.bottomAnchor constant:[ThemeHelper spacingLG]],
+        [self.configContainer.topAnchor constraintEqualToAnchor:self.fieldStatusLabel.bottomAnchor constant:[ThemeHelper spacingLG]],
         [self.configContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
         [self.configContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
         
@@ -496,11 +530,55 @@
             [self updateUI];
         }
     }];
-    
+
     // Wrap DropIn in secure protection for screen prevention
     UIViewController *secureDropInVC = [dropInVC wrapInSecureViewControllerWithPlaceholderText:@""];
     
     [self presentViewController:secureDropInVC animated:YES completion:nil];
+}
+
+- (NSString *)hostedFieldEventName:(HostedFieldEventType)eventType {
+    switch (eventType) {
+        case HostedFieldEventTypeInput:
+            return @"INPUT";
+        case HostedFieldEventTypeFocus:
+            return @"FOCUS";
+        case HostedFieldEventTypeBlur:
+            return @"BLUR";
+        case HostedFieldEventTypeValidation:
+            return @"VALIDATION";
+        default:
+            return @"UNKNOWN";
+    }
+}
+
+- (void)logHostedFieldStateChange:(HostedFieldState *)state {
+    [self updateHostedFieldStatusFromState:state];
+}
+
+- (void)updateHostedFieldStatusFromState:(HostedFieldState *)state {
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    switch (state.fieldType) {
+        case FormFieldTypeCardNumber:
+            if (state.cardSchemeRawValue.length > 0) {
+                [parts addObject:[NSString stringWithFormat:@"Brand: %@", state.cardSchemeRawValue]];
+            }
+            if (state.numberLength != nil) {
+                [parts addObject:[NSString stringWithFormat:@"PAN digits: %@", state.numberLength]];
+            }
+            break;
+        case FormFieldTypeCvc:
+            if (state.cvvLength != nil) {
+                [parts addObject:[NSString stringWithFormat:@"CVV digits: %@", state.cvvLength]];
+            }
+            break;
+        default:
+            break;
+    }
+    if (parts.count == 0) {
+        return;
+    }
+    self.fieldStatusLabel.text = [parts componentsJoinedByString:@" · "];
 }
 
 - (void)updateUI {

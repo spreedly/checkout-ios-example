@@ -41,8 +41,8 @@ The SDK performs runtime security checks during initialization to detect comprom
 
 ### What It Detects
 
-- **Debugger attachment** — LLDB, Frida, or other debuggers attached to the process
-- **Jailbroken devices** — sandbox escape, hooking framework injection (MobileSubstrate, libhooker, FridaGadget, etc.), known jailbreak filesystem artifacts
+- **Debugger attachment** — debuggers attached to the process at runtime
+- **Jailbroken or compromised devices** — sandbox escape, hooking and injection frameworks, and known jailbreak artifacts
 
 ### Blocking Jailbroken Devices (Opt-In)
 
@@ -80,8 +80,7 @@ Spreedly.blockJailbrokenDevices = YES;
 
 ```swift
 if let error = Spreedly.initializationError {
-    print("SDK blocked: \(error.message)")
-    print("Signals: \(error.signals)")
+    // Surface blocked-device error to the user (error.message, error.signals)
     return
 }
 
@@ -93,19 +92,18 @@ if !Spreedly.isDeviceTrusted {
 
 When blocking is enabled and the device is compromised, `Spreedly.initializationError` is set with a `SpreedlySecurityError` containing:
 - `code` — the error category (`.deviceCompromised`)
-- `message` — human-readable description
-- `signals` — which specific checks fired (e.g. `["sandbox_broken", "dylib_injection"]`)
+- `message` — human-readable description suitable for showing to the user or logging
 
 ### What Gets Blocked
 
 When the SDK is blocked, **all operations fail gracefully** — no card data UI appears, no network traffic leaves the device:
 
 - **Card forms** (`CardFormDropIn`, `SPLTextField`) render as invisible — no text fields appear
-- **Recaching UI** (`CVVRecachingView`) does not render and emits a failure result
+- **Recaching UI** (`SpreedlyCVVRecachingView`) does not render and emits a failure result
 - **3DS challenges** (`DoChallengeIfNeeded`) do not render and emit a 3DS failure result
 - **APM flows** (Stripe `present()`, Braintree `present()`) reject immediately with a `PaymentResult.failure`
-- **Offsite payments** (`OffsitePaymentSafariFlow.present()`) reject immediately
-- **Network calls** — a `BlockedNetworkClient` is injected so any network request throws without leaving the device
+- **Offsite payments** (`SpreedlyOffsiteCheckout.present(transactionToken:)`) reject immediately
+- **Network calls** — blocked at the SDK network layer so no request leaves the device
 - **3DS integrations** (Forter, Gateway-Specific) check the blocked state and emit failure results
 
 Merchants observing `paymentResultPublisher` or the `SpreedlyPaymentDelegate` will receive a `PaymentResult.failure` with an error message indicating the SDK is blocked.
@@ -115,14 +113,14 @@ Merchants observing `paymentResultPublisher` or the `SpreedlyPaymentDelegate` wi
 | Component | Presentation | What happens when blocked |
 |---|---|---|
 | `CardFormDropIn` | `.sheet` | Auto-dismisses the sheet, publishes `PaymentResult.failure` via `paymentResultPublisher` |
-| `CVVRecachingView` | `.sheet` | Auto-dismisses the sheet, publishes `PaymentResult.failure` |
-| `CVVRecachingView` | `.dialog` (alert mode) | Prevents dimming overlay, auto-dismisses via `onDismiss` callback |
-| `DoChallengeIfNeeded` | `.sheet` | Auto-dismisses, emits `ThreeDSChallengeResult.failure` via `threeDSChallengeResultPublisher` |
+| `SpreedlyCVVRecachingView` | `.sheet` | Auto-dismisses the sheet, publishes `PaymentResult.failure` on the **payment** channel (not the recache channel) |
+| `SpreedlyCVVRecachingView` | `.dialog` (alert mode) | Prevents dimming overlay, auto-dismisses via `onDismiss` callback |
+| `DoChallengeIfNeeded` | `.sheet` | Auto-dismisses, emits `ThreeDSChallengeResult.failure` via `subscribeToThreeDSChallengeResults` / `threeDSChallengeDelegate` |
 | `SPLTextField` (custom forms) | Inline | Renders blank (zero-size placeholder). **Merchant must check `Spreedly.isDeviceTrusted` on appear and show an error.** See [Custom Payment Forms](custom-payment-forms.md#prerequisites). |
 | Braintree `present()` | UIKit | Returns immediately, publishes `PaymentResult.failure` |
 | Stripe `present()` | UIKit | Returns immediately, publishes `PaymentResult.failure` |
-| Offsite `present()` | Safari | Returns immediately, publishes `PaymentResult.failure` |
-| `createCreditCard()` / network | N/A | `BlockedNetworkClient` throws immediately — no data leaves the device |
+| Offsite `SpreedlyOffsiteCheckout.present(transactionToken:)` | Safari | Returns immediately, publishes `PaymentResult.failure` |
+| `createCreditCard()` / network | N/A | Request fails immediately — no data leaves the device |
 | 3DS (Global / Gateway-Specific) | N/A | Emits `ThreeDSChallengeResult.failure`, no UI shown |
 
 ### How Errors Reach the Merchant
@@ -134,7 +132,7 @@ Blocked-device errors flow through the same channels merchants already subscribe
 | Drop-in forms, recaching, APMs | `Spreedly.shared().subscribeToPaymentResults` / `SpreedlyPaymentDelegate` | `PaymentResult` with `isFailure == true` and message "SDK blocked by security check" |
 | 3DS challenges | `Spreedly.shared().subscribeToThreeDSChallengeResults` | `ThreeDSChallengeResult` with `isFailure == true` |
 | Custom forms (`SPLTextField`) | `Spreedly.initializationError` / `Spreedly.isDeviceTrusted` | Merchant checks these on appear — fields are blank but no automatic error is published |
-| Direct API calls | `BlockedNetworkClient` throws | `NSError` in `spreedlySecurityErrorDomain` with "SDK blocked" message |
+| Direct API calls | Network layer rejects the call | `NSError` in `spreedlySecurityErrorDomain` with "SDK blocked" message |
 
 ### Testing Blocked-Device Behavior
 
@@ -145,10 +143,12 @@ To test the blocking flow during development, use the DEBUG-only override in you
 ```swift
 #if DEBUG
 SecurityManager.shared.setOverrideAssessment(
-    SecurityAssessment(level: .compromised, signals: ["sandbox_broken", "dylib_injection"])
+    SecurityAssessment(level: .compromised, signals: [])
 )
 #endif
 ```
+
+> Pass an empty `signals` array when you only need to trigger the blocked state for UI testing. The DEBUG override is only available in debug builds.
 
 Set the override **before** calling `Spreedly.setup(config:)`. The SDK will treat the device as compromised and block. Pass `nil` to restore normal behavior.
 
@@ -156,16 +156,17 @@ Set the override **before** calling `Spreedly.setup(config:)`. The SDK will trea
 
 If the device condition changes (e.g., a debugger is detached), calling `Spreedly.setup(config:)` or `Spreedly.initializeSDK()` again re-runs the assessment. If it passes, the block is cleared and the SDK resumes normal operation.
 
-### Querying Security Status Directly
+### Querying Security Status
 
-You can also call `SecurityManager` directly for custom policy decisions:
+The standard merchant API is **`Spreedly.isDeviceTrusted`** and **`Spreedly.initializationError`** — both reflect the most recent assessment and are sufficient for almost every integration.
 
 ```swift
-let assessment = SecurityManager.shared.performAssessment()
-// assessment.level: .clean, .suspicious, or .compromised
-// assessment.signals: ["sandbox_broken", "dylib_injection", ...]
-// assessment.isCompromised: true when 2+ signals fired
+if !Spreedly.isDeviceTrusted {
+    // SDK is blocked — show a fallback UI or redirect to web checkout.
+}
 ```
+
+Re-run the assessment by calling `Spreedly.setup(config:)` or `Spreedly.initializeSDK()` again (for example, after a debugger is detached).
 
 ### DEBUG Builds
 
@@ -512,15 +513,13 @@ The Spreedly SDK does not control logging from third-party SDKs it depends on (B
 
 The SDK automatically sanitizes all public-facing error messages in `FailedDetails`, `APIErrorHandler`, and logging. Merchants no longer need to call `sanitizeForDisplay()` — error descriptions returned by `getDescription()` and similar APIs are already safe to log or display.
 
-For displaying masked payment tokens in your UI (e.g., "•••• 4242"), use `Spreedly.maskedToken(_:)`. For logging, use the SDK's `logInfo`/`logError` functions, which auto-sanitize output.
+For displaying masked payment tokens in your UI, use `Spreedly.maskedToken(_:)`. It returns the token's first four characters, a fixed `****` separator, and the last four characters (for tokens shorter than nine characters, it returns `[REDACTED]`). For logging, use the SDK's `logInfo`/`logError` functions, which auto-sanitize output.
 
 ---
 
 ## Binary Hardening
 
-The SDK applies hardening techniques to internal API endpoints, sensitive string constants, and network configuration. This prevents casual extraction of SDK internals from the compiled framework binary using tools like `strings` or disassemblers. Combined with Apple's standard code signing and App Store encryption, this raises the cost of reverse engineering the SDK's network layer.
-
-No action is required from merchants — binary hardening is applied automatically during the SDK build process.
+The SDK applies binary hardening at build time on top of Apple's standard code signing and App Store encryption. No action is required from merchants — hardening is applied automatically as part of the SDK build.
 
 ---
 
