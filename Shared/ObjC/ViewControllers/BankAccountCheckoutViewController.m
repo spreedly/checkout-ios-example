@@ -69,7 +69,7 @@
     [self.contentView addSubview:self.titleLabel];
 
     self.descriptionLabel = [[UILabel alloc] init];
-    self.descriptionLabel.text = @"Preview only — ACH bank-account flows are in the SDK for internal testing and will not ship in 1.4.0. Do not integrate ACH in production. BankAccountFormDropInViewController collects routing and account numbers (with ABA validation), name, and optional bank name + account type via a UIKit-friendly UIHostingController wrapper.";
+    self.descriptionLabel.text = @"Preview only — ACH bank-account flows are in the SDK for internal testing and will not ship in 1.4.1. Do not integrate ACH in production. BankAccountFormDropInViewController collects routing and account numbers (with ABA validation), name, and optional bank name + account type via a UIKit-friendly UIHostingController wrapper.";
     self.descriptionLabel.font = [ThemeHelper screenBodyFont];
     self.descriptionLabel.textColor = [ThemeHelper textColor];
     self.descriptionLabel.textAlignment = NSTextAlignmentCenter;

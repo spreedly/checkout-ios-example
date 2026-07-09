@@ -173,13 +173,13 @@
         },
         @{
             @"title": @"ACH Bank Account Drop-In",
-            @"subtitle": @"Preview only — ACH will not ship in 1.4.0. Do not use in production.",
+            @"subtitle": @"Preview only — ACH will not ship in 1.4.1. Do not use in production.",
             @"class": [BankAccountCheckoutViewController class],
             @"accessibilityId": @"bank-account-checkout-navigation-link"
         },
         @{
             @"title": @"ACH Bank Account – Custom Form",
-            @"subtitle": @"Preview only — headless ACH sample; not for production in 1.4.0.",
+            @"subtitle": @"Preview only — headless ACH sample; not for production in 1.4.1.",
             @"class": [BankAccountCustomFormViewController class],
             @"accessibilityId": @"bank-account-custom-form-navigation-link"
         }

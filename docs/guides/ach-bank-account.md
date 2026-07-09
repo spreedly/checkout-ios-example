@@ -1,6 +1,6 @@
 # ACH Bank Account Payments - Spreedly iOS SDK
 
-> **Status: Preview — not yet released.** ACH bank-account flows are in the SDK for internal testing only and **will not ship in `1.4.0`**. **Do not integrate ACH in production.** When ACH is released, it will appear under its own version header in the changelog with full integration support.
+> **Status: Preview — not yet released.** ACH bank-account flows are in the SDK for internal testing only and **will not ship in `1.4.1`**. **Do not integrate ACH in production.** When ACH is released, it will appear under its own version header in the changelog with full integration support.
 
 Tokenize bank accounts (US ABA routing numbers and Canadian routing numbers) with the Spreedly iOS SDK. Three integration paths are available.
 
