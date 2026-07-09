@@ -5,9 +5,17 @@ All notable changes to the Spreedly iOS SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-07-09
+
+> **Distribution patch** — Same XCFramework binaries and SDK behavior as **1.4.0**. Pin **1.4.1** for new integrations (SPM and CocoaPods). Do not use tag **`1.4.0`** for Swift Package Manager — its `Package.swift` manifest is broken.
+
+### Fixed
+
+- **SPM manifest alignment**: `Package.swift` on **1.4.1** lists only the five XCFrameworks shipped in this release. Feature details are unchanged from **1.4.0** (see below).
+
 ## [1.4.0] - 2026-06-03
 
-> **ACH is not included in this release.** Version **1.4.0** ships card tokenization, CVV recache, Braintree/Stripe APM, and gateway-specific 3DS only. Bank-account APIs (`BankAccountFormDropIn`, `createBankAccount`, etc.) may exist in the repository for internal QA — **merchants must not integrate ACH on 1.4.0**. ACH will be announced under a new version header when it completes QA (see [Unreleased](#unreleased)).
+> **ACH is not included in this release.** Version **1.4.0** ships card tokenization, CVV recache, Braintree/Stripe APM, and gateway-specific 3DS only. Bank-account APIs (`BankAccountFormDropIn`, `createBankAccount`, etc.) may exist in the repository for internal QA — **merchants must not integrate ACH on 1.4.0**. ACH will be announced under a new version header when it completes QA
 
 ### Breaking Changes
 

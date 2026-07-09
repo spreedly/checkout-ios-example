@@ -131,7 +131,7 @@ typedef NS_ENUM(NSInteger, BankAccountNameDisplayMode) {
     [self.contentView addSubview:self.titleLabel];
 
     self.descriptionLabel = [[UILabel alloc] init];
-    self.descriptionLabel.text = @"Preview only — ACH bank-account flows are in the SDK for internal testing and will not ship in 1.4.0. Do not integrate ACH in production. Headless ACH built field-by-field with SPLTextFieldViewController. The app owns the layout and submits via createBankAccountObjC when the user taps PAY NOW.";
+    self.descriptionLabel.text = @"Preview only — ACH bank-account flows are in the SDK for internal testing and will not ship in 1.4.1. Do not integrate ACH in production. Headless ACH built field-by-field with SPLTextFieldViewController. The app owns the layout and submits via createBankAccountObjC when the user taps PAY NOW.";
     self.descriptionLabel.font = [ThemeHelper screenBodyFont];
     self.descriptionLabel.textColor = [ThemeHelper textColor];
     self.descriptionLabel.textAlignment = NSTextAlignmentCenter;

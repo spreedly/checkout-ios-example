@@ -214,7 +214,7 @@ struct MainNavigationView: View {
                                         Text("ACH Bank Account Drop-In")
                                             .font(headerFont)
                                             .foregroundColor(textColor)
-                                        Text("Preview only — ACH will not ship in 1.4.0. Do not use in production.")
+                                        Text("Preview only — ACH will not ship in 1.4.1. Do not use in production.")
                                             .font(subheadingFont)
                                             .foregroundColor(textColor)
                                     }
@@ -230,7 +230,7 @@ struct MainNavigationView: View {
                                         Text("ACH Bank Account – Custom Form")
                                             .font(headerFont)
                                             .foregroundColor(textColor)
-                                        Text("Preview only — headless ACH sample; not for production in 1.4.0.")
+                                        Text("Preview only — headless ACH sample; not for production in 1.4.1.")
                                             .font(subheadingFont)
                                             .foregroundColor(textColor)
                                     }

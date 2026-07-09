@@ -59,7 +59,7 @@ struct BankAccountCheckoutView: View {
                 .accessibilityLabel(AccessibilityLabels.BankAccountCheckout.title)
                 .accessibilityAddTraits(.isHeader)
 
-            Text("Preview only — ACH bank-account flows are in the SDK for internal testing and will not ship in 1.4.0. Do not integrate ACH in production.")
+            Text("Preview only — ACH bank-account flows are in the SDK for internal testing and will not ship in 1.4.1. Do not integrate ACH in production.")
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .padding()

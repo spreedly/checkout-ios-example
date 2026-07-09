@@ -69,7 +69,7 @@ struct ExampleCredentials {
 
 ### Use one package version for all Spreedly modules
 
-Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyBraintree**) are released together under **one** version. Use the **same** resolved version for every Spreedly product in your app — always pick the [latest release tag](https://github.com/spreedly/checkout-ios-package/releases) (the snippets below use **1.4.0** as an example).
+Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyBraintree**) are released together under **one** version. Use the **same** resolved version for every Spreedly product in your app — always pick the [latest release tag](https://github.com/spreedly/checkout-ios-package/releases) (the snippets below use **1.4.1** as an example).
 
 ### Option 1: Swift Package Manager (Recommended)
 
@@ -91,7 +91,7 @@ SPM distribution is from a separate repository: `https://github.com/spreedly/che
 ```swift
 dependencies: [
     // Example minimum version — Xcode resolves to the latest compatible release, or pin an exact tag.
-    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.4.0"),
+    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.4.1"),
     // Optional: add when using 3DS Global (Forter) — separate repo:
     // .package(url: "https://bitbucket.org/forter-mobile/forter-ios.git", exact: "2.1.0")
 ],
@@ -142,12 +142,12 @@ target 'YourApp' do
   use_frameworks!
 
   # Example tags — replace with a release from checkout-ios-package.
-  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.0'
-  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.0'
-  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.0'
+  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
+  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
+  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
   # Add these only if needed:
-  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.0'
-  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.0'
+  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
+  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
 end
 ```
 
@@ -165,7 +165,7 @@ If you use **SpreedlyStripeAPM** with CocoaPods, you **must** add a `post_instal
 platform :ios, '14.0'
 
 PACKAGE_REPO = 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git'
-PACKAGE_TAG  = '1.4.0'  # example — use a checkout-ios-package release tag
+PACKAGE_TAG  = '1.4.1'  # example — use a checkout-ios-package release tag
 
 target 'YourApp' do
   use_frameworks!
@@ -268,8 +268,8 @@ Add these only when you need the corresponding features:
 | Feature | Package | URL | Version |
 |---------|---------|-----|---------|
 | 3DS Global | Forter3DS | `https://bitbucket.org/forter-mobile/forter-ios.git` | 2.1.0 (exact) |
-| Stripe APM | SpreedlyStripeAPM | `https://github.com/spreedly/checkout-ios-package` | 1.4.0+ |
-| Braintree (PayPal/Venmo) | SpreedlyBraintree | `https://github.com/spreedly/checkout-ios-package` | 1.4.0+ |
+| Stripe APM | SpreedlyStripeAPM | `https://github.com/spreedly/checkout-ios-package` | 1.4.1+ |
+| Braintree (PayPal/Venmo) | SpreedlyBraintree | `https://github.com/spreedly/checkout-ios-package` | 1.4.1+ |
 
 **Forter3DS (3DS Global):** Required for 3DS authentication. Add Forter3DS directly from Forter's Bitbucket repository. **Do not use** `pod 'SpreedlyForter3DS'` — use the Forter Bitbucket URL below. A dedicated `SpreedlyForter3DS` module is planned for a future release but is not yet available for standard CocoaPods usage.
 
