@@ -457,6 +457,7 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
                               redirectUrl:(NSString *)redirectUrl
                              callbackUrl:(NSString *)callbackUrl
                                 apmTypes:(NSArray<NSString *> *)apmTypes
+                           radarSessionId:(nullable NSString *)radarSessionId
                               completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion {
     NSString *baseURLString = [self.config.baseURL hasSuffix:@"/"] ? [self.config.baseURL substringToIndex:self.config.baseURL.length - 1] : self.config.baseURL;
     NSString *urlString = [NSString stringWithFormat:@"%@/create-purchase", baseURLString];
@@ -482,14 +483,19 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
         @"payment_method_type": @"stripe_apm",
         @"apm_types": apmTypes ?: @[]
     };
-    NSDictionary *transaction = @{
+    NSMutableDictionary *transaction = [@{
         @"amount": @([amount doubleValue]),
         @"currency_code": currencyCode ?: @"",
         @"redirect_url": redirectUrl ?: @"",
         @"callback_url": callbackUrl ?: @"",
         @"channel": @"app",
         @"payment_method": paymentMethod
-    };
+    } mutableCopy];
+    if (radarSessionId.length > 0) {
+        transaction[@"gateway_specific_fields"] = @{
+            @"stripe_payment_intents": @{ @"radar_session_id": radarSessionId }
+        };
+    }
     NSDictionary *requestBody = @{ @"gateway": @"stripe", @"transaction": transaction };
 
     NSError *jsonError = nil;

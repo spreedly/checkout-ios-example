@@ -674,6 +674,10 @@ In `SceneDelegate.m` — handle redirect return:
 
 > **Important:** When `blockJailbrokenDevices` is enabled and the device is compromised, the SDK blocks this flow automatically. The `present()` call returns immediately without showing any UI, and a `PaymentResult.failure` is published. See [Security — Runtime Integrity](security.md#runtime-integrity) for details.
 
+### Screen Prevention
+
+EBANX checkout runs in Safari / system browser UI. Spreedly `.screenPrevention()` does **not** cover that surface — do not wrap the Safari session. See [Security](security.md).
+
 ## Related Documentation
 
 - [offsite-payments.md](offsite-payments.md) — Custom URL scheme setup, offsite flow details

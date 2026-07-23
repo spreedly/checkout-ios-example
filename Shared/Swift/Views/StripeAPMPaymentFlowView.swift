@@ -2,9 +2,8 @@
 //  StripeAPMPaymentFlowView.swift
 //  SpreedlySDKExample
 //
-//  Requires the app target to link both SpreedlyStripeAPM and StripePaymentSheet (stripe-ios-spm).
-//  StripePaymentSheet must be added so its resource bundle (Stripe_StripePaymentSheet) is embedded;
-//  otherwise presenting PaymentSheet will crash with "unable to find bundle named Stripe_StripePaymentSheet".
+//  Requires SpreedlyStripeAPM (Payment Sheet) on the app target.
+//  Also demonstrates optional SpreedlyStripeRadar session collection (HC-1596).
 //
 
 import SwiftUI
@@ -12,6 +11,14 @@ import Combine
 import SpreedlyCore
 import SpreedlyUI
 import SpreedlyStripeAPM
+import SpreedlyStripeRadar
+
+private enum RadarState {
+    case idle
+    case collecting
+    case success
+    case failed
+}
 
 struct StripeAPMPaymentFlowView: View {
     @Environment(\.spreedlyTheme) private var environmentTheme
@@ -23,6 +30,9 @@ struct StripeAPMPaymentFlowView: View {
     @State private var pendingMessage: String?
     @State private var paymentResultCancellable: AnyCancellable?
     @State private var stage: StripeAPMStage = .idle
+    @State private var radarEnabled: Bool = false
+    @State private var radarSessionId: String?
+    @State private var radarState: RadarState = .idle
 
     // PaymentSheet appearance (QA: tweak before starting checkout)
     @State private var useCustomAppearance: Bool = true
@@ -54,7 +64,17 @@ struct StripeAPMPaymentFlowView: View {
     }
 
     private var isStartButtonEnabled: Bool {
-        selectedProduct != nil && !selectedAPMTypes.isEmpty && !isLoading
+        selectedProduct != nil && !selectedAPMTypes.isEmpty && !isLoading && !isRadarCollecting
+    }
+
+    private var isRadarCollecting: Bool {
+        radarEnabled && radarState == .collecting
+    }
+
+    /// Pass session ID only when Radar is on and collection succeeded (matches ObjC example).
+    private var radarSessionIdForPurchase: String? {
+        guard radarEnabled, let sessionId = radarSessionId, !sessionId.isEmpty else { return nil }
+        return sessionId
     }
 
     /// Primary selected APM display name for messages: "iDEAL" | "Bancontact" | "EPS" | "Przelewy24 (P24)" | "SEPA Debit" (per PAYMENT_MESSAGES_CROSS_PLATFORM).
@@ -90,6 +110,8 @@ struct StripeAPMPaymentFlowView: View {
                 )
 
                 apmTypeSelectionSection
+
+                radarSection
 
                 appearanceConfigurationSection
 
@@ -176,6 +198,7 @@ struct StripeAPMPaymentFlowView: View {
                 .accessibilityLabel(AccessibilityLabels.StripeAPMPayment.title)
                 .accessibilityHint(AccessibilityHints.StripeAPMPayment.title)
                 .accessibilityAddTraits(.isHeader)
+            // With Radar: "Create a pending purchase via Spreedly, then complete checkout using Stripe PaymentSheet. Optionally enable Stripe Radar to attach a session ID to the purchase."
             Text("Create a pending purchase via Spreedly, then complete checkout using Stripe PaymentSheet.")
                 .font(theme.typography.bodyFont)
                 .foregroundColor(theme.colors.textSecondary)
@@ -384,6 +407,93 @@ struct StripeAPMPaymentFlowView: View {
         return appearance
     }
 
+    // MARK: - Stripe Radar
+
+    private var radarSection: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.sm) {
+            Toggle(isOn: $radarEnabled) {
+                Text("Stripe Radar")
+                    .font(theme.typography.subtitleFont)
+                    .foregroundColor(theme.colors.text)
+            }
+            .accessibilityIdentifier(AccessibilityIdentifiers.StripeAPMPayment.radarToggle)
+            .accessibilityLabel(AccessibilityLabels.StripeAPMPayment.radarToggle)
+            .accessibilityHint(AccessibilityHints.StripeAPMPayment.radarToggle)
+            .onChange(of: radarEnabled) { enabled in
+                handleRadarToggle(enabled)
+            }
+
+            if radarEnabled {
+                radarStatusView
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(theme.spacing.md)
+        .background(theme.colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: theme.borderRadius.xl))
+        .overlay(
+            RoundedRectangle(cornerRadius: theme.borderRadius.xl)
+                .stroke(theme.colors.border, lineWidth: 1)
+        )
+        .customShadow(theme.shadows.small)
+    }
+
+    @ViewBuilder
+    private var radarStatusView: some View {
+        switch radarState {
+        case .idle:
+            EmptyView()
+        case .collecting:
+            HStack(spacing: theme.spacing.sm) {
+                ProgressView()
+                Text("Collecting device data...")
+                    .font(theme.typography.captionFont)
+                    .foregroundColor(theme.colors.textSecondary)
+            }
+            .accessibilityIdentifier(AccessibilityIdentifiers.StripeAPMPayment.radarStatusCollecting)
+            .accessibilityLabel(AccessibilityLabels.StripeAPMPayment.radarStatusCollecting)
+        case .success:
+            VStack(alignment: .leading, spacing: theme.spacing.xs) {
+                Text("Session ID")
+                    .font(theme.typography.captionFont)
+                    .foregroundColor(theme.colors.textSecondary)
+                Text(radarSessionId ?? "")
+                    .font(theme.typography.captionFont)
+                    .foregroundColor(theme.colors.text)
+                    .lineLimit(2)
+            }
+            .accessibilityIdentifier(AccessibilityIdentifiers.StripeAPMPayment.radarStatusSuccess)
+            .accessibilityLabel(AccessibilityLabels.StripeAPMPayment.radarStatusSuccess)
+        case .failed:
+            Text("Collection failed — payment will proceed without Radar")
+                .font(theme.typography.captionFont)
+                .foregroundColor(theme.colors.error)
+                .accessibilityIdentifier(AccessibilityIdentifiers.StripeAPMPayment.radarStatusFailed)
+                .accessibilityLabel(AccessibilityLabels.StripeAPMPayment.radarStatusFailed)
+        }
+    }
+
+    private func handleRadarToggle(_ enabled: Bool) {
+        if enabled {
+            Task { await collectRadarSession() }
+        } else {
+            radarSessionId = nil
+            radarState = .idle
+        }
+    }
+
+    private func collectRadarSession() async {
+        await MainActor.run { radarState = .collecting }
+        let config = StripeRadarConfig(
+            publishableKey: SpreedlyConfigManager.shared.stripePublishableKey
+        )
+        let sessionId = await SpreedlyStripeRadarSession.createRadarSession(config)
+        await MainActor.run {
+            radarSessionId = sessionId
+            radarState = sessionId != nil ? .success : .failed
+        }
+    }
+
     // MARK: - Subscriptions
 
     // Step 0: Subscribe to payment results before starting the flow
@@ -432,12 +542,14 @@ struct StripeAPMPaymentFlowView: View {
         let apmTypes = await MainActor.run { Array(selectedAPMTypes) }
         do {
             let client = SpreedlyConfigManager.shared.createPurchaseAPIClient()
+            let radarId = await MainActor.run { radarSessionIdForPurchase }
             let response = try await client.stripeAPMPendingPurchase(
                 amount: amountInCents,
                 currencyCode: "EUR",
                 redirectUrl: redirectUrl,
                 callbackUrl: callbackUrl,
-                apmTypes: apmTypes
+                apmTypes: apmTypes,
+                radarSessionId: radarId
             )
 
             await MainActor.run {

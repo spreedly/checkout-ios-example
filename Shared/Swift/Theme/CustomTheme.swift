@@ -14,7 +14,7 @@ public func createCustomSpreedlyLightTheme() -> SpreedlyTheme {
 }
 
 /// Custom dark theme factory with a modern, gradient-based design
-/// Uses SpreedlyThemeManager.createCustomTheme() for proper accessibility support
+/// Uses SpreedlyThemeManager.createC ustomTheme() for proper accessibility support
 public func createCustomSpreedlyDarkTheme() -> SpreedlyTheme {
     return SpreedlyThemeManager.createCustomTheme(
         colors: customDarkColors,

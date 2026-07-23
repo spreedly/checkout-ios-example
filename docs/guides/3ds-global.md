@@ -60,9 +60,21 @@ Add `Forter3DS` directly from the Forter repository (the Spreedly package does n
 
 1. File → Add Package Dependencies
 2. Enter repository URL: `https://bitbucket.org/forter-mobile/forter-ios.git`
-3. Set dependency rule to "Exact Version" (2.1.0)
+3. Set dependency rule to **Exact Version** **`2.1.0`** (required — see below)
 4. Add `Forter3DS` product to your app target
 5. Ensure "Embed & Sign" is set in "Frameworks, Libraries, and Embedded Content"
+
+#### Forter version (required)
+
+Spreedly Global 3DS is validated against **Forter3DS 2.1.0 only**:
+
+| Rule | Value |
+|------|--------|
+| **SPM** | `exact: "2.1.0"` — in Xcode choose **Exact Version**, not Up to Next Major / Branch |
+| **CocoaPods** | `:tag => '2.1.0'` |
+| **Do not use** | Xcode’s “latest” Forter tag, Up to Next Major from another version, or any tag other than **2.1.0** |
+
+A different Forter major/minor can fail to resolve against Spreedly’s pin or break Global 3DS at runtime. If SPM reports a Forter version conflict, set the app package rule back to **Exact 2.1.0**, reset package caches, and resolve again.
 
 **Option B: CocoaPods**
 
@@ -354,6 +366,10 @@ For detailed error handling patterns, see [error-handling.md](error-handling.md)
 
 > **Important:** When `blockJailbrokenDevices` is enabled and the device is compromised, the SDK blocks 3DS challenge flows automatically. `DoChallengeIfNeeded` auto-dismisses and emits a failure result. See [Security — Runtime Integrity](security.md#runtime-integrity) for details.
 
+### Screen Prevention
+
+Do **not** wrap `DoChallengeIfNeeded` / `DoChallengeIfNeededViewController` with `.screenPrevention()` or `wrapInSecureViewController` — Forter owns the challenge UI. See [Security](security.md).
+
 ## Troubleshooting
 
 ### Forter3DS crash: "dyld: Library not loaded: Forter3DS"
@@ -361,6 +377,12 @@ For detailed error handling patterns, see [error-handling.md](error-handling.md)
 - Add Forter3DS as a **direct** dependency to your app target (not transitive).
 - Ensure "Embed & Sign" is set in "Frameworks, Libraries, and Embedded Content".
 - Rebuild and test on a device; simulator may not always reproduce the crash.
+
+### SPM: Forter / `forter-ios` version conflict
+
+- Spreedly requires **Exact Version `2.1.0`**. Do not leave the package on Up to Next Major or another tag.
+- In Xcode: select the `forter-ios` package → set rule to **Exact** **`2.1.0`** → File → Packages → Reset Package Caches / Resolve Package Versions.
+- See [Forter version (required)](#forter-version-required).
 
 ### Challenge not appearing
 

@@ -21,8 +21,6 @@
 //   6. On success → shows token; on failure → shows error message
 //
 // KEY POINT: The app does NOT build the form itself — CardFormDropIn does it all.
-// Field-state callbacks are headless-only (CustomFormView). Express drop-in uses CardFormDropIn only.
-// QA toggle: enableAutofill seeds CardFormDropInDisplayConfig for PAN/CVC in the sheet.
 // Compare with CustomFormView which builds the form field-by-field.
 // =============================================================================
 
@@ -32,21 +30,10 @@ import Combine
 import SpreedlyCore
 import SpreedlyUI
 
-// Step 1: ThemeOption enum — used by the theme picker buttons on this screen
-enum ThemeOption: String, CaseIterable {
-    case `default` = "Default"
-    case blue = "Blue Theme"
-    case green = "Green Theme"
-    case purple = "Purple Theme"
-    
-    var displayName: String {
-        return self.rawValue
-    }
-}
+// Step 1: ThemeOption enum lives in Shared/ThemeOption.swift so the card and ACH
+// drop-in demos can share the same preset options.
 
 struct CheckoutBasicView: View {
-    @ObservedObject private var uiManager = SpreedlyUIManager.shared
-
     // Step 2: State variables — control what's shown and track payment lifecycle
     @State private var showForm = false                    // controls sheet presentation
     @State private var paymentResult: PaymentResult?       // holds successful payment result
@@ -62,15 +49,13 @@ struct CheckoutBasicView: View {
     @State private var allowBlankDate: Bool = false         // if true, expiry fields can be empty
     @State private var yearFormat: YearFormat = .fourDigit  // .twoDigit = "YY", .fourDigit = "YYYY"
     @State private var nameDisplayMode: DropInNameDisplayMode = .separateFields  // .separateFields = first+last, .singleField = full name
-    /// Seeds drop-in ``CardFormDropInDisplayConfig/enableAutofill`` for PAN/CVC (same as headless ``SPLTextField``).
-    @State private var enableAutofill: Bool = true
-
+    
     // Step 4: Theme config — allows user to pick a custom color theme for the card form
     @State private var useCustomTheme: Bool = false
     @State private var lightTheme: SpreedlyTheme?          // custom light-mode theme (nil = use SDK default)
     @State private var darkTheme: SpreedlyTheme?           // custom dark-mode theme (nil = use SDK default)
     @State private var selectedTheme: ThemeOption = .default
-
+    
     // MARK: - Body (composed from subviews to avoid type-checker timeout)
     // Step 5: Main body — sheet modifier presents CardFormDropIn when showForm = true
     public var body: some View {
@@ -179,7 +164,7 @@ struct CheckoutBasicView: View {
         )
         .shadow(color: cardShadowColor, radius: 4, x: 0, y: 0)
     }
-
+    
     // Step: Config toggles — each toggle calls Spreedly.shared().setParam() to update SDK-level validation rules
     // These params affect how CardFormDropIn validates input (e.g., skip name validation if allowBlankName=true).
     private var configurationOptionsCard: some View {
@@ -258,47 +243,6 @@ struct CheckoutBasicView: View {
                             .accessibilityIdentifier(AccessibilityIdentifiers.BasicCheckout.allowBlankDateToggle)
                             .accessibilityHint(AccessibilityHints.BasicCheckout.allowBlankDateToggle)
                             .accessibilityElement(children: .combine)
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Toggle("Enable autofill", isOn: $enableAutofill)
-                                .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.0/255.0, green: 119.0/255.0, blue: 200.0/255.0)))
-                                .accessibilityIdentifier(AccessibilityIdentifiers.BasicCheckout.enableAutofillToggle)
-                                .accessibilityHint(AccessibilityHints.BasicCheckout.enableAutofillToggle)
-                            Text("Maps to CardFormDropInDisplayConfig.enableAutofill.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(HostedCardDisplayFormatCopy.maskToggleCaption)
-                                .font(.subheadline)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Picker(
-                                "Card number format",
-                                selection: Binding(
-                                    get: { uiManager.hostedCardDisplayState.cardNumberFormat },
-                                    set: { Spreedly.shared().setNumberFormat($0) }
-                                )
-                            ) {
-                                Text("Pretty").tag(CardNumberFormat.pretty)
-                                Text("Plain").tag(CardNumberFormat.plain)
-                                Text("Masked").tag(CardNumberFormat.masked)
-                            }
-                            .pickerStyle(SegmentedPickerStyle())
-                            .accessibilityIdentifier("basic-checkout-pan-format-segmented")
-
-                            Button("toggleMask()") {
-                                Spreedly.shared().toggleMask()
-                            }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(Color(red: 0.0/255.0, green: 119.0/255.0, blue: 200.0/255.0))
-                            .accessibilityIdentifier("basic-checkout-toggle-mask-button")
-                            .accessibilityHint("Toggles Pretty masked ↔ Plain revealed for PAN and CVC")
-                            .accessibilityElement(children: .combine)
-
-                            expressQAStrip
                         }
                         
                         HStack {
@@ -563,43 +507,6 @@ struct CheckoutBasicView: View {
         .shadow(color: cardShadowColor, radius: 4, x: 0, y: 0)
     }
     
-    private var expressQAStrip: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Express QA")
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text("CardFormDropIn has no onFieldStateChange — mask via controls above.")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.leading)
-                .lineLimit(nil)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button("resetPaymentState()") {
-                Spreedly.shared().resetPaymentState()
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundColor(Color(red: 0.0/255.0, green: 119.0/255.0, blue: 200.0/255.0))
-            .accessibilityIdentifier("basic-checkout-reset-payment-state-button")
-            .accessibilityHint("Full reset: secure values, field UI, and hosted PAN/CVV display back to defaults.")
-
-            Text("Dismiss clears typed PAN. Mask/format outside the sheet survives dismiss.")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.leading)
-                .lineLimit(nil)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
-        .background(Color.primary.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
     // Step 6: "Show Basic Checkout Form" button — generates HMAC signature, then opens the CardFormDropIn sheet
     private var showFormButtonSection: some View {
         Button("Show Basic Checkout Form") {
@@ -681,21 +588,17 @@ struct CheckoutBasicView: View {
     // Step 7: CardFormDropIn — the SDK's pre-built card form presented as a sheet
     // Pass yearFormat, nameDisplayMode, and optional custom themes.
     // onProcessingResult fires immediately when user taps "Pay" (before API response).
-    // .screenPrevention() blocks screenshots/screen recording for PCI compliance.
+    // CardFormDropIn applies screen prevention internally.
     private var formSheet: some View {
         CardFormDropIn(
             yearFormat: yearFormat,
             nameDisplayMode: nameDisplayMode,
             theme: useCustomTheme ? lightTheme : nil,
             darkTheme: useCustomTheme ? darkTheme : nil,
-            displayConfig: CardFormDropInDisplayConfig(
-                cardNumberFormat: uiManager.hostedCardDisplayState.cardNumberFormat,
-                enableAutofill: enableAutofill
-            ),
             onProcessingResult: { processingResult in
                 if processingResult.isProcessing { isLoading = true }
             }
-        ).screenPrevention()
+        )
     }
     
     // Step 8: setupOnAppear — syncs toggle states from SDK paramsManager and subscribes to payment results
@@ -771,7 +674,6 @@ struct CheckoutBasicView: View {
     private var cardShadowColor: Color {
         colorScheme == .dark ? Color.black.opacity(0.5) : Color(hex: "#AFB4B5").opacity(0.8)
     }
-
 }
 
 #Preview {

@@ -477,7 +477,7 @@ static const NSInteger kBraintreeStageLineTagBase   = 1200;
     UILabel *priceLabel = [[UILabel alloc] init];
     priceLabel.text = [product formattedPriceUSD];
     priceLabel.font = [ThemeHelper subtitleFont];
-    priceLabel.textColor = [ThemeHelper primaryColor];
+    priceLabel.textColor = [ThemeHelper merchantProductPriceColor];
     [contentStack addArrangedSubview:priceLabel];
 
     [NSLayoutConstraint activateConstraints:@[

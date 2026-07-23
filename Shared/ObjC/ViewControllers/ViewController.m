@@ -172,14 +172,14 @@
             @"accessibilityId": @"braintree-payment-flow-navigation-link"
         },
         @{
-            @"title": @"ACH Bank Account Drop-In",
-            @"subtitle": @"Preview only — ACH will not ship in 1.4.1. Do not use in production.",
+            @"title": @"ACH Bank Account",
+            @"subtitle": @"Tokenize bank accounts via ACH with routing number, account number, and account type",
             @"class": [BankAccountCheckoutViewController class],
             @"accessibilityId": @"bank-account-checkout-navigation-link"
         },
         @{
             @"title": @"ACH Bank Account – Custom Form",
-            @"subtitle": @"Preview only — headless ACH sample; not for production in 1.4.1.",
+            @"subtitle": @"Headless ACH built field-by-field with SPLTextFieldViewController and createBankAccountObjC",
             @"class": [BankAccountCustomFormViewController class],
             @"accessibilityId": @"bank-account-custom-form-navigation-link"
         }

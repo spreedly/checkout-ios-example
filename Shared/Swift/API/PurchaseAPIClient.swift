@@ -181,9 +181,11 @@ public class PurchaseAPIClient {
         currencyCode: String,
         redirectUrl: String,
         callbackUrl: String,
-        apmTypes: [String]
+        apmTypes: [String],
+        radarSessionId: String? = nil
     ) async throws -> PurchaseResponse {
         let paymentMethod = StripeAPMPaymentMethod(apmTypes: apmTypes)
+        let gatewaySpecificFields = radarSessionId.map { StripeGatewaySpecificFields(radarSessionId: $0) }
         let transaction = HerokuCreatePurchaseTransaction(
             paymentMethodToken: nil,
             amount: amount,
@@ -191,7 +193,8 @@ public class PurchaseAPIClient {
             redirectUrl: redirectUrl,
             callbackUrl: callbackUrl,
             channel: "app",
-            paymentMethod: paymentMethod
+            paymentMethod: paymentMethod,
+            gatewaySpecificFields: gatewaySpecificFields
         )
         let body = HerokuCreatePurchaseRequest(gateway: "stripe", transaction: transaction)
         return try await postHeroku(path: "create-purchase", body: body)

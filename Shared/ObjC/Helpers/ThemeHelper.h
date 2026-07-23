@@ -19,6 +19,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (UIColor *)surfaceColor;
 + (UIColor *)textColor;
 + (UIColor *)textSecondaryColor;
++ (UIColor *)merchantProductPriceColor;
 + (UIColor *)borderColor;
 + (UIColor *)errorColor;
 + (UIColor *)successColor;

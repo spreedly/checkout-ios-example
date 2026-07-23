@@ -208,6 +208,7 @@ Extract `transaction.token` for use in `SpreedlyOffsiteCheckout.present(transact
 - **Braintree URL handler ordering:** If your app also uses Braintree, call `BraintreeURLHandler.handleOpen(url:)` before `handleOffsiteReturn(url:)` in your URL handler.
 - **Do NOT cancel the subscription** in `onDisappear` — Safari on top can trigger disappear events, killing the subscription before the result arrives.
 - **No SDK UI before Safari:** `SpreedlyOffsiteCheckout.present(transactionToken:)` opens `SFSafariViewController` directly on the topmost VC — no intermediate sheet or loader. The merchant controls their own loading indicator.
+- **Screen prevention:** Safari / `SFSafariViewController` checkout is **not** covered by Spreedly `.screenPrevention()`. Do not wrap the Safari session.
 
 ---
 

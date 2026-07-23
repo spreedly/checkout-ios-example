@@ -65,6 +65,7 @@ NS_ASSUME_NONNULL_BEGIN
                               redirectUrl:(NSString *)redirectUrl
                              callbackUrl:(NSString *)callbackUrl
                                 apmTypes:(NSArray<NSString *> *)apmTypes
+                           radarSessionId:(nullable NSString *)radarSessionId
                               completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion;
 
 /// Braintree purchase (POST {baseURL}/create-purchase, gateway "braintree").

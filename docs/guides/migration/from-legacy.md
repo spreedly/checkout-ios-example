@@ -164,7 +164,7 @@ If you integrated **Spreedly iFrame v1** (`iframe-v1.min.js`) in a WebView or mo
 | `errors` | **`PaymentResult`** failure + **`APIErrorHandler`** | [Error handling](../error-handling.md). | Parity |
 | `paymentMethod` | **`PaymentResult`** success | Token + payload. | Parity |
 | `3ds:status` | **`subscribeToThreeDSChallengeResults`** + gateway APIs | [3DS Global](../3ds-global.md), [3DS Gateway-Specific](../3ds-gateway-specific.md). | Platform |
-| `fraud:token` | Braintree device data ([Braintree APM](../braintree-apm.md)); gateway fraud via 3DS/APM modules | Different fraud integrations; not a drop-in `fraud:token`. **No Stripe Radar module on iOS.** | Gap |
+| `fraud:token` | Braintree device data ([Braintree APM](../braintree-apm.md)); [Stripe Radar](../stripe-radar.md) (`SpreedlyStripeRadar`) | Different fraud integrations; not a drop-in `fraud:token`. Use gateway-specific Radar session IDs where applicable. | Parity |
 | `consoleError` | (no merchant hook) | Use Spreedly support + your own crash reporting for **app** code. | N/A |
 
 ---
