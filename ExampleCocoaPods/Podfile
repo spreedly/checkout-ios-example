@@ -11,21 +11,26 @@ def spreedly_pods
   use_frameworks!
 
   if USE_LOCAL_PACKAGE
-    pod 'SpreedlyCore',      :path => LOCAL_PACKAGE
-    pod 'SpreedlySecurity',  :path => LOCAL_PACKAGE
-    pod 'SpreedlyUI',        :path => LOCAL_PACKAGE
-    pod 'SpreedlyStripeAPM', :path => LOCAL_PACKAGE
-    pod 'SpreedlyBraintree', :path => LOCAL_PACKAGE
+    pod 'SpreedlyCore',        :path => LOCAL_PACKAGE
+    pod 'SpreedlySecurity',    :path => LOCAL_PACKAGE
+    pod 'SpreedlyUI',          :path => LOCAL_PACKAGE
+    pod 'SpreedlyStripeAPM',   :path => LOCAL_PACKAGE
+    pod 'SpreedlyStripeRadar', :path => LOCAL_PACKAGE
+    pod 'SpreedlyBraintree',   :path => LOCAL_PACKAGE
   else
-    pod 'SpreedlyCore',      :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
-    pod 'SpreedlySecurity',  :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
-    pod 'SpreedlyUI',        :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
-    pod 'SpreedlyStripeAPM', :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
-    pod 'SpreedlyBraintree', :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlyCore',        :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlySecurity',    :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlyUI',          :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlyStripeAPM',   :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlyStripeRadar', :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlyBraintree',   :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
   end
 
   # 3DS Global (Forter) -- optional, from Forter's repo
   pod 'Forter3DS', :git => 'https://bitbucket.org/forter-mobile/forter-ios.git', :tag => '2.1.0'
+
+  # Required for SpreedlyStripeRadar at runtime (Embed & Sign / link StripePayments)
+  pod 'StripePayments', '~> 25.11'
 end
 
 target 'MerchantExamplePods' do

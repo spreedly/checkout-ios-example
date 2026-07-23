@@ -320,6 +320,10 @@ public enum AccessibilityIdentifiers {
         public static let buttonBackgroundColorPicker = "stripe-apm-payment-button-background-color-picker"
         public static let buttonTextColorPicker = "stripe-apm-payment-button-text-color-picker"
         public static let cornerRadiusStepper = "stripe-apm-payment-corner-radius-stepper"
+        public static let radarToggle = "stripe-apm-payment-radar-toggle"
+        public static let radarStatusCollecting = "stripe-apm-payment-radar-status-collecting"
+        public static let radarStatusSuccess = "stripe-apm-payment-radar-status-success"
+        public static let radarStatusFailed = "stripe-apm-payment-radar-status-failed"
         public static let startButton = "stripe-apm-payment-start-button"
         public static let successIcon = "stripe-apm-payment-success-icon"
         public static let successTitle = "stripe-apm-payment-success-title"
@@ -642,6 +646,10 @@ public enum AccessibilityHints {
         public static let buttonBackgroundColorPicker = "Color picker for Stripe PaymentSheet pay button background"
         public static let buttonTextColorPicker = "Color picker for Stripe PaymentSheet pay button text color"
         public static let cornerRadiusStepper = "Stepper for Stripe PaymentSheet corner radius"
+        public static let radarToggle = "Toggle to collect Stripe Radar device data before checkout"
+        public static let radarStatusCollecting = "Stripe Radar is collecting device data"
+        public static let radarStatusSuccess = "Stripe Radar session collected successfully"
+        public static let radarStatusFailed = "Stripe Radar collection failed; checkout proceeds without Radar"
         public static let startButton = "Tap to start Stripe APM payment flow"
         public static let successIcon = "Success indicator icon"
         public static let successTitle = "Stripe APM checkout success message"
@@ -693,6 +701,7 @@ public enum AccessibilityLabels {
     // MARK: - Bank Account Checkout View (ACH)
     public enum BankAccountCheckout {
         public static let title = "ACH Bank Account Drop-In"
+        public static let description = "Tokenize bank account details via ACH"
         public static let showFormButton = "Show Bank Account Form"
         public static let successIcon = "Success"
         public static let successTitle = "Bank Account Tokenized"
@@ -706,6 +715,7 @@ public enum AccessibilityLabels {
     // MARK: - Bank Account Custom Form View (Headless ACH)
     public enum BankAccountCustomForm {
         public static let title = "Headless ACH Bank Account Form"
+        public static let description = "Tokenize bank account details via ACH"
         public static let componentsTitle = "Form Components"
         public static let configurationTitle = "Configuration Options"
         public static let nameDisplayModePicker = "Name Display Mode"
@@ -717,6 +727,7 @@ public enum AccessibilityLabels {
         public static let successIcon = "Success"
         public static let successTitle = "Bank Account Tokenized"
         public static let tokenText = "Payment Token"
+        public static let errorMessage = "Tokenization or validation error from the ACH form"
     }
 
     // MARK: - Basic Checkout View
@@ -891,6 +902,10 @@ public enum AccessibilityLabels {
         public static let buttonBackgroundColorPicker = "Pay button background"
         public static let buttonTextColorPicker = "Pay button text"
         public static let cornerRadiusStepper = "Corner radius"
+        public static let radarToggle = "Stripe Radar"
+        public static let radarStatusCollecting = "Collecting device data"
+        public static let radarStatusSuccess = "Radar session ID"
+        public static let radarStatusFailed = "Radar collection failed"
         public static let startButton = "Start Stripe APM Flow"
         public static let successIcon = "Success"
         public static let successTitle = "Success"
