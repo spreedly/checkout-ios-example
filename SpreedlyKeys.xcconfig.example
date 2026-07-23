@@ -21,3 +21,4 @@ SPREEDLY_SERVER_URL = https:/$()/your-server.example.com/api/v1/auth/params
 SPREEDLY_BASE_URL = https:/$()/your-server.example.com/api/v1
 SPREEDLY_API_KEY =
 STRIPE_PUBLISHABLE_KEY = your_stripe_publishable_key_here
+SPREEDLY_C2P_SANDBOX_SRC_DPA_ID = your_sandbox_src_dpa_id_here

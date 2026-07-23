@@ -173,7 +173,7 @@ struct CVVRecachingView: View {
                             // Called when Cancel button is tapped - merchant handles dismissal
                             showCVVRecachingView = false
                         }
-                    ).screenPrevention()
+                    )
                 }
             }
             // Show Recache CVV UI as FullScreen (Alert mode)
@@ -210,7 +210,7 @@ struct CVVRecachingView: View {
                             // Called when Cancel button is tapped - merchant handles dismissal
                             showCVVRecachingView = false
                         }
-                    ).screenPrevention()
+                    )
                 }
             }
             .onAppear {

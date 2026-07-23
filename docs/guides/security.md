@@ -193,7 +193,7 @@ The SDK includes screen prevention features to protect sensitive payment informa
 
 ### SwiftUI Integration
 
-Apply screen prevention to any SwiftUI view using the `.screenPrevention()` modifier. The most effective approach is to apply it at the root screen level.
+For custom SwiftUI payment UI, use the `.screenPrevention()` modifier. Root-level wrap is recommended for custom in-app forms (SDK Card/ACH/CVV drop-ins already include protection).
 
 **Apply at Root Level (Recommended):**
 
@@ -212,9 +212,21 @@ struct MyApp: App {
 }
 ```
 
-**Apply to Sheets Separately:**
+**Built-in on SDK drop-ins (no merchant wrap):**
 
-Sheets require separate protection. Apply `.screenPrevention()` inside the `.sheet()` modifier:
+`CardFormDropIn` / `CardFormDropInViewController`, `BankAccountFormDropIn` / `BankAccountFormDropInViewController`, and `SpreedlyCVVRecachingView` apply screen prevention automatically. Present them as usual — do not add `.screenPrevention()` or `wrapInSecureViewController` around those components.
+
+```swift
+.sheet(isPresented: $showForm) {
+    CardFormDropIn(
+        yearFormat: yearFormat,
+        nameDisplayMode: nameDisplayMode,
+        onProcessingResult: { _ in }
+    )
+}
+```
+
+**Custom forms and sheets:** Apply `.screenPrevention()` yourself on custom/`SPLTextField` payment UI (and inside `.sheet()` when the sheet hosts custom sensitive content):
 
 ```swift
 .sheet(isPresented: $showPaymentForm) {
@@ -225,39 +237,35 @@ Sheets require separate protection. Apply `.screenPrevention()` inside the `.she
 
 **Custom Placeholder Text:**
 
-Provide custom placeholder text that appears in screenshots, screen recordings, and app switcher previews:
-
 ```swift
 WindowGroup {
     MainView()
         .screenPrevention(placeholderText: "Secure Payment")
 }
 
-// In sheets
 .sheet(isPresented: $showForm) {
     PaymentFormView()
         .screenPrevention(placeholderText: "Payment Information")
 }
 ```
 
-**CardFormDropIn:** Apply `.screenPrevention()` to `CardFormDropIn` when presenting it. Example:
+**Important — what Spreedly wrap does not cover:**
 
-```swift
-.sheet(isPresented: $showForm) {
-    CardFormDropIn(
-        yearFormat: yearFormat,
-        nameDisplayMode: nameDisplayMode,
-        onProcessingResult: { _ in }
-    )
-    .screenPrevention()
-}
-```
+| Surface | Screen prevention |
+|---------|-------------------|
+| Card / ACH / CVV drop-ins | Built-in |
+| Custom in-app forms | Merchant `.screenPrevention()` / UIKit wrap |
+| 3DS Global (`DoChallengeIfNeeded`) | Do **not** wrap — Forter owns the challenge UI |
+| Gateway 3DS Safari / `ASWebAuthenticationSession` | Not covered by Spreedly wrap |
+| Offsite / EBANX Safari | Not covered by Spreedly wrap |
+| Stripe PaymentSheet | Not covered by Spreedly wrap |
+| Braintree / PayPal partner UI | Not covered by Spreedly wrap |
 
-**Important:** Screen prevention cannot be applied to 3DS challenges (`DoChallengeIfNeeded` or `DoChallengeIfNeededViewController`) because the challenge UI is presented in a separate view controller that cannot be wrapped in the protection layer.
+Root-level wrap remains recommended for custom in-app UI outside the built-in drop-ins.
 
 ### UIKit Integration
 
-**CardFormDropInViewController:** Wrap `CardFormDropInViewController` with `wrapInSecureViewController(placeholderText:)` before presenting. Example:
+**CardFormDropInViewController / BankAccountFormDropInViewController:** Present directly — screen prevention is built in.
 
 ```swift
 let dropInVC = CardFormDropInViewController(
@@ -266,11 +274,10 @@ let dropInVC = CardFormDropInViewController(
     nameDisplayMode: .separateFields,
     onProcessingResult: { _ in }
 )
-let secureVC = dropInVC.wrapInSecureViewController(placeholderText: "Payment information is protected")
-present(secureVC, animated: true)
+present(dropInVC, animated: true)
 ```
 
-For other UIKit view controllers, use the `wrapInSecureViewController()` extension:
+For **custom** UIKit view controllers that display sensitive data, use the `wrapInSecureViewController()` extension:
 
 ```swift
 import UIKit
@@ -527,7 +534,7 @@ The SDK applies binary hardening at build time on top of Apple's standard code s
 
 - [ ] Consider enabling `blockJailbrokenDevices` for high-risk payment flows
 - [ ] Check `Spreedly.initializationError` after setup when blocking is enabled, or `Spreedly.isDeviceTrusted` at any time
-- [ ] Apply `.screenPrevention()` to payment forms and custom views displaying sensitive data
+- [ ] Rely on built-in screen prevention for Card/ACH/CVV drop-ins; apply `.screenPrevention()` to custom views that display sensitive data
 - [ ] Fetch signature parameters from your backend before each payment session
 - [ ] Cancel Combine subscriptions in `onDisappear` (or `dealloc` for Objective-C)
 - [ ] Use Keychain for sensitive token storage; never use UserDefaults or plain text

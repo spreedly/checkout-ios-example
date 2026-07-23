@@ -551,7 +551,7 @@ static const NSInteger kEbanxStageLineTagBase   = 700;
     UILabel *amountLabel = [[UILabel alloc] init];
     amountLabel.tag = 999;
     amountLabel.font = [ThemeHelper subtitleFont];
-    amountLabel.textColor = [ThemeHelper primaryColor];
+    amountLabel.textColor = [ThemeHelper merchantProductPriceColor];
     amountLabel.textAlignment = NSTextAlignmentRight;
     amountLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.totalAmountContainer addSubview:amountLabel];
@@ -628,7 +628,7 @@ static const NSInteger kEbanxStageLineTagBase   = 700;
     UILabel *priceLabel = [[UILabel alloc] init];
     priceLabel.text = [product formattedPriceWithCurrency:[self currentCurrencyCode]];
     priceLabel.font = [ThemeHelper subtitleFont];
-    priceLabel.textColor = [ThemeHelper primaryColor];
+    priceLabel.textColor = [ThemeHelper merchantProductPriceColor];
     [textStack addArrangedSubview:priceLabel];
     [contentStack addArrangedSubview:textStack];
 

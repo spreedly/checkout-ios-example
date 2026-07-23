@@ -125,7 +125,6 @@ struct ThreeDSPaymentFlowView: View {
                         show3DSChallenge = false
                     }
                 )
-                .screenPrevention()
             }
         }
         .onAppear {

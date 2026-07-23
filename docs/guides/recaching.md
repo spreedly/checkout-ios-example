@@ -92,7 +92,6 @@ struct CheckoutView: View {
                 },
                 onDismiss: { showCVVRecaching = false }
             )
-            .screenPrevention()
         }
         .onAppear {
             cancellable = Spreedly.shared().subscribeToRecacheResults { result in
@@ -352,7 +351,6 @@ struct SavedCardsView: View {
                 },
                 onDismiss: { selectedCard = nil }
             )
-            .screenPrevention()
         }
         .onAppear {
             cancellable = Spreedly.shared().subscribeToRecacheResults { result in
@@ -571,7 +569,6 @@ For dialog mode, use the SDK's `.crossDissolveFullScreenCover()` View extension 
         paymentMethodToken: paymentMethodToken,
         onDismiss: { showCVVRecaching = false }
     )
-    .screenPrevention()
 }
 ```
 
@@ -704,16 +701,7 @@ For error handling patterns, see [error-handling.md](error-handling.md).
 
 ### Screenshot Prevention
 
-Always apply `.screenPrevention()` to protect sensitive CVV input:
-
-```swift
-SpreedlyCVVRecachingView(
-    config: recacheConfig,
-    paymentMethodToken: paymentMethodToken,
-    onDismiss: { showCVVRecaching = false }
-)
-.screenPrevention()
-```
+`SpreedlyCVVRecachingView` applies screen prevention automatically — no merchant `.screenPrevention()` wrap required. For custom CVV UI, apply `.screenPrevention()` yourself (see [Security](security.md)).
 
 ### SecureValueContainer
 
@@ -795,7 +783,7 @@ Reset validation parameters in `onDisappear` to restore defaults when the recach
 
 **Screen prevention not working**
 
-- Ensure `.screenPrevention()` is applied to the recaching view
+- `SpreedlyCVVRecachingView` includes built-in protection — confirm you are presenting the SDK component (not a custom CVV field without `.screenPrevention()`)
 - Verify the SpreedlyUI module is properly imported
 
 **Memory leaks or retain cycles**

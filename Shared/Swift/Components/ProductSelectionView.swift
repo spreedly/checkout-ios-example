@@ -7,6 +7,11 @@
 
 import SwiftUI
 
+/// Merchant product catalog price — neutral label color, not SDK theme.
+private enum MerchantProductPriceStyle {
+    static let color = Color.primary.opacity(0.6)
+}
+
 // MARK: - Product Selection View
 struct ProductSelectionView: View {
     let products: [Product]
@@ -54,7 +59,7 @@ struct ProductSelectionView: View {
                         Spacer()
                         Text(selected.formattedPrice)
                             .font(theme.typography.subtitleFont)
-                            .foregroundColor(theme.colors.primary)
+                            .foregroundColor(MerchantProductPriceStyle.color)
                     }
                     .accessibilityIdentifier("product-total-amount")
                     .accessibilityLabel("Total amount: \(selected.formattedPrice)")
@@ -111,7 +116,7 @@ struct ProductRowView: View {
                 
                 Text(product.formattedPrice)
                     .font(theme.typography.subtitleFont)
-                    .foregroundColor(theme.colors.primary)
+                    .foregroundColor(MerchantProductPriceStyle.color)
             }
             
             // Selection Indicator - optional; when hidden, use spacer to keep layout consistent

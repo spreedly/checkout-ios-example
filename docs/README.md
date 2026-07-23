@@ -78,7 +78,7 @@ Express snippets: [express-checkout.md](guides/express-checkout.md#code-sample--
 | [Getting Started](guides/getting-started.md) | Install the SDK, set it up, and run a first payment |
 | [Express Checkout](guides/express-checkout.md) | Use the ready-made CardFormDropIn payment form |
 | [Custom Payment Forms](guides/custom-payment-forms.md) | Build your own payment form UI with SPLTextField |
-| [ACH Bank Account](guides/ach-bank-account.md) _(preview — not yet released)_ | Tokenize US ABA + Canadian routing numbers via BankAccountFormDropIn or headless. **Do not integrate in production until ACH ships in a future release.** |
+| [ACH Bank Account](guides/ach-bank-account.md) | Tokenize US ABA + Canadian routing numbers via BankAccountFormDropIn or headless (**1.5.0+**). |
 | [Theme and Styling](guides/theme-and-styling.md) | Colors, typography, dark mode |
 | [Error Handling](guides/error-handling.md) | Error types, retry guidance, and user-friendly messages |
 | [Security](guides/security.md) | Screen prevention, PCI compliance |
@@ -86,6 +86,7 @@ Express snippets: [express-checkout.md](guides/express-checkout.md#code-sample--
 | [Offsite Payments](guides/offsite-payments.md) | PayPal, Sprel via Safari |
 | [EBANX APM](guides/ebanx-apm.md) | Pix, Boleto, OXXO, NuPay via EBANX |
 | [Stripe APM](guides/stripe-apm.md) | iDEAL, Bancontact, EPS, P24, SEPA via Stripe |
+| [Stripe Radar](guides/stripe-radar.md) | Device data / Radar session ID for fraud signals |
 | [Braintree APM](guides/braintree-apm.md) | PayPal and Venmo via Braintree |
 | [3DS Global](guides/3ds-global.md) | Forter-based 3D Secure authentication |
 | [3DS Gateway-Specific](guides/3ds-gateway-specific.md) | Gateway-managed 3DS authentication (e.g. Worldpay) |

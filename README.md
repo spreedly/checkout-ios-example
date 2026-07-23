@@ -6,15 +6,15 @@ Demonstrates integrating the [Spreedly iOS SDK](https://github.com/spreedly/chec
 
 Each variant contains a **SwiftUI (Swift)** target and a **UIKit (Objective-C)** target, showing both language integration paths.
 
-**SDK Version:** 1.4.1
+**SDK Version:** 1.5.0
 
 ## Prerequisites
 
 | Requirement       | Version        |
 |-------------------|----------------|
-| **Xcode**         | 16.0+  |
+| **Xcode**         | 26.0+  |
 | **iOS Deployment**| 14.0+    |
-| **Swift**         | 5.10+  |
+| **Swift**         | 6.0+  |
 | **XcodeGen**      | 2.40+ (to regenerate `.xcodeproj`) |
 | **CocoaPods**     | 1.15+ (CocoaPods variant only) |
 
@@ -26,6 +26,7 @@ Each variant contains a **SwiftUI (Swift)** target and a **UIKit (Objective-C)**
   | **SpreedlySecurity** | `SpreedlySecurity` | SpreedlySecurity framework |
   | **SpreedlyUI** | `SpreedlyUI` | SpreedlyUI framework |
   | **SpreedlyStripeAPM** | `SpreedlyStripeAPM` | SpreedlyStripeAPM framework |
+  | **SpreedlyStripeRadar** | `SpreedlyStripeRadar` | SpreedlyStripeRadar framework |
   | **SpreedlyBraintree** | `SpreedlyBraintree` | SpreedlyBraintree framework |
 
 ## Credential Setup

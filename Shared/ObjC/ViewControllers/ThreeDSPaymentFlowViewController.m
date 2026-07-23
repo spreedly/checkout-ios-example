@@ -358,7 +358,7 @@ static char ThreeDSErrorContainerKey;
     UILabel *amountLabel = [[UILabel alloc] init];
     amountLabel.tag = 999; // Tag to identify this label for updates
     amountLabel.font = [ThemeHelper subtitleFont];
-    amountLabel.textColor = [ThemeHelper primaryColor];
+    amountLabel.textColor = [ThemeHelper merchantProductPriceColor];
     amountLabel.textAlignment = NSTextAlignmentRight;
     amountLabel.translatesAutoresizingMaskIntoConstraints = NO;
     amountLabel.accessibilityIdentifier = @"product-total-amount";
@@ -451,7 +451,7 @@ static char ThreeDSErrorContainerKey;
     UILabel *priceLabel = [[UILabel alloc] init];
     priceLabel.text = [product formattedPrice];
     priceLabel.font = [ThemeHelper subtitleFont];
-    priceLabel.textColor = [ThemeHelper primaryColor];
+    priceLabel.textColor = [ThemeHelper merchantProductPriceColor];
     priceLabel.textAlignment = NSTextAlignmentCenter;
     priceLabel.numberOfLines = 1;
     priceLabel.translatesAutoresizingMaskIntoConstraints = NO;

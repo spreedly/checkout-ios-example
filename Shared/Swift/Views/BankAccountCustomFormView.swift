@@ -26,21 +26,42 @@ struct BankAccountCustomFormView: View {
     @State private var fullNameIsValid: Bool = false
     @State private var firstNameIsValid: Bool = false
     @State private var lastNameIsValid: Bool = false
+    @State private var bankNameIsValid: Bool = true
 
     @State private var nameDisplayMode: DropInNameDisplayMode = .singleField
     @State private var showBankName: Bool = false
-    @State private var bankNameInput: String = ""
+    @State private var showAccountType: Bool = true
+    @State private var showAccountHolderType: Bool = true
     @State private var bankAccountType: BankAccountType = .checking
     @State private var bankAccountHolderType: BankAccountHolderType = .personal
 
-    @State private var allowBlankName: Bool = false
-
     @State private var focusedFieldType: FormFieldType?
+
+    /// Same chip + border-radius model as `BankAccountCheckoutView` / Android `BankAccountConfigPanel`.
+    @State private var useCustomTheme: Bool = false
+    @State private var lightTheme: SpreedlyTheme?
+    @State private var darkTheme: SpreedlyTheme?
+    @State private var selectedPrimarySwatchID: Int?
+    @State private var selectedFieldBackgroundID: Int?
+    @State private var formCornerRadius: CGFloat = 8
+
+    private var activeFieldTheme: SpreedlyTheme? {
+        useCustomTheme ? lightTheme : nil
+    }
+
+    private var activeFieldDarkTheme: SpreedlyTheme? {
+        useCustomTheme ? darkTheme : nil
+    }
+
+    // Demo-side wording — matches the bundled `bank_account_holder_name_required`
+    // string the SDK ships for the drop-in. Hard-coded here because the example
+    // app doesn't link the SDK's internal `LocalizationHelper`.
+    private let nameRequiredMessage: String = "Name is required"
 
     public var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                Text("ACH Bank Account – Custom Form")
+                Text("ACH Bank Account")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.title)
@@ -48,21 +69,17 @@ struct BankAccountCustomFormView: View {
                     .accessibilityHint(AccessibilityHints.BankAccountCustomForm.title)
                     .accessibilityAddTraits(.isHeader)
 
-                Text("Preview only — ACH bank-account flows are in the SDK for internal testing and will not ship in 1.4.1. Do not integrate ACH in production.")
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(.secondary)
-                    .padding()
-
-                Text("Headless ACH built field-by-field with individual SPLTextFields. The app owns the layout and submit flow; it calls Spreedly.shared().createBankAccount(...) directly when the user taps PAY NOW.")
+                Text("Tokenize bank account details via ACH")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .padding()
                     .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.description)
+                    .accessibilityLabel(AccessibilityLabels.BankAccountCustomForm.description)
                     .accessibilityHint(AccessibilityHints.BankAccountCustomForm.description)
 
                 componentsCard
                 configurationCard
+                themeConfigurationCard
 
                 if let error = errorMessage {
                     Text("Error: \(error)")
@@ -84,7 +101,7 @@ struct BankAccountCustomFormView: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(isFormValid && !isLoading ? theme.colors.primary : theme.colors.primary.opacity(0.6))
+                                .fill(isFormValid && !isLoading ? payButtonPrimary : payButtonPrimary.opacity(0.6))
                         )
                 }
                 .disabled(!isFormValid || isLoading)
@@ -100,12 +117,11 @@ struct BankAccountCustomFormView: View {
             }
             .padding()
         }
+        .background(Color(UIColor.systemBackground))
         .onAppear {
             if !Spreedly.isDeviceTrusted {
                 errorMessage = Spreedly.initializationError?.message ?? "SDK blocked by security check"
             }
-
-            allowBlankName = Spreedly.shared().paramsManager.getParam(parameter: .allowBlankName)
 
             cancellable = Spreedly.shared().subscribeToPaymentResults { result in
                 paymentResult = result
@@ -139,24 +155,24 @@ struct BankAccountCustomFormView: View {
 
     private var componentsCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Form Components:")
+            Text("Form components:")
                 .font(.headline)
                 .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.componentsTitle)
                 .accessibilityLabel(AccessibilityLabels.BankAccountCustomForm.componentsTitle)
                 .accessibilityHint(AccessibilityHints.BankAccountCustomForm.componentsTitle)
                 .accessibilityAddTraits(.isHeader)
 
-            Text("• Account Holder Name: SPLTextField with .fullName / .firstName / .lastName")
+            Text("• Account holder name")
                 .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.nameComponent)
 
-            Text("• Bank Name (optional): plain SwiftUI TextField (free-form, not validated)")
-                .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.bankNameComponent)
-
-            Text("• Routing Number: SPLTextField with .routingNumber (ABA + Canadian validation)")
+            Text("• Routing number")
                 .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.routingNumberComponent)
 
-            Text("• Account Number: SPLTextField with .accountNumber (4–17 digits, secure)")
+            Text("• Account number")
                 .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.accountNumberComponent)
+
+            Text("• Bank name (optional)")
+                .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.bankNameComponent)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
@@ -178,13 +194,14 @@ struct BankAccountCustomFormView: View {
                 .accessibilityHint(AccessibilityHints.BankAccountCustomForm.configurationTitle)
                 .accessibilityAddTraits(.isHeader)
 
-            HStack {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Name display:")
                 Picker("Name display", selection: $nameDisplayMode) {
                     Text("Full Name").tag(DropInNameDisplayMode.singleField)
                     Text("Separate").tag(DropInNameDisplayMode.separateFields)
                 }
                 .pickerStyle(SegmentedPickerStyle())
+                .frame(maxWidth: .infinity)
                 .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.nameDisplayModePicker)
                 .accessibilityLabel(AccessibilityLabels.BankAccountCustomForm.nameDisplayModePicker)
                 .accessibilityHint(AccessibilityHints.BankAccountCustomForm.nameDisplayModePicker)
@@ -196,44 +213,11 @@ struct BankAccountCustomFormView: View {
                 .accessibilityLabel(AccessibilityLabels.BankAccountCustomForm.showBankNameToggle)
                 .accessibilityHint(AccessibilityHints.BankAccountCustomForm.showBankNameToggle)
 
-            Toggle(
-                "Allow Blank Name",
-                isOn: Binding(
-                    get: { allowBlankName },
-                    set: { newValue in
-                        allowBlankName = newValue
-                        Spreedly.shared().setParam(parameter: .allowBlankName, value: newValue)
-                    }
-                )
-            )
-            .toggleStyle(SwitchToggleStyle(tint: theme.colors.primary))
-            .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.allowBlankNameToggle)
-            .accessibilityLabel(AccessibilityLabels.BankAccountCustomForm.allowBlankNameToggle)
-            .accessibilityHint(AccessibilityHints.BankAccountCustomForm.allowBlankNameToggle)
+            Toggle("Show account type", isOn: $showAccountType)
+                .toggleStyle(SwitchToggleStyle(tint: theme.colors.primary))
 
-            HStack {
-                Text("Account type:")
-                Picker("Account type", selection: $bankAccountType) {
-                    Text("Checking").tag(BankAccountType.checking)
-                    Text("Savings").tag(BankAccountType.savings)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.accountTypePicker)
-                .accessibilityLabel(AccessibilityLabels.BankAccountCustomForm.accountTypePicker)
-                .accessibilityHint(AccessibilityHints.BankAccountCustomForm.accountTypePicker)
-            }
-
-            HStack {
-                Text("Holder type:")
-                Picker("Holder type", selection: $bankAccountHolderType) {
-                    Text("Personal").tag(BankAccountHolderType.personal)
-                    Text("Business").tag(BankAccountHolderType.business)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.holderTypePicker)
-                .accessibilityLabel(AccessibilityLabels.BankAccountCustomForm.holderTypePicker)
-                .accessibilityHint(AccessibilityHints.BankAccountCustomForm.holderTypePicker)
-            }
+            Toggle("Show holder type", isOn: $showAccountHolderType)
+                .toggleStyle(SwitchToggleStyle(tint: theme.colors.primary))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
@@ -246,15 +230,338 @@ struct BankAccountCustomFormView: View {
         .shadow(color: cardShadowColor, radius: 4, x: 0, y: 0)
     }
 
+    private var themeConfigurationCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Theme Configuration:")
+                .font(.headline)
+                .accessibilityIdentifier("bankAccountCustomThemeTitle")
+                .accessibilityLabel("Theme Configuration")
+                .accessibilityHint("Configure custom theme for the headless ACH form")
+                .accessibilityAddTraits(.isHeader)
+
+            HStack {
+                Toggle(
+                    "Use Custom Theme",
+                    isOn: Binding(
+                        get: { useCustomTheme },
+                        set: { newValue in
+                            useCustomTheme = newValue
+                            if !newValue {
+                                lightTheme = nil
+                                darkTheme = nil
+                                selectedPrimarySwatchID = nil
+                                selectedFieldBackgroundID = nil
+                            } else {
+                                if selectedPrimarySwatchID == nil { selectedPrimarySwatchID = 0 }
+                                if selectedFieldBackgroundID == nil { selectedFieldBackgroundID = 0 }
+                                applyCustomization()
+                            }
+                        }
+                    )
+                )
+                .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.0 / 255.0, green: 119.0 / 255.0, blue: 200.0 / 255.0)))
+                .accessibilityIdentifier("bankAccountCustomThemeToggle")
+                .accessibilityHint("Toggle to use a custom theme for the headless ACH form")
+            }
+
+            HStack {
+                Text("Current accent:")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Text(currentAccentSummary)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(
+                        useCustomTheme && selectedPrimarySwatchID != nil && selectedFieldBackgroundID != nil
+                            ? .primary
+                            : .gray
+                    )
+                    .accessibilityIdentifier("bankAccountCustomCurrentTheme")
+            }
+            .padding(.top, 4)
+
+            if useCustomTheme {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("UI customization")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    Text("Primary color")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 12) {
+                        ForEach(Self.achThemeSwatches) { swatch in
+                            let chip = colorScheme == .dark ? swatch.darkPrimary : swatch.lightPrimary
+                            Button {
+                                selectedPrimarySwatchID = swatch.id
+                                applyCustomization()
+                            } label: {
+                                Circle()
+                                    .fill(chip)
+                                    .frame(width: 36, height: 36)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .stroke(
+                                                selectedPrimarySwatchID == swatch.id ? Color.primary : Color.clear,
+                                                lineWidth: selectedPrimarySwatchID == swatch.id ? 3 : 0
+                                            )
+                                    )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .accessibilityIdentifier("bankAccountCustomPrimarySwatch_\(swatch.id)")
+                            .accessibilityLabel("Primary \(swatch.label)")
+                            .accessibilityHint("Sets field focus accents and PAY NOW button to \(swatch.label)")
+                            .accessibilityAddTraits(selectedPrimarySwatchID == swatch.id ? [.isButton, .isSelected] : .isButton)
+                        }
+                    }
+
+                    Text("Field background")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 4)
+
+                    HStack(spacing: 12) {
+                        ForEach(Self.fieldBackgroundSwatches) { swatch in
+                            let chip = colorScheme == .dark ? swatch.darkSurface : swatch.lightSurface
+                            Button {
+                                selectedFieldBackgroundID = swatch.id
+                                applyCustomization()
+                            } label: {
+                                Circle()
+                                    .fill(chip)
+                                    .frame(width: 36, height: 36)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .stroke(
+                                                selectedFieldBackgroundID == swatch.id ? Color.primary : Color.clear,
+                                                lineWidth: selectedFieldBackgroundID == swatch.id ? 3 : 0
+                                            )
+                                    )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .accessibilityIdentifier("bankAccountCustomFieldBackgroundSwatch_\(swatch.id)")
+                            .accessibilityLabel("Field background \(swatch.label)")
+                            .accessibilityHint("Sets SPLTextField surface fill to \(swatch.label)")
+                            .accessibilityAddTraits(selectedFieldBackgroundID == swatch.id ? [.isButton, .isSelected] : .isButton)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Border radius")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                        HStack {
+                            Spacer()
+                            Text("\(Int(formCornerRadius)) pt")
+                                .font(.subheadline.monospacedDigit())
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $formCornerRadius, in: 4...24, step: 1)
+                            .accessibilityIdentifier("bankAccountCustomFormCornerRadiusSlider")
+                            .accessibilityLabel("Border radius")
+                            .onChange(of: formCornerRadius) { _ in
+                                refreshCustomThemeIfNeeded()
+                            }
+                    }
+                    .padding(.top, 4)
+
+                    Button("Reset to Default") {
+                        lightTheme = nil
+                        darkTheme = nil
+                        selectedPrimarySwatchID = nil
+                        selectedFieldBackgroundID = nil
+                        formCornerRadius = 8
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                    .accessibilityIdentifier("bankAccountCustomResetThemeButton")
+                    .accessibilityLabel("Reset to Default Theme")
+                    .accessibilityHint("Reset the headless ACH form to the default theme")
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding()
+        .background(cardBackgroundColor)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(cardBorderColor, lineWidth: 1)
+        )
+        .shadow(color: cardShadowColor, radius: 4, x: 0, y: 0)
+    }
+
+    private var payButtonPrimary: Color {
+        guard useCustomTheme,
+              let pId = selectedPrimarySwatchID,
+              let swatch = Self.achThemeSwatches.first(where: { $0.id == pId }) else {
+            return theme.colors.primary
+        }
+        return colorScheme == .dark ? swatch.darkPrimary : swatch.lightPrimary
+    }
+
+    private func borderRadiusFromSlider(_ base: CGFloat) -> SpreedlyBorderRadius {
+        let sm = base
+        let xs = max(2, base - 2)
+        let md = min(base + 2, 28)
+        let lg = min(base + 4, 32)
+        let xl = min(base + 8, 36)
+        return SpreedlyBorderRadius(xs: xs, sm: sm, md: md, lg: lg, xl: xl)
+    }
+
+    private func refreshCustomThemeIfNeeded() {
+        applyCustomization()
+    }
+
+    private func applyCustomization() {
+        guard useCustomTheme,
+              let pId = selectedPrimarySwatchID,
+              let fId = selectedFieldBackgroundID,
+              let primarySwatch = Self.achThemeSwatches.first(where: { $0.id == pId }),
+              let fieldSwatch = Self.fieldBackgroundSwatches.first(where: { $0.id == fId }) else { return }
+
+        let borderRadius = borderRadiusFromSlider(formCornerRadius)
+        let lightP = primarySwatch.lightPrimary
+        let darkP = primarySwatch.darkPrimary
+        let lightSurface = fieldSwatch.lightSurface
+        let darkSurface = fieldSwatch.darkSurface
+
+        let lightColors = SpreedlyColors(
+            primary: lightP,
+            secondary: lightP.opacity(0.75),
+            background: Color.white,
+            surface: lightSurface,
+            text: Color.black,
+            textSecondary: Color(red: 0.2, green: 0.2, blue: 0.22),
+            border: lightP.opacity(0.32),
+            borderFocused: lightP,
+            error: Color.red,
+            placeholder: Color.gray.opacity(0.65)
+        )
+        let darkColors = SpreedlyColors(
+            primary: darkP,
+            secondary: darkP.opacity(0.85),
+            background: Color.black,
+            surface: darkSurface,
+            text: Color.white,
+            textSecondary: Color.white.opacity(0.72),
+            border: darkP.opacity(0.5),
+            borderFocused: darkP,
+            error: Color.red,
+            placeholder: Color.white.opacity(0.55)
+        )
+
+        lightTheme = SpreedlyThemeManager.createCustomTheme(
+            colors: lightColors,
+            borderRadius: borderRadius
+        )
+        darkTheme = SpreedlyThemeManager.createCustomTheme(
+            colors: darkColors,
+            borderRadius: borderRadius
+        )
+    }
+
+    private var currentAccentSummary: String {
+        if !useCustomTheme { return ThemeOption.default.displayName }
+        guard let pId = selectedPrimarySwatchID,
+              let fId = selectedFieldBackgroundID,
+              let p = Self.achThemeSwatches.first(where: { $0.id == pId }),
+              let f = Self.fieldBackgroundSwatches.first(where: { $0.id == fId }) else {
+            return "Pick colors"
+        }
+        return "\(p.label) · \(f.label)"
+    }
+
+    private struct ACHThemeSwatch: Identifiable {
+        let id: Int
+        let lightPrimary: Color
+        let darkPrimary: Color
+        let label: String
+    }
+
+    private static let achThemeSwatches: [ACHThemeSwatch] = [
+        ACHThemeSwatch(id: 0, lightPrimary: Color(hex: "#1976D2"), darkPrimary: Color(hex: "#64B5F6"), label: "Blue"),
+        ACHThemeSwatch(id: 1, lightPrimary: Color(hex: "#388E3C"), darkPrimary: Color(hex: "#81C784"), label: "Green"),
+        ACHThemeSwatch(id: 2, lightPrimary: Color(hex: "#7B1FA2"), darkPrimary: Color(hex: "#BA68C8"), label: "Purple"),
+        ACHThemeSwatch(id: 3, lightPrimary: Color(hex: "#D32F2F"), darkPrimary: Color(hex: "#E57373"), label: "Red"),
+        ACHThemeSwatch(id: 4, lightPrimary: Color(hex: "#00897B"), darkPrimary: Color(hex: "#4DB6AC"), label: "Teal"),
+        ACHThemeSwatch(id: 5, lightPrimary: Color(hex: "#E64A19"), darkPrimary: Color(hex: "#FF8A65"), label: "Orange"),
+    ]
+
+    private struct ACHFieldBackgroundSwatch: Identifiable {
+        let id: Int
+        let lightSurface: Color
+        let darkSurface: Color
+        let label: String
+    }
+
+    private static let fieldBackgroundSwatches: [ACHFieldBackgroundSwatch] = [
+        ACHFieldBackgroundSwatch(id: 0, lightSurface: Color.white, darkSurface: Color(hex: "#1C1C1E"), label: "Default"),
+        ACHFieldBackgroundSwatch(id: 1, lightSurface: Color(hex: "#F5F5F5"), darkSurface: Color(hex: "#2C2C2C"), label: "Gray"),
+        ACHFieldBackgroundSwatch(id: 2, lightSurface: Color(hex: "#E8F5E9"), darkSurface: Color(hex: "#1B3A2A"), label: "Pale green"),
+        ACHFieldBackgroundSwatch(id: 3, lightSurface: Color(hex: "#E3F2FD"), darkSurface: Color(hex: "#1A2C3D"), label: "Pale blue"),
+        ACHFieldBackgroundSwatch(id: 4, lightSurface: Color(hex: "#FFF3E0"), darkSurface: Color(hex: "#3D2E1A"), label: "Pale cream"),
+        ACHFieldBackgroundSwatch(id: 5, lightSurface: Color(hex: "#F3E5F5"), darkSurface: Color(hex: "#2E1A3D"), label: "Pale purple"),
+    ]
+
     private var fieldsSection: some View {
         VStack(spacing: 16) {
+            SPLTextField(
+                type: .routingNumber,
+                title: "Routing Number",
+                isRequired: true,
+                theme: activeFieldTheme,
+                darkTheme: activeFieldDarkTheme,
+                onValidationChange: { routingNumberIsValid = $0 },
+                onSubmit: { handleFieldSubmit(for: .routingNumber) },
+                submitLabel: getSubmitLabel(for: .routingNumber),
+                shouldFocus: focusedFieldType == .routingNumber,
+                onFocus: { focusedFieldType = .routingNumber }
+            )
+
+            SPLTextField(
+                type: .accountNumber,
+                title: "Account Number",
+                isRequired: true,
+                theme: activeFieldTheme,
+                darkTheme: activeFieldDarkTheme,
+                onValidationChange: { accountNumberIsValid = $0 },
+                onSubmit: { handleFieldSubmit(for: .accountNumber) },
+                submitLabel: getSubmitLabel(for: .accountNumber),
+                shouldFocus: focusedFieldType == .accountNumber,
+                onFocus: { focusedFieldType = .accountNumber }
+            )
+
+            Text("Personal information")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             switch nameDisplayMode {
             case .singleField:
                 SPLTextField(
                     type: .fullName,
                     title: "Account Holder Name",
-                    isRequired: !allowBlankName,
-                    theme: theme,
+                    isRequired: true,
+                    placeholder: "Account Holder Name",
+                    requiredMessage: nameRequiredMessage,
+                    theme: activeFieldTheme,
+                    darkTheme: activeFieldDarkTheme,
                     onValidationChange: { fullNameIsValid = $0 },
                     onSubmit: { handleFieldSubmit(for: .fullName) },
                     submitLabel: getSubmitLabel(for: .fullName),
@@ -266,8 +573,11 @@ struct BankAccountCustomFormView: View {
                     SPLTextField(
                         type: .firstName,
                         title: "First Name",
-                        isRequired: !allowBlankName,
-                        theme: theme,
+                        isRequired: true,
+                        placeholder: "First Name",
+                        requiredMessage: nameRequiredMessage,
+                        theme: activeFieldTheme,
+                        darkTheme: activeFieldDarkTheme,
                         onValidationChange: { firstNameIsValid = $0 },
                         onSubmit: { handleFieldSubmit(for: .firstName) },
                         submitLabel: getSubmitLabel(for: .firstName),
@@ -277,8 +587,11 @@ struct BankAccountCustomFormView: View {
                     SPLTextField(
                         type: .lastName,
                         title: "Last Name",
-                        isRequired: !allowBlankName,
-                        theme: theme,
+                        isRequired: true,
+                        placeholder: "Last Name",
+                        requiredMessage: nameRequiredMessage,
+                        theme: activeFieldTheme,
+                        darkTheme: activeFieldDarkTheme,
                         onValidationChange: { lastNameIsValid = $0 },
                         onSubmit: { handleFieldSubmit(for: .lastName) },
                         submitLabel: getSubmitLabel(for: .lastName),
@@ -291,39 +604,55 @@ struct BankAccountCustomFormView: View {
             }
 
             if showBankName {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Bank Name")
+                SPLTextField(
+                    type: .bankName,
+                    title: "Bank Name",
+                    isRequired: false,
+                    placeholder: "Bank Name",
+                    theme: activeFieldTheme,
+                    darkTheme: activeFieldDarkTheme,
+                    onValidationChange: { bankNameIsValid = $0 },
+                    onSubmit: { handleFieldSubmit(for: .bankName) },
+                    submitLabel: getSubmitLabel(for: .bankName),
+                    shouldFocus: focusedFieldType == .bankName,
+                    onFocus: { focusedFieldType = .bankName }
+                )
+                .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.bankNameField)
+            }
+
+            if showAccountType {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Account type:")
                         .font(.subheadline)
-                        .foregroundColor(theme.colors.textSecondary)
-                    TextField("Bank name (optional)", text: $bankNameInput)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.bankNameField)
+                        .fontWeight(.medium)
+                    Picker("Account type", selection: $bankAccountType) {
+                        Text("Checking").tag(BankAccountType.checking)
+                        Text("Savings").tag(BankAccountType.savings)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.accountTypePicker)
+                    .accessibilityLabel(AccessibilityLabels.BankAccountCustomForm.accountTypePicker)
+                    .accessibilityHint(AccessibilityHints.BankAccountCustomForm.accountTypePicker)
                 }
             }
 
-            SPLTextField(
-                type: .routingNumber,
-                title: "Routing Number",
-                isRequired: true,
-                theme: theme,
-                onValidationChange: { routingNumberIsValid = $0 },
-                onSubmit: { handleFieldSubmit(for: .routingNumber) },
-                submitLabel: getSubmitLabel(for: .routingNumber),
-                shouldFocus: focusedFieldType == .routingNumber,
-                onFocus: { focusedFieldType = .routingNumber }
-            )
-
-            SPLTextField(
-                type: .accountNumber,
-                title: "Account Number",
-                isRequired: true,
-                theme: theme,
-                onValidationChange: { accountNumberIsValid = $0 },
-                onSubmit: { handleFieldSubmit(for: .accountNumber) },
-                submitLabel: getSubmitLabel(for: .accountNumber),
-                shouldFocus: focusedFieldType == .accountNumber,
-                onFocus: { focusedFieldType = .accountNumber }
-            )
+            if showAccountHolderType {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Account holder type:")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Picker("Holder type", selection: $bankAccountHolderType) {
+                        Text("Personal").tag(BankAccountHolderType.personal)
+                        Text("Business").tag(BankAccountHolderType.business)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.holderTypePicker)
+                    .accessibilityLabel(AccessibilityLabels.BankAccountCustomForm.holderTypePicker)
+                    .accessibilityHint(AccessibilityHints.BankAccountCustomForm.holderTypePicker)
+                }
+            }
         }
         .padding()
         .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCustomForm.fieldsSection)
@@ -366,13 +695,14 @@ struct BankAccountCustomFormView: View {
         let nameValid: Bool
         switch nameDisplayMode {
         case .singleField:
-            nameValid = allowBlankName ? true : fullNameIsValid
+            nameValid = fullNameIsValid
         case .separateFields:
-            nameValid = allowBlankName ? true : (firstNameIsValid && lastNameIsValid)
+            nameValid = firstNameIsValid && lastNameIsValid
         @unknown default:
             nameValid = false
         }
-        return routingValid && accountValid && nameValid
+        let bankNameValid = showBankName ? bankNameIsValid : true
+        return routingValid && accountValid && nameValid && bankNameValid
     }
 
     private func handleSubmit() {
@@ -394,16 +724,12 @@ struct BankAccountCustomFormView: View {
             }
 
             await MainActor.run {
-                let trimmedBankName = bankNameInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                let bankNameToSend: String? = (showBankName && !trimmedBankName.isEmpty) ? trimmedBankName : nil
-
                 let processingResult = Spreedly.shared().createBankAccount(
                     additionalFields: [:],
-                    bankAccountType: bankAccountType,
-                    bankAccountHolderType: bankAccountHolderType,
-                    bankName: bankNameToSend,
-                    metadata: nil,
-                    allowBlankName: allowBlankName ? true : nil
+                    bankAccountType: showAccountType ? bankAccountType : nil,
+                    bankAccountHolderType: showAccountHolderType ? bankAccountHolderType : nil,
+                    bankName: nil,
+                    metadata: nil
                 )
 
                 if processingResult.isValidationFailed {
@@ -428,14 +754,17 @@ struct BankAccountCustomFormView: View {
     // MARK: - Focus Management
 
     private var fieldOrder: [FormFieldType] {
+        let optionalBankName: [FormFieldType] = showBankName ? [.bankName] : []
+        let nameFields: [FormFieldType]
         switch nameDisplayMode {
         case .singleField:
-            return [.fullName, .routingNumber, .accountNumber]
+            nameFields = [.fullName]
         case .separateFields:
-            return [.firstName, .lastName, .routingNumber, .accountNumber]
+            nameFields = [.firstName, .lastName]
         @unknown default:
-            return [.routingNumber, .accountNumber]
+            nameFields = []
         }
+        return [.routingNumber, .accountNumber] + nameFields + optionalBankName
     }
 
     private func getSubmitLabel(for fieldType: FormFieldType) -> SpreedlySubmitLabel {

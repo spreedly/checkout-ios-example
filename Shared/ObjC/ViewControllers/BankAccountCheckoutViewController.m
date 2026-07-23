@@ -15,6 +15,48 @@
 #import "SpreedlyConfigManager.h"
 #import "ThemeHelper.h"
 
+static const NSInteger kACHSwatchUnset = -1;
+static const NSUInteger kACHPrimarySwatchCount = 6;
+static const NSUInteger kACHFieldSwatchCount = 6;
+
+NS_INLINE UIColor *ACHRGB(unsigned r, unsigned g, unsigned b) {
+    return [UIColor colorWithRed:(CGFloat)r / 255.0 green:(CGFloat)g / 255.0 blue:(CGFloat)b / 255.0 alpha:1.0];
+}
+
+static void ACHPrimaryPair(NSUInteger index, UIColor *__autoreleasing *light, UIColor *__autoreleasing *dark) {
+    switch (index) {
+        case 0: *light = ACHRGB(0x19, 0x76, 0xD2); *dark = ACHRGB(0x64, 0xB5, 0xF6); break;
+        case 1: *light = ACHRGB(0x38, 0x8E, 0x3C); *dark = ACHRGB(0x81, 0xC7, 0x84); break;
+        case 2: *light = ACHRGB(0x7B, 0x1F, 0xA2); *dark = ACHRGB(0xBA, 0x68, 0xC8); break;
+        case 3: *light = ACHRGB(0xD3, 0x2F, 0x2F); *dark = ACHRGB(0xE5, 0x73, 0x73); break;
+        case 4: *light = ACHRGB(0x00, 0x89, 0x7B); *dark = ACHRGB(0x4D, 0xB6, 0xAC); break;
+        case 5: *light = ACHRGB(0xE6, 0x4A, 0x19); *dark = ACHRGB(0xFF, 0x8A, 0x65); break;
+        default: *light = ACHRGB(0x19, 0x76, 0xD2); *dark = ACHRGB(0x64, 0xB5, 0xF6); break;
+    }
+}
+
+static void ACHFieldSurfacePair(NSUInteger index, UIColor *__autoreleasing *light, UIColor *__autoreleasing *dark) {
+    switch (index) {
+        case 0: *light = [UIColor whiteColor]; *dark = ACHRGB(0x1C, 0x1C, 0x1E); break;
+        case 1: *light = ACHRGB(0xF5, 0xF5, 0xF5); *dark = ACHRGB(0x2C, 0x2C, 0x2C); break;
+        case 2: *light = ACHRGB(0xE8, 0xF5, 0xE9); *dark = ACHRGB(0x1B, 0x3A, 0x2A); break;
+        case 3: *light = ACHRGB(0xE3, 0xF2, 0xFD); *dark = ACHRGB(0x1A, 0x2C, 0x3D); break;
+        case 4: *light = ACHRGB(0xFF, 0xF3, 0xE0); *dark = ACHRGB(0x3D, 0x2E, 0x1A); break;
+        case 5: *light = ACHRGB(0xF3, 0xE5, 0xF5); *dark = ACHRGB(0x2E, 0x1A, 0x3D); break;
+        default: *light = [UIColor whiteColor]; *dark = ACHRGB(0x1C, 0x1C, 0x1E); break;
+    }
+}
+
+static NSString *ACHPrimaryLabel(NSUInteger index) {
+    NSArray<NSString *> *labels = @[@"Blue", @"Green", @"Purple", @"Red", @"Teal", @"Orange"];
+    return (index < labels.count) ? labels[index] : @"";
+}
+
+static NSString *ACHFieldLabel(NSUInteger index) {
+    NSArray<NSString *> *labels = @[@"Default", @"Gray", @"Pale green", @"Pale blue", @"Pale cream", @"Pale purple"];
+    return (index < labels.count) ? labels[index] : @"";
+}
+
 @interface BankAccountCheckoutViewController () <SpreedlyPaymentDelegate>
 
 @property (nonatomic, strong) UIScrollView *scrollView;
@@ -31,6 +73,33 @@
 @property (nonatomic, strong) UILabel *errorLabel;
 @property (nonatomic, strong) UIActivityIndicatorView *loadingIndicator;
 
+// Theme picker UI
+@property (nonatomic, strong) UIView *themeConfigurationContainer;
+@property (nonatomic, strong) UISwitch *useCustomThemeSwitch;
+@property (nonatomic, strong) UILabel *currentThemeLabel;
+@property (nonatomic, strong) UILabel *themeNameLabel;
+@property (nonatomic, strong) UIView *themeCustomizerContainer;
+@property (nonatomic, strong) UILabel *uiCustomizationTitleLabel;
+@property (nonatomic, strong) UILabel *primarySectionLabel;
+@property (nonatomic, strong) UIStackView *primarySwatchStack;
+@property (nonatomic, strong) NSMutableArray<UIButton *> *primarySwatchButtons;
+@property (nonatomic, strong) UILabel *fieldBackgroundSectionLabel;
+@property (nonatomic, strong) UIStackView *fieldBackgroundSwatchStack;
+@property (nonatomic, strong) NSMutableArray<UIButton *> *fieldBackgroundSwatchButtons;
+@property (nonatomic, strong) UILabel *borderRadiusSectionLabel;
+@property (nonatomic, strong) UILabel *borderRadiusValueLabel;
+@property (nonatomic, strong) UISlider *cornerRadiusSlider;
+@property (nonatomic, strong) UIButton *resetThemeButton;
+
+// Theme picker state — `SPLThemeConfig` instances are passed into the themed
+// `BankAccountFormDropInViewController` initializer at present-time.
+@property (nonatomic, strong) SPLThemeConfig *lightThemeConfig;
+@property (nonatomic, strong) SPLThemeConfig *darkThemeConfig;
+@property (nonatomic, assign) BOOL useCustomTheme;
+@property (nonatomic, assign) NSInteger selectedPrimarySwatchID;
+@property (nonatomic, assign) NSInteger selectedFieldBackgroundSwatchID;
+@property (nonatomic, assign) CGFloat formCornerRadius;
+
 @property (nonatomic, assign) BOOL isLoading;
 
 @end
@@ -40,8 +109,13 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.title = @"ACH Bank Account Drop-In";
+    self.title = @"ACH Bank Account";
     self.view.backgroundColor = [UIColor systemBackgroundColor];
+
+    self.useCustomTheme = NO;
+    self.selectedPrimarySwatchID = kACHSwatchUnset;
+    self.selectedFieldBackgroundSwatchID = kACHSwatchUnset;
+    self.formCornerRadius = 8.0;
 
     [self setupUI];
     [self setupConstraints];
@@ -59,7 +133,7 @@
     [self.scrollView addSubview:self.contentView];
 
     self.titleLabel = [[UILabel alloc] init];
-    self.titleLabel.text = @"ACH Bank Account Drop-In";
+    self.titleLabel.text = @"ACH Bank Account";
     self.titleLabel.font = [ThemeHelper screenTitleFont];
     self.titleLabel.textColor = [ThemeHelper textColor];
     self.titleLabel.textAlignment = NSTextAlignmentCenter;
@@ -69,7 +143,8 @@
     [self.contentView addSubview:self.titleLabel];
 
     self.descriptionLabel = [[UILabel alloc] init];
-    self.descriptionLabel.text = @"Preview only — ACH bank-account flows are in the SDK for internal testing and will not ship in 1.4.1. Do not integrate ACH in production. BankAccountFormDropInViewController collects routing and account numbers (with ABA validation), name, and optional bank name + account type via a UIKit-friendly UIHostingController wrapper.";
+    self.descriptionLabel.text = @"Tokenize bank account details via ACH";
+    self.descriptionLabel.accessibilityIdentifier = @"bank-account-checkout-description";
     self.descriptionLabel.font = [ThemeHelper screenBodyFont];
     self.descriptionLabel.textColor = [ThemeHelper textColor];
     self.descriptionLabel.textAlignment = NSTextAlignmentCenter;
@@ -93,15 +168,18 @@
 
     self.showBankNameSwitch = [self addToggleWithText:@"Show bank name field"
                                               identifier:@"bankAccountShowBankNameToggle"];
-    self.showAccountTypeSwitch = [self addToggleWithText:@"Show account type (checking/savings)"
+    self.showAccountTypeSwitch = [self addToggleWithText:@"Show account type"
                                              identifier:@"bankAccountShowAccountTypeToggle"];
     self.showAccountTypeSwitch.on = YES;
-    self.showAccountHolderTypeSwitch = [self addToggleWithText:@"Show holder type (personal/business)"
+    self.showAccountHolderTypeSwitch = [self addToggleWithText:@"Show holder type"
                                                    identifier:@"bankAccountShowHolderTypeToggle"];
     self.showAccountHolderTypeSwitch.on = YES;
 
+    self.themeConfigurationContainer = [self buildThemeConfigurationContainer];
+    [self.contentView addSubview:self.themeConfigurationContainer];
+
     self.showFormButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.showFormButton setTitle:@"Show Bank Account Form" forState:UIControlStateNormal];
+    [self.showFormButton setTitle:@"Add Bank Account" forState:UIControlStateNormal];
     self.showFormButton.titleLabel.font = [ThemeHelper buttonFont];
     self.showFormButton.backgroundColor = [ThemeHelper primaryColor];
     [self.showFormButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
@@ -208,7 +286,11 @@
         prev = label.bottomAnchor;
     }
 
-    [self.showFormButton.topAnchor constraintEqualToAnchor:prev constant:[ThemeHelper spacingLG]].active = YES;
+    [self.themeConfigurationContainer.topAnchor constraintEqualToAnchor:prev constant:[ThemeHelper spacingLG]].active = YES;
+    [self.themeConfigurationContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]].active = YES;
+    [self.themeConfigurationContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]].active = YES;
+
+    [self.showFormButton.topAnchor constraintEqualToAnchor:self.themeConfigurationContainer.bottomAnchor constant:[ThemeHelper spacingLG]].active = YES;
     [self.showFormButton.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]].active = YES;
     [self.showFormButton.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]].active = YES;
     [self.showFormButton.heightAnchor constraintEqualToConstant:44].active = YES;
@@ -260,24 +342,459 @@
                                          showAccountHolderType:self.showAccountHolderTypeSwitch.isOn
                                         accountHolderTypeLabel:nil];
 
-    BankAccountFormDropInViewController *dropInVC = [[BankAccountFormDropInViewController alloc]
-        initWithFieldConfig:config
-         onProcessingResult:^(PaymentProcessingResult *processingResult) {
-            if (processingResult.isProcessing) {
-                self.isLoading = YES;
-                [self.loadingIndicator startAnimating];
-                self.showFormButton.enabled = NO;
-            } else if (processingResult.isValidationFailed) {
-                self.isLoading = NO;
-                [self.loadingIndicator stopAnimating];
-                self.showFormButton.enabled = YES;
-                self.errorLabel.text = [NSString stringWithFormat:@"Validation failed: %@", [processingResult getDescription]];
-                self.errorLabel.hidden = NO;
-            }
-        }];
+    void (^processingHandler)(PaymentProcessingResult *) = ^(PaymentProcessingResult *processingResult) {
+        if (processingResult.isProcessing) {
+            self.isLoading = YES;
+            [self.loadingIndicator startAnimating];
+            self.showFormButton.enabled = NO;
+        } else if (processingResult.isValidationFailed) {
+            self.isLoading = NO;
+            [self.loadingIndicator stopAnimating];
+            self.showFormButton.enabled = YES;
+            self.errorLabel.text = [NSString stringWithFormat:@"Validation failed: %@", [processingResult getDescription]];
+            self.errorLabel.hidden = NO;
+        }
+    };
 
-    UIViewController *secureVC = [dropInVC wrapInSecureViewControllerWithPlaceholderText:@""];
-    [self presentViewController:secureVC animated:YES completion:nil];
+    BankAccountFormDropInViewController *dropInVC;
+    if (self.useCustomTheme && self.lightThemeConfig && self.darkThemeConfig) {
+        dropInVC = [[BankAccountFormDropInViewController alloc]
+            initWithFieldConfig:config
+               lightThemeConfig:self.lightThemeConfig
+                darkThemeConfig:self.darkThemeConfig
+             onProcessingResult:processingHandler];
+    } else {
+        dropInVC = [[BankAccountFormDropInViewController alloc]
+            initWithFieldConfig:config
+             onProcessingResult:processingHandler];
+    }
+
+    // BankAccountFormDropInViewController applies screen prevention internally.
+    [self presentViewController:dropInVC animated:YES completion:nil];
+}
+
+#pragma mark - Theme picker (chip + slider — matches Swift `BankAccountCheckoutView`)
+
+- (UIView *)buildThemeConfigurationContainer {
+    UIView *container = [[UIView alloc] init];
+    container.backgroundColor = [ThemeHelper cardBackgroundColor];
+    container.layer.cornerRadius = [ThemeHelper borderRadiusXL];
+    container.layer.borderWidth = 1.0;
+    UIColor *borderColor = [ThemeHelper cardBorderColor];
+    UIColor *resolvedBorderColor = [borderColor resolvedColorWithTraitCollection:self.traitCollection];
+    container.layer.borderColor = resolvedBorderColor.CGColor;
+    container.translatesAutoresizingMaskIntoConstraints = NO;
+    container.accessibilityIdentifier = @"bankAccountThemeConfigurationSection";
+    [ThemeHelper applySmallShadowToView:container];
+
+    UILabel *titleLabel = [[UILabel alloc] init];
+    titleLabel.text = @"Theme Configuration:";
+    titleLabel.font = [ThemeHelper screenHeadlineFont];
+    titleLabel.textColor = [ThemeHelper textColor];
+    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    titleLabel.accessibilityIdentifier = @"bankAccountThemeTitle";
+    titleLabel.accessibilityLabel = @"Theme Configuration";
+    titleLabel.accessibilityTraits = UIAccessibilityTraitHeader;
+    [container addSubview:titleLabel];
+
+    UILabel *useCustomThemeLabel = [[UILabel alloc] init];
+    useCustomThemeLabel.text = @"Use Custom Theme";
+    useCustomThemeLabel.font = [ThemeHelper screenBodyFont];
+    useCustomThemeLabel.textColor = [ThemeHelper textColor];
+    useCustomThemeLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:useCustomThemeLabel];
+
+    self.useCustomThemeSwitch = [[UISwitch alloc] init];
+    self.useCustomThemeSwitch.onTintColor = [ThemeHelper primaryColor];
+    self.useCustomThemeSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+    self.useCustomThemeSwitch.accessibilityIdentifier = @"bankAccountCustomThemeToggle";
+    self.useCustomThemeSwitch.accessibilityHint = @"Toggle to enable or disable custom theme";
+    [self.useCustomThemeSwitch addTarget:self action:@selector(useCustomThemeToggled:) forControlEvents:UIControlEventValueChanged];
+    [container addSubview:self.useCustomThemeSwitch];
+
+    self.currentThemeLabel = [[UILabel alloc] init];
+    self.currentThemeLabel.text = @"Current accent:";
+    self.currentThemeLabel.font = [ThemeHelper screenSubheadlineFont];
+    self.currentThemeLabel.textColor = [ThemeHelper textColor];
+    self.currentThemeLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:self.currentThemeLabel];
+
+    self.themeNameLabel = [[UILabel alloc] init];
+    self.themeNameLabel.text = @"Default";
+    self.themeNameLabel.font = [ThemeHelper screenSubheadlineFont];
+    self.themeNameLabel.textColor = [ThemeHelper textSecondaryColor];
+    self.themeNameLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.themeNameLabel.accessibilityIdentifier = @"bankAccountCurrentTheme";
+    [container addSubview:self.themeNameLabel];
+
+    self.themeCustomizerContainer = [[UIView alloc] init];
+    self.themeCustomizerContainer.translatesAutoresizingMaskIntoConstraints = NO;
+    self.themeCustomizerContainer.hidden = YES;
+    [container addSubview:self.themeCustomizerContainer];
+
+    self.uiCustomizationTitleLabel = [[UILabel alloc] init];
+    self.uiCustomizationTitleLabel.text = @"UI customization";
+    self.uiCustomizationTitleLabel.font = [ThemeHelper screenSubheadlineFont];
+    self.uiCustomizationTitleLabel.textColor = [ThemeHelper textColor];
+    self.uiCustomizationTitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.themeCustomizerContainer addSubview:self.uiCustomizationTitleLabel];
+
+    self.primarySectionLabel = [[UILabel alloc] init];
+    self.primarySectionLabel.text = @"Primary color";
+    self.primarySectionLabel.font = [ThemeHelper screenCaptionFont];
+    self.primarySectionLabel.textColor = [ThemeHelper textSecondaryColor];
+    self.primarySectionLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.themeCustomizerContainer addSubview:self.primarySectionLabel];
+
+    self.primarySwatchStack = [[UIStackView alloc] init];
+    self.primarySwatchStack.axis = UILayoutConstraintAxisHorizontal;
+    self.primarySwatchStack.spacing = 12.0;
+    self.primarySwatchStack.alignment = UIStackViewAlignmentCenter;
+    self.primarySwatchStack.distribution = UIStackViewDistributionEqualSpacing;
+    self.primarySwatchStack.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.themeCustomizerContainer addSubview:self.primarySwatchStack];
+
+    self.primarySwatchButtons = [NSMutableArray arrayWithCapacity:kACHPrimarySwatchCount];
+    for (NSUInteger i = 0; i < kACHPrimarySwatchCount; i++) {
+        UIButton *chip = [UIButton buttonWithType:UIButtonTypeCustom];
+        chip.tag = (NSInteger)i;
+        chip.translatesAutoresizingMaskIntoConstraints = NO;
+        chip.layer.cornerRadius = 18.0;
+        chip.clipsToBounds = YES;
+        chip.accessibilityIdentifier = [NSString stringWithFormat:@"bankAccountPrimarySwatch_%lu", (unsigned long)i];
+        chip.accessibilityLabel = [NSString stringWithFormat:@"Primary %@", ACHPrimaryLabel(i)];
+        chip.accessibilityHint = [NSString stringWithFormat:@"Sets Checkout button and focus accents to %@", ACHPrimaryLabel(i)];
+        [chip addTarget:self action:@selector(primarySwatchTapped:) forControlEvents:UIControlEventTouchUpInside];
+        [chip.widthAnchor constraintEqualToConstant:36].active = YES;
+        [chip.heightAnchor constraintEqualToConstant:36].active = YES;
+        [self.primarySwatchStack addArrangedSubview:chip];
+        [self.primarySwatchButtons addObject:chip];
+    }
+
+    self.fieldBackgroundSectionLabel = [[UILabel alloc] init];
+    self.fieldBackgroundSectionLabel.text = @"Field background";
+    self.fieldBackgroundSectionLabel.font = [ThemeHelper screenCaptionFont];
+    self.fieldBackgroundSectionLabel.textColor = [ThemeHelper textSecondaryColor];
+    self.fieldBackgroundSectionLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.themeCustomizerContainer addSubview:self.fieldBackgroundSectionLabel];
+
+    self.fieldBackgroundSwatchStack = [[UIStackView alloc] init];
+    self.fieldBackgroundSwatchStack.axis = UILayoutConstraintAxisHorizontal;
+    self.fieldBackgroundSwatchStack.spacing = 12.0;
+    self.fieldBackgroundSwatchStack.alignment = UIStackViewAlignmentCenter;
+    self.fieldBackgroundSwatchStack.distribution = UIStackViewDistributionEqualSpacing;
+    self.fieldBackgroundSwatchStack.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.themeCustomizerContainer addSubview:self.fieldBackgroundSwatchStack];
+
+    self.fieldBackgroundSwatchButtons = [NSMutableArray arrayWithCapacity:kACHFieldSwatchCount];
+    for (NSUInteger i = 0; i < kACHFieldSwatchCount; i++) {
+        UIButton *chip = [UIButton buttonWithType:UIButtonTypeCustom];
+        chip.tag = (NSInteger)i;
+        chip.translatesAutoresizingMaskIntoConstraints = NO;
+        chip.layer.cornerRadius = 18.0;
+        chip.clipsToBounds = YES;
+        chip.accessibilityIdentifier = [NSString stringWithFormat:@"bankAccountFieldBackgroundSwatch_%lu", (unsigned long)i];
+        chip.accessibilityLabel = [NSString stringWithFormat:@"Field background %@", ACHFieldLabel(i)];
+        chip.accessibilityHint = [NSString stringWithFormat:@"Sets SPLTextField surface fill to %@", ACHFieldLabel(i)];
+        [chip addTarget:self action:@selector(fieldBackgroundSwatchTapped:) forControlEvents:UIControlEventTouchUpInside];
+        [chip.widthAnchor constraintEqualToConstant:36].active = YES;
+        [chip.heightAnchor constraintEqualToConstant:36].active = YES;
+        [self.fieldBackgroundSwatchStack addArrangedSubview:chip];
+        [self.fieldBackgroundSwatchButtons addObject:chip];
+    }
+
+    self.borderRadiusSectionLabel = [[UILabel alloc] init];
+    self.borderRadiusSectionLabel.text = @"Border radius";
+    self.borderRadiusSectionLabel.font = [ThemeHelper screenCaptionFont];
+    self.borderRadiusSectionLabel.textColor = [ThemeHelper textSecondaryColor];
+    self.borderRadiusSectionLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.themeCustomizerContainer addSubview:self.borderRadiusSectionLabel];
+
+    self.borderRadiusValueLabel = [[UILabel alloc] init];
+    self.borderRadiusValueLabel.text = @"8 pt";
+    self.borderRadiusValueLabel.font = [ThemeHelper screenSubheadlineFont];
+    self.borderRadiusValueLabel.textColor = [ThemeHelper textSecondaryColor];
+    self.borderRadiusValueLabel.textAlignment = NSTextAlignmentRight;
+    self.borderRadiusValueLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.themeCustomizerContainer addSubview:self.borderRadiusValueLabel];
+
+    self.cornerRadiusSlider = [[UISlider alloc] init];
+    self.cornerRadiusSlider.minimumValue = 4.0f;
+    self.cornerRadiusSlider.maximumValue = 24.0f;
+    self.cornerRadiusSlider.value = 8.0f;
+    self.cornerRadiusSlider.translatesAutoresizingMaskIntoConstraints = NO;
+    self.cornerRadiusSlider.accessibilityIdentifier = @"bankAccountFormCornerRadiusSlider";
+    self.cornerRadiusSlider.accessibilityLabel = @"Border radius";
+    [self.cornerRadiusSlider addTarget:self action:@selector(cornerRadiusSliderChanged:) forControlEvents:UIControlEventValueChanged];
+    [self.themeCustomizerContainer addSubview:self.cornerRadiusSlider];
+
+    self.resetThemeButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.resetThemeButton setTitle:@"Reset to Default" forState:UIControlStateNormal];
+    self.resetThemeButton.backgroundColor = [UIColor systemBlueColor];
+    [self.resetThemeButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    self.resetThemeButton.layer.cornerRadius = 8.0;
+    self.resetThemeButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.resetThemeButton.accessibilityIdentifier = @"bankAccountResetThemeButton";
+    self.resetThemeButton.accessibilityLabel = @"Reset to Default Theme";
+    self.resetThemeButton.accessibilityHint = @"Reset the bank account form to the default theme";
+    [self.resetThemeButton addTarget:self action:@selector(resetThemeButtonTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.themeCustomizerContainer addSubview:self.resetThemeButton];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [titleLabel.topAnchor constraintEqualToAnchor:container.topAnchor constant:[ThemeHelper spacingMD]],
+        [titleLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [titleLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [useCustomThemeLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [useCustomThemeLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [useCustomThemeLabel.centerYAnchor constraintEqualToAnchor:self.useCustomThemeSwitch.centerYAnchor],
+
+        [self.useCustomThemeSwitch.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.useCustomThemeSwitch.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.currentThemeLabel.topAnchor constraintEqualToAnchor:useCustomThemeLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.currentThemeLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+
+        [self.themeNameLabel.centerYAnchor constraintEqualToAnchor:self.currentThemeLabel.centerYAnchor],
+        [self.themeNameLabel.leadingAnchor constraintEqualToAnchor:self.currentThemeLabel.trailingAnchor constant:[ThemeHelper spacingXS]],
+        [self.themeNameLabel.trailingAnchor constraintLessThanOrEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.themeCustomizerContainer.topAnchor constraintEqualToAnchor:self.currentThemeLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.themeCustomizerContainer.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.themeCustomizerContainer.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+        [self.themeCustomizerContainer.bottomAnchor constraintEqualToAnchor:container.bottomAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.uiCustomizationTitleLabel.topAnchor constraintEqualToAnchor:self.themeCustomizerContainer.topAnchor],
+        [self.uiCustomizationTitleLabel.leadingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.leadingAnchor],
+        [self.uiCustomizationTitleLabel.trailingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.trailingAnchor],
+
+        [self.primarySectionLabel.topAnchor constraintEqualToAnchor:self.uiCustomizationTitleLabel.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [self.primarySectionLabel.leadingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.leadingAnchor],
+        [self.primarySectionLabel.trailingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.trailingAnchor],
+
+        [self.primarySwatchStack.topAnchor constraintEqualToAnchor:self.primarySectionLabel.bottomAnchor constant:4],
+        [self.primarySwatchStack.leadingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.leadingAnchor],
+        [self.primarySwatchStack.trailingAnchor constraintLessThanOrEqualToAnchor:self.themeCustomizerContainer.trailingAnchor],
+
+        [self.fieldBackgroundSectionLabel.topAnchor constraintEqualToAnchor:self.primarySwatchStack.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.fieldBackgroundSectionLabel.leadingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.leadingAnchor],
+        [self.fieldBackgroundSectionLabel.trailingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.trailingAnchor],
+
+        [self.fieldBackgroundSwatchStack.topAnchor constraintEqualToAnchor:self.fieldBackgroundSectionLabel.bottomAnchor constant:4],
+        [self.fieldBackgroundSwatchStack.leadingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.leadingAnchor],
+        [self.fieldBackgroundSwatchStack.trailingAnchor constraintLessThanOrEqualToAnchor:self.themeCustomizerContainer.trailingAnchor],
+
+        [self.borderRadiusSectionLabel.topAnchor constraintEqualToAnchor:self.fieldBackgroundSwatchStack.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.borderRadiusSectionLabel.leadingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.leadingAnchor],
+
+        [self.borderRadiusValueLabel.centerYAnchor constraintEqualToAnchor:self.borderRadiusSectionLabel.centerYAnchor],
+        [self.borderRadiusValueLabel.leadingAnchor constraintEqualToAnchor:self.borderRadiusSectionLabel.trailingAnchor constant:[ThemeHelper spacingSM]],
+        [self.borderRadiusValueLabel.trailingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.trailingAnchor],
+
+        [self.cornerRadiusSlider.topAnchor constraintEqualToAnchor:self.borderRadiusSectionLabel.bottomAnchor constant:4],
+        [self.cornerRadiusSlider.leadingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.leadingAnchor],
+        [self.cornerRadiusSlider.trailingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.trailingAnchor],
+
+        [self.resetThemeButton.topAnchor constraintEqualToAnchor:self.cornerRadiusSlider.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.resetThemeButton.leadingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.leadingAnchor],
+        [self.resetThemeButton.trailingAnchor constraintEqualToAnchor:self.themeCustomizerContainer.trailingAnchor],
+        [self.resetThemeButton.heightAnchor constraintEqualToConstant:40],
+        [self.resetThemeButton.bottomAnchor constraintEqualToAnchor:self.themeCustomizerContainer.bottomAnchor]
+    ]];
+
+    [self refreshSwatchFillColors];
+    [self refreshSwatchSelectionOutlines];
+    [self refreshAccentSummaryLabel];
+
+    return container;
+}
+
+- (void)useCustomThemeToggled:(UISwitch *)sender {
+    self.useCustomTheme = sender.isOn;
+    self.themeCustomizerContainer.hidden = !self.useCustomTheme;
+
+    if (self.useCustomTheme) {
+        self.selectedPrimarySwatchID = 0;
+        self.selectedFieldBackgroundSwatchID = 0;
+        self.formCornerRadius = 8.0;
+        self.cornerRadiusSlider.value = 8.0f;
+        [self updateBorderRadiusValueLabel];
+        [self applyACHThemeFromSwatchSelection];
+    } else {
+        self.lightThemeConfig = nil;
+        self.darkThemeConfig = nil;
+        self.selectedPrimarySwatchID = kACHSwatchUnset;
+        self.selectedFieldBackgroundSwatchID = kACHSwatchUnset;
+    }
+
+    [self refreshSwatchFillColors];
+    [self refreshSwatchSelectionOutlines];
+    [self refreshAccentSummaryLabel];
+
+    [UIView animateWithDuration:0.25 animations:^{
+        [self.view layoutIfNeeded];
+    }];
+}
+
+- (void)primarySwatchTapped:(UIButton *)sender {
+    self.selectedPrimarySwatchID = sender.tag;
+    if (self.selectedFieldBackgroundSwatchID < 0) {
+        self.selectedFieldBackgroundSwatchID = 0;
+    }
+    [self applyACHThemeFromSwatchSelection];
+    [self refreshSwatchFillColors];
+    [self refreshSwatchSelectionOutlines];
+    [self refreshAccentSummaryLabel];
+}
+
+- (void)fieldBackgroundSwatchTapped:(UIButton *)sender {
+    self.selectedFieldBackgroundSwatchID = sender.tag;
+    if (self.selectedPrimarySwatchID < 0) {
+        self.selectedPrimarySwatchID = 0;
+    }
+    [self applyACHThemeFromSwatchSelection];
+    [self refreshSwatchFillColors];
+    [self refreshSwatchSelectionOutlines];
+    [self refreshAccentSummaryLabel];
+}
+
+- (void)cornerRadiusSliderChanged:(UISlider *)sender {
+    self.formCornerRadius = (CGFloat)lround((double)sender.value);
+    sender.value = (float)self.formCornerRadius;
+    [self updateBorderRadiusValueLabel];
+    [self applyACHThemeFromSwatchSelection];
+}
+
+- (void)updateBorderRadiusValueLabel {
+    self.borderRadiusValueLabel.text = [NSString stringWithFormat:@"%.0f pt", self.formCornerRadius];
+}
+
+- (void)resetThemeButtonTapped {
+    self.lightThemeConfig = nil;
+    self.darkThemeConfig = nil;
+    self.selectedPrimarySwatchID = kACHSwatchUnset;
+    self.selectedFieldBackgroundSwatchID = kACHSwatchUnset;
+    self.formCornerRadius = 8.0;
+    self.cornerRadiusSlider.value = 8.0f;
+    [self updateBorderRadiusValueLabel];
+    [self refreshSwatchFillColors];
+    [self refreshSwatchSelectionOutlines];
+    [self refreshAccentSummaryLabel];
+}
+
+- (void)applyACHThemeFromSwatchSelection {
+    if (!self.useCustomTheme) { return; }
+    if (self.selectedPrimarySwatchID < 0 || self.selectedFieldBackgroundSwatchID < 0) {
+        self.lightThemeConfig = nil;
+        self.darkThemeConfig = nil;
+        return;
+    }
+
+    UIColor *lightP = nil;
+    UIColor *darkP = nil;
+    UIColor *lightS = nil;
+    UIColor *darkS = nil;
+    ACHPrimaryPair((NSUInteger)self.selectedPrimarySwatchID, &lightP, &darkP);
+    ACHFieldSurfacePair((NSUInteger)self.selectedFieldBackgroundSwatchID, &lightS, &darkS);
+    CGFloat br = self.formCornerRadius;
+
+    UIColor *lightSecondary = [lightP colorWithAlphaComponent:0.75];
+    UIColor *lightBorder = [lightP colorWithAlphaComponent:0.32];
+    UIColor *lightTextSecondary = ACHRGB(51, 51, 56);
+    UIColor *lightPlaceholder = [[UIColor grayColor] colorWithAlphaComponent:0.65];
+
+    self.lightThemeConfig = [[SPLThemeConfig alloc] initWithPrimaryColor:lightP
+                                                        secondaryColor:lightSecondary
+                                                       backgroundColor:[UIColor whiteColor]
+                                                          surfaceColor:lightS
+                                                           borderColor:lightBorder
+                                                    borderFocusedColor:lightP
+                                                             textColor:[UIColor blackColor]
+                                                    textSecondaryColor:lightTextSecondary
+                                                            errorColor:[UIColor systemRedColor]
+                                                      placeholderColor:lightPlaceholder
+                                                          borderRadius:br];
+
+    UIColor *darkSecondary = [darkP colorWithAlphaComponent:0.85];
+    UIColor *darkBorder = [darkP colorWithAlphaComponent:0.5];
+    UIColor *darkTextSecondary = [[UIColor whiteColor] colorWithAlphaComponent:0.72];
+    UIColor *darkPlaceholder = [[UIColor whiteColor] colorWithAlphaComponent:0.55];
+
+    self.darkThemeConfig = [[SPLThemeConfig alloc] initWithPrimaryColor:darkP
+                                                       secondaryColor:darkSecondary
+                                                      backgroundColor:[UIColor blackColor]
+                                                         surfaceColor:darkS
+                                                          borderColor:darkBorder
+                                                   borderFocusedColor:darkP
+                                                            textColor:[UIColor whiteColor]
+                                                   textSecondaryColor:darkTextSecondary
+                                                           errorColor:[UIColor systemRedColor]
+                                                     placeholderColor:darkPlaceholder
+                                                         borderRadius:br];
+}
+
+- (void)refreshAccentSummaryLabel {
+    if (!self.useCustomTheme) {
+        self.themeNameLabel.text = @"Default";
+        self.themeNameLabel.textColor = [ThemeHelper textSecondaryColor];
+        return;
+    }
+    if (self.selectedPrimarySwatchID < 0 || self.selectedFieldBackgroundSwatchID < 0) {
+        self.themeNameLabel.text = @"Pick colors";
+        self.themeNameLabel.textColor = [UIColor systemGrayColor];
+        return;
+    }
+    NSString *p = ACHPrimaryLabel((NSUInteger)self.selectedPrimarySwatchID);
+    NSString *f = ACHFieldLabel((NSUInteger)self.selectedFieldBackgroundSwatchID);
+    self.themeNameLabel.text = [NSString stringWithFormat:@"%@ · %@", p, f];
+    self.themeNameLabel.textColor = [UIColor labelColor];
+}
+
+- (void)refreshSwatchFillColors {
+    BOOL dark = (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark);
+    for (NSUInteger i = 0; i < self.primarySwatchButtons.count; i++) {
+        UIButton *b = self.primarySwatchButtons[i];
+        UIColor *lightP = nil;
+        UIColor *darkP = nil;
+        ACHPrimaryPair(i, &lightP, &darkP);
+        b.backgroundColor = dark ? darkP : lightP;
+    }
+    for (NSUInteger i = 0; i < self.fieldBackgroundSwatchButtons.count; i++) {
+        UIButton *b = self.fieldBackgroundSwatchButtons[i];
+        UIColor *lightS = nil;
+        UIColor *darkS = nil;
+        ACHFieldSurfacePair(i, &lightS, &darkS);
+        b.backgroundColor = dark ? darkS : lightS;
+    }
+}
+
+- (void)refreshSwatchSelectionOutlines {
+    UIColor *ring = [UIColor labelColor];
+    UIColor *subtle = [[UIColor blackColor] colorWithAlphaComponent:0.12];
+    for (NSUInteger i = 0; i < self.primarySwatchButtons.count; i++) {
+        UIButton *b = self.primarySwatchButtons[i];
+        BOOL sel = (self.selectedPrimarySwatchID == (NSInteger)i);
+        b.layer.borderWidth = sel ? 3.0 : 1.0;
+        b.layer.borderColor = (sel ? ring : subtle).CGColor;
+        b.accessibilityTraits = sel ? (UIAccessibilityTraitButton | UIAccessibilityTraitSelected) : UIAccessibilityTraitButton;
+    }
+    for (NSUInteger i = 0; i < self.fieldBackgroundSwatchButtons.count; i++) {
+        UIButton *b = self.fieldBackgroundSwatchButtons[i];
+        BOOL sel = (self.selectedFieldBackgroundSwatchID == (NSInteger)i);
+        b.layer.borderWidth = sel ? 3.0 : 1.0;
+        b.layer.borderColor = (sel ? ring : subtle).CGColor;
+        b.accessibilityTraits = sel ? (UIAccessibilityTraitButton | UIAccessibilityTraitSelected) : UIAccessibilityTraitButton;
+    }
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self refreshSwatchFillColors];
+            [self refreshSwatchSelectionOutlines];
+        }
+    }
 }
 
 #pragma mark - SpreedlyPaymentDelegate

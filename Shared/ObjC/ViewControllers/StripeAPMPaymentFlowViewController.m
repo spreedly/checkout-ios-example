@@ -3,13 +3,14 @@
 //  SpreedlySDKExampleObjectiveC
 //
 //  Flow: Merchant creates pending purchase (Spreedly API) -> SDK presents PaymentSheet -> Merchant handles result via delegate.
-//  Mirrors Swift StripeAPMPaymentFlowView.
+//  Mirrors Swift StripeAPMPaymentFlowView. Includes optional SpreedlyStripeRadar session collection (HC-1596).
 //
 
 #import "StripeAPMPaymentFlowViewController.h"
 #import <SpreedlyCore/SpreedlyCore-Swift.h>
 #import <SpreedlyUI/SpreedlyUI-Swift.h>
 #import <SpreedlyStripeAPM/SpreedlyStripeAPM-Swift.h>
+#import <SpreedlyStripeRadar/SpreedlyStripeRadar-Swift.h>
 #import "SpreedlyConfigManager.h"
 #import "PurchaseAPIClient.h"
 #import "PurchaseModels.h"
@@ -21,6 +22,13 @@ typedef NS_ENUM(NSInteger, StripeAPMStage) {
     StripeAPMStageIdle = 0,
     StripeAPMStageCreatingPendingPurchase,
     StripeAPMStageCheckout
+};
+
+typedef NS_ENUM(NSInteger, StripeAPMRadarState) {
+    StripeAPMRadarStateIdle = 0,
+    StripeAPMRadarStateCollecting,
+    StripeAPMRadarStateSuccess,
+    StripeAPMRadarStateFailed
 };
 
 @interface StripeAPMProduct : NSObject
@@ -42,6 +50,10 @@ typedef NS_ENUM(NSInteger, StripeAPMStage) {
 static NSString * const kStripeAPMReturnURL = @"spreedlyCApp://stripe-redirect";
 static NSString * const kStripeAPMRedirectURL = @"https://spreedly.com/stripe-apm/redirect";
 static NSString * const kExampleCallbackURL = @"https://www.google.com/";
+static NSString * const kStripeAPMRadarToggleAccessibilityId = @"stripe-apm-payment-radar-toggle";
+static NSString * const kStripeAPMRadarStatusCollectingAccessibilityId = @"stripe-apm-payment-radar-status-collecting";
+static NSString * const kStripeAPMRadarStatusSuccessAccessibilityId = @"stripe-apm-payment-radar-status-success";
+static NSString * const kStripeAPMRadarStatusFailedAccessibilityId = @"stripe-apm-payment-radar-status-failed";
 
 static UIColor *stripeAPMStageDisabledColor(void) {
     return [UIColor colorWithRed:0.678 green:0.710 blue:0.741 alpha:1.0];
@@ -63,6 +75,13 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
 @property (nonatomic, strong) UIView *totalAmountContainer;
 @property (nonatomic, strong) UIView *apmSelectionContainer;
 @property (nonatomic, strong) UIStackView *apmTypesStackView;
+@property (nonatomic, strong) UIView *radarContainer;
+@property (nonatomic, strong) UISwitch *radarSwitch;
+@property (nonatomic, strong) UILabel *radarStatusLabel;
+@property (nonatomic, strong) UIActivityIndicatorView *radarSpinner;
+@property (nonatomic, assign) BOOL radarEnabled;
+@property (nonatomic, copy, nullable) NSString *radarSessionId;
+@property (nonatomic, assign) StripeAPMRadarState radarState;
 @property (nonatomic, strong) UIButton *startButton;
 @property (nonatomic, strong) UILabel *successLabel;
 @property (nonatomic, strong) UILabel *errorLabel;
@@ -178,6 +197,9 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
     // APM types (EBANX-style: rows with icon, title, subtitle, checkmark)
     self.apmSelectionContainer = [self createAPMSelectionContainer];
     [self.contentView addSubview:self.apmSelectionContainer];
+
+    self.radarContainer = [self createRadarContainer];
+    [self.contentView addSubview:self.radarContainer];
 
     // Start button
     self.startButton = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -299,7 +321,10 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
         [self.apmSelectionContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:spacing],
         [self.apmSelectionContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-spacing],
 
-        [self.startButton.topAnchor constraintEqualToAnchor:self.apmSelectionContainer.bottomAnchor constant:lg],
+        [self.radarContainer.topAnchor constraintEqualToAnchor:self.apmSelectionContainer.bottomAnchor constant:lg],
+        [self.radarContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:spacing],
+        [self.radarContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-spacing],
+        [self.startButton.topAnchor constraintEqualToAnchor:self.radarContainer.bottomAnchor constant:lg],
         [self.startButton.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:spacing],
         [self.startButton.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-spacing],
         [self.startButton.heightAnchor constraintEqualToConstant:48],
@@ -485,7 +510,7 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
     UILabel *amountLabel = [[UILabel alloc] init];
     amountLabel.tag = 999;
     amountLabel.font = [ThemeHelper subtitleFont];
-    amountLabel.textColor = [ThemeHelper primaryColor];
+    amountLabel.textColor = [ThemeHelper merchantProductPriceColor];
     amountLabel.textAlignment = NSTextAlignmentRight;
     amountLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.totalAmountContainer addSubview:amountLabel];
@@ -562,7 +587,7 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
     UILabel *priceLabel = [[UILabel alloc] init];
     priceLabel.text = [product formattedPriceEUR];
     priceLabel.font = [ThemeHelper subtitleFont];
-    priceLabel.textColor = [ThemeHelper primaryColor];
+    priceLabel.textColor = [ThemeHelper merchantProductPriceColor];
     [textStack addArrangedSubview:priceLabel];
     [contentStack addArrangedSubview:textStack];
 
@@ -627,6 +652,126 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
     ]];
 
     return container;
+}
+
+- (UIView *)createRadarContainer {
+    UIView *container = [[UIView alloc] init];
+    container.backgroundColor = [ThemeHelper surfaceColor];
+    container.layer.cornerRadius = [ThemeHelper borderRadiusXL];
+    container.layer.borderWidth = 1.0;
+    container.layer.borderColor = [ThemeHelper borderColor].CGColor;
+    container.translatesAutoresizingMaskIntoConstraints = NO;
+    [ThemeHelper applySmallShadowToView:container];
+
+    UILabel *titleLabel = [[UILabel alloc] init];
+    titleLabel.text = @"Stripe Radar";
+    titleLabel.font = [ThemeHelper subtitleFont];
+    titleLabel.textColor = [ThemeHelper textColor];
+    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:titleLabel];
+
+    self.radarSwitch = [[UISwitch alloc] init];
+    self.radarSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+    self.radarSwitch.accessibilityIdentifier = kStripeAPMRadarToggleAccessibilityId;
+    self.radarSwitch.accessibilityLabel = @"Stripe Radar";
+    [self.radarSwitch addTarget:self action:@selector(radarSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+    [container addSubview:self.radarSwitch];
+
+    self.radarSpinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    self.radarSpinner.hidesWhenStopped = YES;
+    self.radarSpinner.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:self.radarSpinner];
+
+    self.radarStatusLabel = [[UILabel alloc] init];
+    self.radarStatusLabel.font = [ThemeHelper captionFont];
+    self.radarStatusLabel.textColor = [ThemeHelper textSecondaryColor];
+    self.radarStatusLabel.numberOfLines = 0;
+    self.radarStatusLabel.hidden = YES;
+    self.radarStatusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:self.radarStatusLabel];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [titleLabel.topAnchor constraintEqualToAnchor:container.topAnchor constant:[ThemeHelper spacingMD]],
+        [titleLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.radarSwitch.centerYAnchor constraintEqualToAnchor:titleLabel.centerYAnchor],
+        [self.radarSwitch.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+        [self.radarSpinner.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [self.radarSpinner.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.radarStatusLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [self.radarStatusLabel.leadingAnchor constraintEqualToAnchor:self.radarSpinner.trailingAnchor constant:[ThemeHelper spacingSM]],
+        [self.radarStatusLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+        [self.radarStatusLabel.bottomAnchor constraintEqualToAnchor:container.bottomAnchor constant:-[ThemeHelper spacingMD]]
+    ]];
+
+    return container;
+}
+
+- (BOOL)isRadarCollecting {
+    return self.radarEnabled && self.radarState == StripeAPMRadarStateCollecting;
+}
+
+- (void)radarSwitchChanged:(UISwitch *)sender {
+    self.radarEnabled = sender.isOn;
+    if (sender.isOn) {
+        [self collectRadarSession];
+    } else {
+        self.radarSessionId = nil;
+        self.radarState = StripeAPMRadarStateIdle;
+        [self updateRadarStatusUI];
+        [self updateStartButtonState];
+    }
+}
+
+- (void)collectRadarSession {
+    self.radarState = StripeAPMRadarStateCollecting;
+    [self updateRadarStatusUI];
+    [self updateStartButtonState];
+
+    StripeRadarConfigObjC *config = [[StripeRadarConfigObjC alloc] initWithPublishableKey:[[SpreedlyConfigManager shared] stripePublishableKey]
+                                                                               stripeAccount:nil];
+    __weak typeof(self) weakSelf = self;
+    [SpreedlyStripeRadar createRadarSessionWithConfig:config completion:^(NSString * _Nullable sessionId) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        self.radarSessionId = sessionId;
+        self.radarState = sessionId.length > 0 ? StripeAPMRadarStateSuccess : StripeAPMRadarStateFailed;
+        [self updateRadarStatusUI];
+        [self updateStartButtonState];
+    }];
+}
+
+- (void)updateRadarStatusUI {
+    switch (self.radarState) {
+        case StripeAPMRadarStateIdle:
+            self.radarStatusLabel.hidden = YES;
+            self.radarStatusLabel.accessibilityIdentifier = nil;
+            [self.radarSpinner stopAnimating];
+            break;
+        case StripeAPMRadarStateCollecting:
+            self.radarStatusLabel.hidden = NO;
+            self.radarStatusLabel.text = @"Collecting device data...";
+            self.radarStatusLabel.textColor = [ThemeHelper textSecondaryColor];
+            self.radarStatusLabel.accessibilityIdentifier = kStripeAPMRadarStatusCollectingAccessibilityId;
+            self.radarStatusLabel.accessibilityLabel = @"Collecting device data";
+            [self.radarSpinner startAnimating];
+            break;
+        case StripeAPMRadarStateSuccess:
+            self.radarStatusLabel.hidden = NO;
+            self.radarStatusLabel.text = [NSString stringWithFormat:@"Session ID: %@", self.radarSessionId ?: @""];
+            self.radarStatusLabel.textColor = [ThemeHelper textColor];
+            self.radarStatusLabel.accessibilityIdentifier = kStripeAPMRadarStatusSuccessAccessibilityId;
+            self.radarStatusLabel.accessibilityLabel = @"Radar session ID";
+            [self.radarSpinner stopAnimating];
+            break;
+        case StripeAPMRadarStateFailed:
+            self.radarStatusLabel.hidden = NO;
+            self.radarStatusLabel.text = @"Collection failed — payment will proceed without Radar";
+            self.radarStatusLabel.textColor = [ThemeHelper errorColor];
+            self.radarStatusLabel.accessibilityIdentifier = kStripeAPMRadarStatusFailedAccessibilityId;
+            self.radarStatusLabel.accessibilityLabel = @"Radar collection failed";
+            [self.radarSpinner stopAnimating];
+            break;
+    }
 }
 
 - (UIView *)createAPMRowWithId:(NSString *)apmId title:(NSString *)title subtitle:(NSString *)subtitle iconName:(NSString *)iconName {
@@ -785,7 +930,7 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
 }
 
 - (void)updateStartButtonState {
-    BOOL enable = (self.selectedProduct != nil && self.selectedAPMTypes.count > 0 && !self.isLoading);
+    BOOL enable = (self.selectedProduct != nil && self.selectedAPMTypes.count > 0 && !self.isLoading && ![self isRadarCollecting]);
     self.startButton.enabled = enable;
     self.startButton.userInteractionEnabled = enable;
     if (enable) {
@@ -868,11 +1013,13 @@ static const NSInteger kStripeAPMStageLineTagBase    = 800;
 
     __weak typeof(self) weakSelf = self;
     PurchaseAPIClient *client = [[SpreedlyConfigManager shared] createPurchaseAPIClient];
+    NSString *radarId = (self.radarEnabled && self.radarSessionId.length > 0) ? self.radarSessionId : nil;
     [client stripeAPMPendingPurchaseWithAmount:amountInCents
                                  currencyCode:@"EUR"
                                   redirectUrl:kStripeAPMRedirectURL
                                  callbackUrl:kExampleCallbackURL
                                     apmTypes:apmTypes
+                              radarSessionId:radarId
                                   completion:^(PurchaseResponse * _Nullable response, NSError * _Nullable error) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;

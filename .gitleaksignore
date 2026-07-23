@@ -27,4 +27,4 @@ Shared/Swift/Config/SignatureGenerator.swift:private-key:96
 
 # Documentation example placeholders (truncated/fake values)
 docs/guides/braintree-apm.md:generic-api-key:295
-docs/guides/stripe-apm.md:generic-api-key:209
+docs/guides/stripe-apm.md:generic-api-key:218

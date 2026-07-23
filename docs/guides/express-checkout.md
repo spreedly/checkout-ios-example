@@ -94,7 +94,6 @@ struct CheckoutView: View {
                     }
                 }
             )
-            .screenPrevention()
         }
         .onAppear {
             cancellable = Spreedly.shared().subscribeToPaymentResults { paymentResult in
@@ -115,7 +114,7 @@ struct CheckoutView: View {
 }
 ```
 
-Always apply `.screenPrevention()` to protect sensitive payment data from app switcher screenshots.
+`CardFormDropIn` applies screen prevention automatically. For custom forms, apply `.screenPrevention()` yourself (see [Security](security.md)).
 
 Reset validation parameters in `onDisappear` to restore defaults when the checkout view is dismissed.
 
@@ -169,7 +168,6 @@ struct ExpressCheckoutView: View {
                     }
                 }
             )
-            .screenPrevention()
         }
         .onAppear {
             paymentCancellable = Spreedly.shared().subscribeToPaymentResults { result in
@@ -250,7 +248,6 @@ Task {
         if result.isProcessing { /* show loading */ }
         else if result.isValidationFailed { /* show result.getDescription() */ }
     })
-    .screenPrevention()
 }
 ```
 
@@ -290,7 +287,7 @@ Cancel the subscription and reset validation parameters when the view disappears
 
 ### UIKit
 
-Use `CardFormDropInViewController` with the parameterized initializer and present it modally. Use `onProcessingResult` only for validation status; handle success/failure via `subscribeToPaymentResults` (Swift) or `paymentDelegate` (Obj-C). Always wrap with `wrapInSecureViewControllerWithPlaceholderText:` for screen prevention:
+Use `CardFormDropInViewController` with the parameterized initializer and present it modally. Use `onProcessingResult` only for validation status; handle success/failure via `subscribeToPaymentResults` (Swift) or `paymentDelegate` (Obj-C). Screen prevention is built in — present the view controller directly:
 
 ```swift
 import UIKit
@@ -328,15 +325,14 @@ class PaymentViewController: UIViewController {
                 }
             }
         )
-        let secureVC = dropInVC.wrapInSecureViewController(placeholderText: "")
-        present(secureVC, animated: true)
+        present(dropInVC, animated: true)
     }
 }
 ```
 
 ### Objective-C
 
-Create `CardFormDropInViewController` with `initWithOtherFields:yearFormat:nameDisplayMode:onProcessingResult:`, set `paymentDelegate` on `Spreedly.shared()`, and wrap with `wrapInSecureViewControllerWithPlaceholderText:` before presenting:
+Create `CardFormDropInViewController` with `initWithOtherFields:yearFormat:nameDisplayMode:onProcessingResult:`, set `paymentDelegate` on `Spreedly.shared()`, and present directly (built-in screen prevention):
 
 ```objc
 #import <SpreedlyCore/SpreedlyCore-Swift.h>
@@ -364,8 +360,7 @@ Create `CardFormDropInViewController` with `initWithOtherFields:yearFormat:nameD
                 // Validation failed; show [result getDescription]
             }
         }];
-    UIViewController *secureVC = [dropInVC wrapInSecureViewControllerWithPlaceholderText:@""];
-    [self presentViewController:secureVC animated:YES completion:nil];
+    [self presentViewController:dropInVC animated:YES completion:nil];
 }
 
 - (void)paymentDidComplete:(PaymentResult *)result {

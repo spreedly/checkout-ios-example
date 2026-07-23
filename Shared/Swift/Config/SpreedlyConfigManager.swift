@@ -21,6 +21,7 @@ class SpreedlyConfigManager {
     private let baseURL: String = infoPlistValue(forKey: "SpreedlyBaseURL")
     let stripePublishableKey: String = infoPlistValue(forKey: "StripePublishableKey")
     private let apiKey: String = infoPlistValue(forKey: "SpreedlyApiKey")
+    let c2pSandboxSrcDpaId: String = infoPlistValue(forKey: "SpreedlyC2PSandboxSrcDpaId")
     
     private init() {
         Spreedly.initializeSDK()

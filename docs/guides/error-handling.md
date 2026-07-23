@@ -205,7 +205,6 @@ CardFormDropIn(
         }
     }
 )
-.screenPrevention()
 
 // Success/failure comes via subscribeToPaymentResults:
 cancellable = Spreedly.shared().subscribeToPaymentResults { result in

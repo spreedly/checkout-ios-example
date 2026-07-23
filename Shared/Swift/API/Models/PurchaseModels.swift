@@ -118,6 +118,8 @@ public struct HerokuCreatePurchaseTransaction: Codable {
     public let channel: String
     /// Stripe only: payment_method with payment_method_type "stripe_apm" and apm_types; omitted for EBANX.
     public let paymentMethod: StripeAPMPaymentMethod?
+    /// Stripe only: optional `gateway_specific_fields.stripe_payment_intents` (e.g. Radar session ID).
+    public let gatewaySpecificFields: StripeGatewaySpecificFields?
 
     private enum CodingKeys: String, CodingKey {
         case paymentMethodToken = "payment_method_token"
@@ -127,6 +129,7 @@ public struct HerokuCreatePurchaseTransaction: Codable {
         case callbackUrl = "callback_url"
         case channel
         case paymentMethod = "payment_method"
+        case gatewaySpecificFields = "gateway_specific_fields"
     }
 
     public init(
@@ -136,7 +139,8 @@ public struct HerokuCreatePurchaseTransaction: Codable {
         redirectUrl: String,
         callbackUrl: String,
         channel: String = "app",
-        paymentMethod: StripeAPMPaymentMethod? = nil
+        paymentMethod: StripeAPMPaymentMethod? = nil,
+        gatewaySpecificFields: StripeGatewaySpecificFields? = nil
     ) {
         self.paymentMethodToken = paymentMethodToken
         self.amount = NSDecimalNumber(decimal: amount).doubleValue
@@ -145,6 +149,7 @@ public struct HerokuCreatePurchaseTransaction: Codable {
         self.callbackUrl = callbackUrl
         self.channel = channel
         self.paymentMethod = paymentMethod
+        self.gatewaySpecificFields = gatewaySpecificFields
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -156,6 +161,37 @@ public struct HerokuCreatePurchaseTransaction: Codable {
         try container.encode(callbackUrl, forKey: .callbackUrl)
         try container.encode(channel, forKey: .channel)
         try container.encodeIfPresent(paymentMethod, forKey: .paymentMethod)
+        try container.encodeIfPresent(gatewaySpecificFields, forKey: .gatewaySpecificFields)
+    }
+}
+
+// MARK: - Gateway Specific Fields (Stripe APM request)
+
+public struct StripeGatewaySpecificFields: Codable {
+    public let stripePaymentIntents: StripePaymentIntentsRequestFields
+
+    private enum CodingKeys: String, CodingKey {
+        case stripePaymentIntents = "stripe_payment_intents"
+    }
+
+    public init(stripePaymentIntents: StripePaymentIntentsRequestFields) {
+        self.stripePaymentIntents = stripePaymentIntents
+    }
+
+    public init(radarSessionId: String) {
+        self.stripePaymentIntents = StripePaymentIntentsRequestFields(radarSessionId: radarSessionId)
+    }
+}
+
+public struct StripePaymentIntentsRequestFields: Codable {
+    public let radarSessionId: String
+
+    private enum CodingKeys: String, CodingKey {
+        case radarSessionId = "radar_session_id"
+    }
+
+    public init(radarSessionId: String) {
+        self.radarSessionId = radarSessionId
     }
 }
 

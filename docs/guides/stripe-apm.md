@@ -71,11 +71,20 @@ Before integrating Stripe APM:
 8. **Info.plist:** Set **Bundle display name** (`CFBundleDisplayName`) in your app's `Info.plist`. The Stripe SDK requires it to be non-nil; otherwise you may see: *"CFBundleDisplayName must be non-nil. Please set 'Bundle display name' in your Info.plist."*
 9. **Info.plist:** Add `NSCameraUsageDescription` with a user-facing string. The Stripe SDK's `StripePaymentSheet` includes card scanning that references camera APIs internally. Apple rejects App Store builds without this key (`ITMS-90683`), even if card scanning is never used.
 
-Stripe APM lives in **SpreedlyStripeAPM**; PaymentSheet and its resources are part of that XCFramework. You do not manage a separate Stripe product or version for normal Spreedly checkout.
+Stripe APM lives in **SpreedlyStripeAPM**; PaymentSheet and its resources are part of that XCFramework. You do not manage a separate Stripe product or version for **APM-only** Spreedly checkout.
 
 ### Stripe dependency (SPM and CocoaPods)
 
-There is no separate `StripePaymentSheet` dependency to add. SPM and CocoaPods both pull **SpreedlyStripeAPM** only; Stripe is built in. Add Stripe's own package or pod only if your app uses Stripe APIs outside Spreedly.
+There is no separate `StripePaymentSheet` dependency to add for APM-only. SPM and CocoaPods both pull **SpreedlyStripeAPM** only; Stripe is built in.
+
+**If you also add [stripe-ios-spm](https://github.com/stripe/stripe-ios-spm) on the app target** (required for [Stripe Radar](stripe-radar.md), or if your app calls Stripe APIs outside Spreedly), you **must** stay on **Stripe 25.x**:
+
+| Rule | Value |
+|------|--------|
+| **SPM (recommended)** | `from: "25.11.0"` (Up to Next Major → **25.x** only) |
+| **Do not use** | Stripe **26.x** while Spreedly still resolves **25.x** — SPM will fail to resolve |
+
+Details and troubleshooting: [Stripe Radar — Stripe version](stripe-radar.md#stripe-version-required).
 
 ### CocoaPods: Stripe Bundle Patcher {#cocoapods-stripe-bundle-patcher}
 
@@ -214,6 +223,8 @@ Content-Type: application/json
 ```
 
 Extract `transaction.token` (the Spreedly transaction token) and `transaction.gateway_specific_response_fields.stripe_payment_intents.client_secret` (the Stripe PaymentIntent client secret) for use in `StripeAPMConfig`.
+
+**Optional — Stripe Radar:** When your app collects a Radar session ID first ([Stripe Radar](stripe-radar.md)), include it on the same purchase under `gateway_specific_fields.stripe_payment_intents.radar_session_id`. Omit the block when you have no session ID.
 
 **`redirect_url`:** Can be a Spreedly-hosted URL (e.g. `https://spreedly.com/stripe-apm/redirect`) or your custom scheme (e.g. `myapp://stripe-redirect`). See [redirect_url vs returnURL Clarification](#redirect_url-vs-returnurl-clarification).
 
@@ -590,6 +601,10 @@ appearance.primaryButton.height = 52;
 
 > **Important:** When `blockJailbrokenDevices` is enabled and the device is compromised, the SDK blocks this flow automatically. The `present()` call returns immediately without showing any UI, and a `PaymentResult.failure` is published. See [Security — Runtime Integrity](security.md#runtime-integrity) for details.
 
+### Screen Prevention
+
+Stripe PaymentSheet is partner UI. Spreedly `.screenPrevention()` does **not** cover PaymentSheet — do not wrap it. See [Security](security.md).
+
 ## Troubleshooting
 
 | Issue | Solution |
@@ -607,6 +622,7 @@ appearance.primaryButton.height = 52;
 
 ## Related Documentation
 
+- [stripe-radar.md](stripe-radar.md) - Optional `radar_session_id` on the same Stripe PI purchase
 - [offsite-payments.md](offsite-payments.md) - PayPal and Sprel offsite payments
 - [ebanx-apm.md](ebanx-apm.md) - Pix, Boleto, OXXO, NuPay
 - [braintree-apm.md](braintree-apm.md) - PayPal and Venmo via Braintree

@@ -199,7 +199,7 @@ The SDK **always** calls `GET .../transactions/{token}/status.json` when you cal
 |-------|---------|
 | `client_token` | Required to launch Braintree (status, `context`, or config fallback) |
 | `payment_method_type` | Must match `BraintreeCheckoutConfig.paymentType` (`paypal` / `venmo`) |
-| `created_at` | When present and parseable, token older than 24 hours blocks launch |
+| `created_at` | When present and parseable, token older than 24 hours blocks launch. When present but unparseable, launch is blocked. Missing/blank does not block. |
 | `amount`, `currency_code` | Amount and currency shown in PayPal/Venmo UI |
 | `paypal_flow_type` | `checkout`, `vault`, or `checkout_with_vault` |
 | `line_items`, `shipping_address`, `billing_agreement_description` | PayPal vault / checkout-with-vault flows |
@@ -604,6 +604,10 @@ The example app includes both a SwiftUI and an Objective-C Braintree screen for 
 ### Blocked Devices
 
 > **Important:** When `blockJailbrokenDevices` is enabled and the device is compromised, the SDK blocks this flow automatically. The `present()` call returns immediately without showing any UI, and a `PaymentResult.failure` is published. See [Security — Runtime Integrity](security.md#runtime-integrity) for details.
+
+### Screen Prevention
+
+Braintree / PayPal (and Venmo) partner UI is **not** covered by Spreedly `.screenPrevention()` — do not wrap those surfaces. See [Security](security.md).
 
 ## Troubleshooting
 

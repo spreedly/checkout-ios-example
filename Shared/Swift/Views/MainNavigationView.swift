@@ -208,13 +208,13 @@ struct MainNavigationView: View {
                                 .accessibilityLabel("Braintree Payment Flow")
                                 .accessibilityHint("Navigate to Braintree PayPal and Venmo payment example")
                                 .accessibilityAddTraits(.isButton)
-                                
+
                                 NavigationLink(destination: BankAccountCheckoutView()) {
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text("ACH Bank Account Drop-In")
+                                        Text("ACH Bank Account")
                                             .font(headerFont)
                                             .foregroundColor(textColor)
-                                        Text("Preview only — ACH will not ship in 1.4.1. Do not use in production.")
+                                        Text("Tokenize bank accounts via ACH with routing number, account number, and account type")
                                             .font(subheadingFont)
                                             .foregroundColor(textColor)
                                     }
@@ -230,7 +230,7 @@ struct MainNavigationView: View {
                                         Text("ACH Bank Account – Custom Form")
                                             .font(headerFont)
                                             .foregroundColor(textColor)
-                                        Text("Preview only — headless ACH sample; not for production in 1.4.1.")
+                                        Text("Headless ACH built field-by-field with SPLTextField and createBankAccount")
                                             .font(subheadingFont)
                                             .foregroundColor(textColor)
                                     }
@@ -278,8 +278,6 @@ struct MainNavigationView: View {
                     .padding(.bottom, 16)
                 }
                 .onAppear {
-                    // Hub screen: wipe checkout when landing here (launch or pop back from any example).
-                    Spreedly.shared().resetPaymentState()
                     ValidationParamReset.reset()
                 }
             }

@@ -47,6 +47,10 @@
     }];
 }
 
++ (UIColor *)merchantProductPriceColor {
+    return [[self textColor] colorWithAlphaComponent:0.6];
+}
+
 + (UIColor *)borderColor {
     // Card border: Light #EFEDEA, Dark #3A3A3C
     return [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {

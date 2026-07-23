@@ -205,6 +205,16 @@ SPLTextField(
 
 > Direct parameters take precedence over the environment modifier. If both are set, the direct `theme`/`darkTheme` values win.
 
+
+### Toggle switches (iOS 14+)
+
+For custom payment UI that includes `Toggle` controls, use `.spreedlyThemedSwitchToggle(tint:)` so the switch matches `SpreedlyColors.primary` on iOS 14 (`accentColor`) and iOS 15+ (`SwitchToggleStyle`):
+
+```swift
+Toggle("Remember me", isOn: $rememberMe)
+    .spreedlyThemedSwitchToggle(tint: theme.colors.primary)
+```
+
 ---
 
 ## SpreedlyColors Properties
@@ -609,11 +619,12 @@ struct ThemedCheckoutView: View {
                     else if result.isValidationFailed { errorMessage = result.getDescription() }
                 }
             )
-            .screenPrevention()
         }
     }
 }
 ```
+
+`CardFormDropIn` includes built-in screen prevention — no merchant `.screenPrevention()` on the drop-in.
 
 ### UIKit with CVVRecachingViewController
 

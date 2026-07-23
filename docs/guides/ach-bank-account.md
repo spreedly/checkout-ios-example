@@ -1,7 +1,5 @@
 # ACH Bank Account Payments - Spreedly iOS SDK
 
-> **Status: Preview — not yet released.** ACH bank-account flows are in the SDK for internal testing only and **will not ship in `1.4.1`**. **Do not integrate ACH in production.** When ACH is released, it will appear under its own version header in the changelog with full integration support.
-
 Tokenize bank accounts (US ABA routing numbers and Canadian routing numbers) with the Spreedly iOS SDK. Three integration paths are available.
 
 **Estimated integration time:** ~15 minutes
@@ -26,7 +24,8 @@ Tokenize bank accounts (US ABA routing numbers and Canadian routing numbers) wit
 14. [Security](#security)
 15. [Important Notes](#important-notes)
 16. [Troubleshooting](#troubleshooting)
-17. [Related Documentation](#related-documentation)
+17. [Iframe to iOS migration](#iframe-to-ios-migration)
+18. [Related Documentation](#related-documentation)
 
 ---
 
@@ -41,6 +40,8 @@ ACH support tokenizes a bank account into a Spreedly `payment_method_token` whic
 | **Headless** | Fully custom UI; you call `Spreedly.shared().createBankAccount(...)` directly. |
 
 All three paths return results through the same `paymentResultPublisher` / `SpreedlyPaymentDelegate` channel used for credit cards.
+
+> **Release status:** ACH bank-account tokenization ships in **1.5.0+** (see [CHANGELOG](../CHANGELOG.md) `## [1.5.0]`).
 
 ### When to use ACH vs. credit card
 
@@ -83,6 +84,13 @@ Optional fields:
 
 The simplest integration. `BankAccountFormDropIn` is a full SwiftUI form (UIKit wrapper available too). It collects routing/account/name plus any optional fields you've enabled, validates as the user types, and on submit calls `Spreedly.shared().createBankAccount(...)`.
 
+**Drop-in UX (current SDK):**
+
+- Submit button label is **Checkout** (Android parity), not the card drop-in “Pay now” string.
+- Name fields use ACH-specific titles and required errors (not card “First name” / “Last name” defaults).
+- Optional **Bank Name** uses `SPLTextField(type: .bankName)` inside the drop-in when enabled in `BankAccountFieldConfig`.
+- Account type / holder type segmented controls use the sheet theme primary color.
+
 ### SwiftUI
 
 ```swift
@@ -105,7 +113,6 @@ struct BankCheckoutView: View {
                         else if result.isValidationFailed { /* show result.getDescription() */ }
                     }
                 )
-                .screenPrevention()
             }
             .onAppear {
                 cancellable = Spreedly.shared().subscribeToPaymentResults { paymentResult in
@@ -122,7 +129,7 @@ struct BankCheckoutView: View {
 }
 ```
 
-Always apply `.screenPrevention()` to protect sensitive bank-account data from app-switcher screenshots.
+`BankAccountFormDropIn` applies screen prevention automatically. For custom/`SPLTextField` ACH UI, apply `.screenPrevention()` yourself.
 
 ### UIKit
 
@@ -151,8 +158,8 @@ class PaymentViewController: UIViewController {
                 else if result.isValidationFailed { /* show result.getDescription() */ }
             }
         )
-        let secureVC = dropInVC.wrapInSecureViewController(placeholderText: "")
-        present(secureVC, animated: true)
+        // Built-in screen prevention — present directly.
+        present(dropInVC, animated: true)
     }
 
     deinit { cancellable?.cancel() }
@@ -163,7 +170,7 @@ class PaymentViewController: UIViewController {
 
 ## Custom Layout
 
-Build your own form using `SPLTextField` for the sensitive routing and account number fields. The values auto-register with `SecureValueContainer`, which keeps them in protected memory until submission. When ready, call `Spreedly.shared().createBankAccount(...)`.
+Build your own form using `SPLTextField` for routing number, account number, and any SDK-managed display fields such as Bank Name. The values register with the SDK until submission. When ready, call `Spreedly.shared().createBankAccount(...)`.
 
 ```swift
 import SwiftUI
@@ -171,24 +178,23 @@ import SpreedlyCore
 import SpreedlyUI
 
 struct CustomBankForm: View {
-    @State private var fullName = ""
-    @State private var bankName = ""
-
     var body: some View {
         VStack(spacing: 12) {
-            TextField("Account Holder Name", text: $fullName)
-            TextField("Bank Name (optional)", text: $bankName)
-
-            // Sensitive fields: encrypted in memory via SecureValueContainer
+            SPLTextField(
+                type: .fullName,
+                title: "Account Holder Name",
+                isRequired: true,
+                requiredMessage: "Name is required"
+            )
+            SPLTextField(type: .bankName, title: "Bank Name", isRequired: false)
             SPLTextField(type: .routingNumber, title: "Routing Number", isRequired: true)
             SPLTextField(type: .accountNumber, title: "Account Number", isRequired: true)
 
-            Button("Pay") {
+            Button("Checkout") {
                 let result = Spreedly.shared().createBankAccount(
-                    additionalFields: [.fullName: fullName],
+                    additionalFields: [:],
                     bankAccountType: .checking,
                     bankAccountHolderType: .personal,
-                    bankName: bankName.isEmpty ? nil : bankName,
                     metadata: nil
                 )
                 // result is `.processing` or `.validationFailed`;
@@ -200,11 +206,15 @@ struct CustomBankForm: View {
 }
 ```
 
+If your app owns Bank Name outside `SPLTextField`, continue passing it through the `bankName:` parameter on `createBankAccount(...)`; an explicit parameter value takes precedence over any collected `.bankName` field.
+
 ---
 
 ## Headless Flow
 
-If you don't want to use `SPLTextField` at all, you can pass values directly through `additionalFields`. **Note:** routing and account numbers must still go through `SPLTextField` (or be registered via `SecureValueContainer`) — there is no plain-text headless path for those two fields. Non-sensitive values like name, email, and metadata can be passed directly.
+Use `additionalFields` for non-sensitive values (name, email, metadata) when you are not collecting them in `SPLTextField`. **Routing and account numbers must still be entered through `SPLTextField`** (or registered in `SecureValueContainer`) — there is no plain-text path for those fields.
+
+At tokenize time, `createBankAccount` and `createCreditCard` resolve holder names from secure-container values first, then fall back to matching `AdditionalField` entries when a secure value is empty (Android parity). Prefer one shape per flow: either `full_name` or `first_name` + `last_name`, not a mix.
 
 ```swift
 let result = Spreedly.shared().createBankAccount(
@@ -253,8 +263,10 @@ let config = BankAccountFieldConfig(
 
 ### Name display modes
 
-- `.singleField` — one "Account Holder Name" field that maps to `full_name`
-- `.separateFields` — separate "First Name" and "Last Name" fields
+- `.singleField` — one account-holder name field that maps to `full_name` on the wire
+- `.separateFields` — separate first and last name fields with ACH-specific labels (not card “First name” / “Last name” copy)
+
+In custom layouts, pass `requiredMessage: "Name is required"` (or your own string) on name `SPLTextField` instances so required/min/max errors stay bank-appropriate instead of card defaults.
 
 ---
 
@@ -265,7 +277,7 @@ The same callback channels used by credit-card flows apply to ACH:
 | Channel | Delivers | Use |
 |---|---|---|
 | `onProcessingResult` (callback on the form) | `.processing` or `.validationFailed` | Show loading or field errors |
-| `subscribeToPaymentResults` (Swift) / `paymentDelegate` (ObjC) | `PaymentResult` with `isSuccess` / `isFailure` and `token` or `failureDetails` | Use `result.token` on success; show `failureDetails.getDescription()` on failure |
+| `subscribeToPaymentResults` (Swift) / `paymentDelegate` (ObjC) | `PaymentResult.success(token)` or `.failure(details)` | Use the token / show error |
 
 | Result state | Meaning | Recommended UX |
 |---|---|---|
@@ -340,8 +352,7 @@ final class BankCheckoutVC: UIViewController {
                 }
             }
         )
-        let secure = dropIn.wrapInSecureViewController(placeholderText: "")
-        present(secure, animated: true)
+        present(dropIn, animated: true)
     }
 }
 ```
@@ -384,8 +395,7 @@ A full working sample ships in Spreedly's iOS sample app under the Objective-C t
                 NSLog(@"Validation failed: %@", [result getDescription]);
             }
         }];
-    UIViewController *secure = [dropIn wrapInSecureViewControllerWithPlaceholderText:@""];
-    [self presentViewController:secure animated:YES completion:nil];
+    [self presentViewController:dropIn animated:YES completion:nil];
 }
 
 #pragma mark - SpreedlyPaymentDelegate
@@ -425,9 +435,10 @@ Validation runs on every keystroke and again at submission time:
 
 | Field | Rule | Behavior |
 |---|---|---|
-| Routing number | `RoutingNumberRule` | 9 numeric digits; ABA checksum (US); a leading `0` is treated as Canadian and bypasses ABA. Failure shows the localized invalid message. |
-| Account number | `AccountNumberRule` | 4-17 numeric digits. Empty is valid only when the field is non-required. |
-| Name | `NameValidator` (existing) | Length / presence rules consistent with cards. |
+| Routing number | `RoutingNumberRule` | 9 numeric digits; ABA checksum (US); a leading `0` is treated as Canadian and bypasses ABA. User-visible errors match Android (`Routing number is required`, `Routing number is invalid`). |
+| Account number | `AccountNumberRule` | 4–17 numeric digits. Empty is valid only when the field is non-required. Errors match Android (`Account number is required`, `Account number is invalid`, `Account number is too short`, `Account number is too long`). |
+| Name | `firstNameRules` / `lastNameRules` / `fullNameRules` | ACH drop-in and bank `SPLTextField` name fields use bank-specific required and length messages when `requiredMessage` is set (default in drop-in: `"Name is required"`). |
+| Bank name | `bankNameRules` | Optional unless `BankAccountFieldConfig.bankNameRequired` is `true`; max length matches other text fields. |
 
 If a field fails, `PaymentProcessingResult.isValidationFailed` is `true`, `invalidFields` lists the offending types, and field-level errors are wired into `Spreedly.shared().errorHandler` so the form will highlight them.
 
@@ -436,8 +447,8 @@ If a field fails, `PaymentProcessingResult.isValidationFailed` is `true`, `inval
 ## Security
 
 - Routing and account numbers are kept in protected memory by `SecureValueContainer` (the same path the SDK uses for PAN/CVV). They are read only when `createBankAccount` is dispatched and cleared immediately after the request completes.
-- `BankAccountFormDropIn` and `BankAccountFormDropInViewController` apply `.screenPrevention()` (UIKit `wrapInSecureViewController`) to prevent screenshots and app-switcher previews.
-- Account number copy/cut is blocked. Paste is allowed (so users can paste from password managers).
+- `BankAccountFormDropIn` and `BankAccountFormDropInViewController` apply screen prevention automatically (no merchant wrap required).
+- Routing and account number fields disable copy, cut, and paste on the text field (parity with the Android bank-account form).
 - Account number entry uses `.numberPad` keyboard and `oneTimeCode`-style autofill suppression where applicable.
 - Logging of bank routing/account numbers is redacted by `LogSanitizer`; never log raw values.
 - Bank account number is treated as PCI-equivalent sensitive data for purposes of memory handling; the SDK does not write it to disk.
@@ -448,10 +459,10 @@ For full security details, see [security.md](security.md).
 
 ## Important Notes
 
-- `BankAccountFormDropIn` clears the payment session on disappear (secure values and errors) without resetting hosted card display state.
+- On dismiss, `BankAccountFormDropIn` clears secure values and visible field text via `resetPaymentFormPreservingDisplayConfigForDropIn` (and field reset). It does **not** call full `reset()`, so display defaults such as mask/format state are preserved.
 - The `bank_*`-prefixed JSON keys (`bank_routing_number`, `bank_account_number`, `bank_account_type`, `bank_account_holder_type`, `bank_name`) are the canonical Spreedly API contract for ACH. Do **not** mix them with credit-card key names.
 - `email` and `metadata` are lifted to the `payment_method` level on the wire (not nested under `bank_account`). The SDK does this automatically when you pass them through `BankAccountRequest` / `createBankAccount`.
-- **Headless form state:** iOS does not ship a SDK-level `bankAccountState` holder — use SwiftUI `@State` and `SPLTextField` (values register in `SecureValueContainer` automatically). `Spreedly.shared().reset()` clears bank fields; SwiftUI typically preserves `@State` across re-presentations without a separate preserve API.
+- Cross-platform parity: Android exposes a `bankAccountState` / `bankAccountCallbacks` Compose state surface for headless mode. iOS does not mirror this — SwiftUI's native `@State` and `SecureValueContainer` cover the same use cases idiomatically. The mapping is: `sdk.bankAccountState` → SwiftUI `@State` inside the form view; `bankAccountCallbacks.onRoutingNumberChange(...)` → `SPLTextField(type: .routingNumber, ...)` (auto-registers in `SecureValueContainer`); `resetBankAccountState()` → `Spreedly.shared().reset()`; `preserveBankAccountStateOnNextShow()` is unnecessary because SwiftUI preserves `@State` across re-presentations.
 ---
 
 ## Troubleshooting
@@ -461,9 +472,30 @@ For full security details, see [security.md](security.md).
 | `paymentResultPublisher` never fires | Subscribe **before** presenting the form. Late subscriptions miss the result. |
 | Submit button stays disabled | Check that all required fields are valid. The Submit button only enables once every required field passes its validator. |
 | `bank_routing_number` shows `[REDACTED]` in logs | That's intentional — `LogSanitizer` redacts the field on every log path. |
-| Field shows "Invalid routing number" but the value looks right | Confirm it's a valid US ABA routing number (the SDK runs the standard ABA checksum). Canadian routing numbers must begin with `0`. |
+| Field shows "Routing number is invalid" but the value looks right | Confirm it's a valid US ABA routing number (the SDK runs the standard ABA checksum). Canadian routing numbers must begin with `0`. |
 | `createBankAccount` returns `.validationFailed` immediately | One or more `SPLTextField` fields are missing or invalid. Inspect `processingResult.invalidFields` to see which. |
 | Tokenization succeeds but the gateway rejects the charge | Tokenization and charging are separate. Check the `purchase`/`authorize` response on your backend; the SDK only handles the tokenization step. |
+
+---
+
+## Iframe to iOS migration
+
+The **web iframe SDK has no ACH / bank-account API** (no bank hosted fields, no `tokenizeBankAccount`). Use this table only as a **card → ACH pattern** map: left = what iframe does for **cards**; right = the ACH equivalent on iOS.
+
+| Web iframe (cards) | ACH on iOS |
+|--------------------|------------|
+| Spreedly Express checkout UI | `BankAccountFormDropIn` / `BankAccountFormDropInViewController` |
+| Hosted fields for number + CVV iframes | `SPLTextField` with `.routingNumber` / `.accountNumber` (optional name / bank name fields as needed) |
+| `Spreedly.tokenizeCreditCard(...)` | `Spreedly.shared().createBankAccount(...)` / `createBankAccountObjC(...)` |
+| `paymentMethod` event (token result) | `subscribeToPaymentResults` / `SpreedlyPaymentDelegate` |
+| Backend `purchase` / `authorize` with `payment_method_token` | Same — bank account returns a Spreedly payment method token |
+
+**What does not carry over from iframe card fields**
+
+- iframe `setNumberFormat` / `toggleMask` — ACH fields are not card number/CVV display fields.
+- iframe `fieldEvent` BIN / length for PAN — routing/account use field validation instead.
+
+For iframe **card** field migration on iOS (including `createCreditCard`), see [Migration from legacy iframe-ui](migration/from-legacy.md). For ACH setup and APIs, use the sections above in this guide.
 
 ---
 
@@ -474,3 +506,4 @@ For full security details, see [security.md](security.md).
 - [security.md](security.md) — `SecureValueContainer`, encryption, and screen prevention
 - [error-handling.md](error-handling.md) — Result handling and error mapping
 - [objective-c.md](objective-c.md) — Objective-C usage patterns
+- [Migration from legacy iframe-ui](migration/from-legacy.md) — Card hosted-field iframe → iOS mapping

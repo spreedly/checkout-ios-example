@@ -283,7 +283,8 @@ On **`PAN_MASK_CHANGED`**, trust **`HostedFieldState`** (`isPanMasked`, `panDisp
 | `type` | `FormFieldType` | Field type (e.g., `.cardNumber`, `.firstName`) |
 | `title` | `String?` | Label above the field |
 | `isRequired` | `Bool` | Whether the field is required for validation |
-| `placeholder` | `String?` | Custom placeholder text |
+| `placeholder` | `String?` | Custom placeholder text. **Ignored when `type` is `.cardNumber`** — see [Card number placeholder](#card-number-placeholder-current-behavior). |
+| `requiredMessage` | `String?` | Overrides the default required-field validation error (e.g. ACH flows use bank-specific copy instead of card defaults). Available on SwiftUI `SPLTextField` and UIKit/ObjC `SPLTextFieldViewController` (`requiredMessage` property). |
 | `theme` | `SpreedlyTheme?` | Light mode theme |
 | `darkTheme` | `SpreedlyTheme?` | Dark mode theme |
 | `yearFormat` | `YearFormat` | `.twoDigit` or `.fourDigit` (default), applies to expiration fields |
@@ -579,12 +580,13 @@ Use the `type` parameter to specify the field behavior. The SDK applies validati
 | `.city` | City | `.default` |
 | `.state` | State/Province | `.default` |
 | `.zipCode` | Postal/ZIP code | `.default` |
-| `.routingNumber` | Bank routing number (US ACH, 9 digits) — **preview** | `.numberPad` |
-| `.accountNumber` | Bank account number (4–17 digits) — **preview** | `.numberPad` |
+| `.routingNumber` | Bank routing number (US/Canada ACH, 9 digits) | `.numberPad` |
+| `.accountNumber` | Bank account number (4–17 digits) | `.numberPad` |
+| `.bankName` | Optional issuing bank name (ACH) | `.default` |
 
 Both patterns are valid: use `.firstName` and `.lastName` for separate fields, or `.fullName` for a single combined name field.
 
-> **ACH preview:** `.routingNumber` and `.accountNumber` belong to the [ACH bank-account guide](ach-bank-account.md) and ship as a preview. Do not use them in production checkout flows yet.
+> **ACH bank-account fields:** Use `.routingNumber`, `.accountNumber`, and `.bankName` with [ACH bank-account payments](ach-bank-account.md). Routing and account values are stored in `SecureValueContainer`; copy/cut/paste are disabled on those field types (Android parity). Stable **1.4.0** does not include ACH in the production release set — see [CHANGELOG](../CHANGELOG.md) for the current boundary.
 
 > **Combined expiry field:** Instead of separate `.expirationMonth` and `.expirationYear` fields, you can use `.expirationDate` as a single combined MM/YY field. Use the `yearFormat` property (`.twoDigit` or `.fourDigit`) to control year display. This simplifies the form when a single expiration input is preferred.
 
@@ -1292,6 +1294,7 @@ Spreedly.shared().toggleMask()
 | `onFieldStateChange` | Safe **`HostedFieldState`** — brand, `numberLength`, `isPanMasked`, valid/empty/focus; **no raw PAN**. **`isPanMasked` is only meaningful when `state.fieldType == .cardNumber`** — always `true` for CVC. |
 | `onInputLength` | Digit count only (not PAN string). |
 | `onChange` | Opaque SDK-encoded string for PAN (not what appears on screen). **Do not log.** Use **`createCreditCard`** to tokenize. |
+| `requiredMessage` | Overrides the default required-field error string (e.g. `"Name is required"` on ACH name fields). When set on name fields, min/max length errors also use bank-account wording. |
 
 Card number and CVC display follow **`Spreedly.shared().setNumberFormat(_:)`** / **`toggleMask()`** automatically — no per-field mask or observe parameters.
 
@@ -1331,6 +1334,7 @@ pan.didMove(toParent: self)
 |----------|----------------|
 | `field` | Must be **`FormFieldType.cardNumber`** (or `.cvc` for coupled CVV mask). |
 | `enableAutofill` | Same as SwiftUI — credit-card autofill when `true`. |
+| `requiredMessage` | Same as SwiftUI — override required-field validation copy. |
 | `trailingIconViewFactory` | **PAN only** — `(String) -> UIView` with scheme raw value (`"visa"`, `"mastercard"`, …). |
 | `onFieldStateChange` | Swift closure — same snapshot as SwiftUI. |
 | `hostedFieldStateListener` | ObjC **`HostedFieldStateListener`** alternative to `onFieldStateChange`. |

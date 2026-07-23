@@ -123,7 +123,6 @@ struct GatewaySpecificThreeDSPaymentFlowView: View {
                         show3DSChallenge = false
                     }
                 )
-                .screenPrevention()
             }
         }
         .onAppear {

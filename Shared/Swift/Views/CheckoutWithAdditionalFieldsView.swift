@@ -325,7 +325,7 @@ struct CheckoutWithAdditionalFieldsView: View {
         }
         // Step 5: CardFormDropIn with otherFields — the key difference from CheckoutBasicView
         // otherFields: additionalFields adds address fields below the standard card form
-        // .screenPrevention() blocks screenshots/recording for PCI compliance
+        // CardFormDropIn applies screen prevention internally.
         .sheet(isPresented: $showForm) {
             CardFormDropIn(
                 otherFields: additionalFields,
@@ -336,7 +336,7 @@ struct CheckoutWithAdditionalFieldsView: View {
                         isLoading = true
                     }
                 }
-            ).screenPrevention()
+            )
         }
         // Step 6: onAppear — sync toggle states and subscribe to async payment results (same pattern as CheckoutBasicView)
         .onAppear {

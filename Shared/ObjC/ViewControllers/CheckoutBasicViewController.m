@@ -1141,10 +1141,8 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
 
     dropInVC.enableAutofill = self.enableAutofillSwitch.isOn;
     
-    // Wrap DropIn in secure protection for screen prevention
-    UIViewController *secureDropInVC = [dropInVC wrapInSecureViewControllerWithPlaceholderText:@""];
-    
-    [self presentViewController:secureDropInVC animated:YES completion:nil];
+    // CardFormDropInViewController applies screen prevention internally.
+    [self presentViewController:dropInVC animated:YES completion:nil];
 }
 
 - (NSString *)hostedFieldEventName:(HostedFieldEventType)eventType {
