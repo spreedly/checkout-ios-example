@@ -17,6 +17,7 @@ def spreedly_pods
     pod 'SpreedlyStripeAPM',   :path => LOCAL_PACKAGE
     pod 'SpreedlyStripeRadar', :path => LOCAL_PACKAGE
     pod 'SpreedlyBraintree',   :path => LOCAL_PACKAGE
+    pod 'SpreedlyClickToPay',  :path => LOCAL_PACKAGE
   else
     pod 'SpreedlyCore',        :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
     pod 'SpreedlySecurity',    :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
@@ -24,6 +25,7 @@ def spreedly_pods
     pod 'SpreedlyStripeAPM',   :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
     pod 'SpreedlyStripeRadar', :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
     pod 'SpreedlyBraintree',   :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
+    pod 'SpreedlyClickToPay',  :git => REMOTE_PACKAGE, :tag => PACKAGE_TAG
   end
 
   # 3DS Global (Forter) -- optional, from Forter's repo

@@ -11,7 +11,7 @@ packages:
     from: "1.6.0"
   stripe-ios-spm:
     url: https://github.com/stripe/stripe-ios-spm
-    from: "1.6.0"
+    from: "25.11.0"
   forter-ios:
     url: https://bitbucket.org/forter-mobile/forter-ios.git
     exactVersion: "2.1.0"
@@ -49,6 +49,8 @@ targets:
         product: SpreedlyStripeRadar
       - package: checkout-ios-package
         product: SpreedlyBraintree
+      - package: checkout-ios-package
+        product: SpreedlyClickToPay
       - package: stripe-ios-spm
         product: StripePayments
       - package: forter-ios
@@ -82,6 +84,8 @@ targets:
         product: SpreedlyStripeRadar
       - package: checkout-ios-package
         product: SpreedlyBraintree
+      - package: checkout-ios-package
+        product: SpreedlyClickToPay
       - package: stripe-ios-spm
         product: StripePayments
       - package: forter-ios
