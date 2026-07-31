@@ -209,6 +209,22 @@ struct MainNavigationView: View {
                                 .accessibilityHint("Navigate to Braintree PayPal and Venmo payment example")
                                 .accessibilityAddTraits(.isButton)
 
+                                NavigationLink(destination: ClickToPayMerchantCheckoutView()) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Click to Pay Checkout")
+                                            .font(headerFont)
+                                            .foregroundColor(textColor)
+                                        Text("Product checkout with Click to Pay — merchant reference flow")
+                                            .font(subheadingFont)
+                                            .foregroundColor(textColor)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .accessibilityIdentifier("navigation_click_to_pay_checkout_link")
+                                .accessibilityLabel("Click to Pay Checkout")
+                                .accessibilityHint("Navigate to merchant Click to Pay checkout example")
+                                .accessibilityAddTraits(.isButton)
+
                                 NavigationLink(destination: BankAccountCheckoutView()) {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("ACH Bank Account")
