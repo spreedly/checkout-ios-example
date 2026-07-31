@@ -17,6 +17,7 @@
 #import "EbanxPaymentFlowViewController.h"
 #import "StripeAPMPaymentFlowViewController.h"
 #import "BraintreePaymentFlowViewController.h"
+#import "ClickToPayPaymentFlowViewController.h"
 #import "BankAccountCheckoutViewController.h"
 #import "BankAccountCustomFormViewController.h"
 #import "ThemeHelper.h"
@@ -170,6 +171,12 @@
             @"subtitle": @"PayPal and Venmo payments via Braintree gateway",
             @"class": [BraintreePaymentFlowViewController class],
             @"accessibilityId": @"braintree-payment-flow-navigation-link"
+        },
+        @{
+            @"title": @"Click to Pay Checkout",
+            @"subtitle": @"Product checkout with Click to Pay — merchant reference flow",
+            @"class": [ClickToPayPaymentFlowViewController class],
+            @"accessibilityId": @"navigation_click_to_pay_checkout_link"
         },
         @{
             @"title": @"ACH Bank Account",

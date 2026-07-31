@@ -69,7 +69,7 @@ struct ExampleCredentials {
 
 ### Use one package version for all Spreedly modules
 
-Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyStripeRadar**, **SpreedlyBraintree**) are released together under **one** version. Use the **same** resolved version for every Spreedly product in your app — always pick the [latest release tag](https://github.com/spreedly/checkout-ios-package/releases) (the snippets below use **1.4.1** as an example).
+Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyStripeRadar**, **SpreedlyBraintree**, **SpreedlyClickToPay**) are released together under **one** version. Use the **same** resolved version for every Spreedly product in your app — always pick the [latest release tag](https://github.com/spreedly/checkout-ios-package/releases) (the snippets below use **1.6.0** as an example).
 
 ### Option 1: Swift Package Manager (Recommended)
 
@@ -85,6 +85,7 @@ SPM distribution is from a separate repository: `https://github.com/spreedly/che
    - **SpreedlyStripeAPM** (optional, for Stripe APM)
    - **SpreedlyStripeRadar** (optional, for Stripe Radar device data)
    - **SpreedlyBraintree** (optional, for Braintree PayPal/Venmo)
+   - **SpreedlyClickToPay** (optional, for Mastercard Click to Pay — **1.6.0+**)
    - **Forter3DS** (optional, for 3DS Global) — add separately from `https://bitbucket.org/forter-mobile/forter-ios.git`; not part of the Spreedly package
 
 **Add via Package.swift:**
@@ -92,7 +93,7 @@ SPM distribution is from a separate repository: `https://github.com/spreedly/che
 ```swift
 dependencies: [
     // Example minimum version — Xcode resolves to the latest compatible release, or pin an exact tag.
-    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.4.1"),
+    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.6.0"),
     // Optional: add when using 3DS Global (Forter) — separate repo:
     // .package(url: "https://bitbucket.org/forter-mobile/forter-ios.git", exact: "2.1.0")
 ],
@@ -106,6 +107,7 @@ targets: [
             // .product(name: "SpreedlyStripeAPM", package: "checkout-ios-package"),
             // .product(name: "SpreedlyStripeRadar", package: "checkout-ios-package"), // 1.5.0+
             // .product(name: "SpreedlyBraintree", package: "checkout-ios-package"),
+            // .product(name: "SpreedlyClickToPay", package: "checkout-ios-package"), // 1.6.0+
             // Optional: add when using 3DS Global (Forter):
             // .product(name: "Forter3DS", package: "forter-ios")
         ]
@@ -125,13 +127,14 @@ Add to your `Podfile`. Source is `https://github.com/spreedly/checkout-ios-packa
 target 'YourApp' do
   use_frameworks!
 
-  pod 'SpreedlyCore', '~> 1.4'
-  pod 'SpreedlySecurity', '~> 1.4'
-  pod 'SpreedlyUI', '~> 1.4'
+  pod 'SpreedlyCore', '~> 1.6'
+  pod 'SpreedlySecurity', '~> 1.6'
+  pod 'SpreedlyUI', '~> 1.6'
   # Add these only if needed:
-  # pod 'SpreedlyStripeAPM', '~> 1.4'
-  # pod 'SpreedlyStripeRadar', '~> 1.4'  # requires a package tag that ships SpreedlyStripeRadar
-  # pod 'SpreedlyBraintree', '~> 1.4'
+  # pod 'SpreedlyStripeAPM', '~> 1.6'
+  # pod 'SpreedlyStripeRadar', '~> 1.6'  # 1.5.0+
+  # pod 'SpreedlyBraintree', '~> 1.6'
+  # pod 'SpreedlyClickToPay', '~> 1.6'  # 1.6.0+
 end
 ```
 Then run `pod install`.
@@ -143,13 +146,14 @@ target 'YourApp' do
   use_frameworks!
 
   # Example tags — replace with a release from checkout-ios-package.
-  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
-  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
-  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
+  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
+  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
+  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
   # Add these only if needed:
-  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
-  # pod 'SpreedlyStripeRadar', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
-  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.4.1'
+  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
+  # pod 'SpreedlyStripeRadar', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
+  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
+  # pod 'SpreedlyClickToPay', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
 end
 ```
 
@@ -167,7 +171,7 @@ If you use **SpreedlyStripeAPM** with CocoaPods, you **must** add a `post_instal
 platform :ios, '14.0'
 
 PACKAGE_REPO = 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git'
-PACKAGE_TAG  = '1.4.1'  # example — use a checkout-ios-package release tag
+PACKAGE_TAG  = '1.6.0'  # example — use a checkout-ios-package release tag
 
 target 'YourApp' do
   use_frameworks!
@@ -185,6 +189,9 @@ target 'YourApp' do
 
   # Braintree (optional)
   # pod 'SpreedlyBraintree', :git => PACKAGE_REPO, :tag => PACKAGE_TAG
+
+  # Click to Pay (optional — 1.6.0+)
+  # pod 'SpreedlyClickToPay', :git => PACKAGE_REPO, :tag => PACKAGE_TAG
 
   # 3DS Global (optional — from Forter's repo, not Spreedly)
   # pod 'Forter3DS', :git => 'https://bitbucket.org/forter-mobile/forter-ios.git', :tag => '2.1.0'
@@ -273,10 +280,11 @@ Add these only when you need the corresponding features:
 | Feature | Package | URL | Version |
 |---------|---------|-----|---------|
 | 3DS Global | Forter3DS | `https://bitbucket.org/forter-mobile/forter-ios.git` | **Exact `2.1.0` only** (not “latest” / Up to Next Major) |
-| Stripe APM | SpreedlyStripeAPM | `https://github.com/spreedly/checkout-ios-package` | Same Spreedly SDK version as Core (e.g. 1.4.1+) |
+| Stripe APM | SpreedlyStripeAPM | `https://github.com/spreedly/checkout-ios-package` | Same Spreedly SDK version as Core (e.g. 1.6.0+) |
 | Stripe Radar | SpreedlyStripeRadar | `https://github.com/spreedly/checkout-ios-package` | Same Spreedly SDK version as Core (**1.5.0+**; not in **1.4.1**) |
 | Stripe on app target (Radar / own Stripe APIs) | StripePayments (via `stripe-ios-spm`) | `https://github.com/stripe/stripe-ios-spm.git` | **`from: "25.11.0"`** (25.x only — do **not** use Stripe **26.x**) |
-| Braintree (PayPal/Venmo) | SpreedlyBraintree | `https://github.com/spreedly/checkout-ios-package` | Same Spreedly SDK version as Core (e.g. 1.4.1+) |
+| Braintree (PayPal/Venmo) | SpreedlyBraintree | `https://github.com/spreedly/checkout-ios-package` | Same Spreedly SDK version as Core (e.g. 1.6.0+) |
+| Click to Pay (Mastercard SRC) | SpreedlyClickToPay | `https://github.com/spreedly/checkout-ios-package` | Same Spreedly SDK version as Core (**1.6.0+**) |
 
 **Forter3DS (3DS Global):** Required for Global 3DS. Add Forter3DS directly from Forter's Bitbucket repository. **Do not use** `pod 'SpreedlyForter3DS'` — use the Forter Bitbucket URL below. A dedicated `SpreedlyForter3DS` module is planned for a future release but is not yet available for standard CocoaPods usage.
 
@@ -293,6 +301,8 @@ Without Forter3DS linked (and embedded) for Global 3DS, challenge UI falls back 
 **StripePaymentSheet (Stripe APM):** Required for Stripe APM flows (iDEAL, Bancontact, EPS, P24, SEPA Debit). **SPM / CocoaPods:** adding `SpreedlyStripeAPM` from `checkout-ios-package` is enough for APM-only — Stripe is embedded; you do not add a separate Stripe package for APM alone. **CocoaPods** must include the Stripe bundle patcher `post_install` block above. See [Stripe APM](stripe-apm.md).
 
 **SpreedlyStripeRadar (Stripe Radar):** Optional headless module — returns a `radar_session_id` for Stripe Payment Intents fraud signals. **Availability:** Included from package **1.5.0+** (`SpreedlyStripeRadar` XCFramework). **1.4.1** does not include Radar. **App target:** also link **`StripePayments`** from [stripe-ios-spm](https://github.com/stripe/stripe-ios-spm) using **`from: "25.11.0"`** (stay on **25.x** — do not accept Xcode’s Stripe **26.x** “latest”). See [Stripe Radar — Stripe version](stripe-radar.md#stripe-version-required). Radar does not use Payment Sheet — `NSCameraUsageDescription` is not required for Radar-only integrations.
+
+**SpreedlyClickToPay (Click to Pay):** Optional Mastercard SRC checkout module. **Availability:** Included from package **1.6.0+**. Requires Core, Security, and UI at the same version. See [Click to Pay](click-to-pay.md).
 
 **SpreedlyBraintree (Braintree PayPal/Venmo):** Add `SpreedlyBraintree` from `checkout-ios-package` — no extra Braintree dependencies needed. Both SPM and CocoaPods resolve the required Braintree modules (Core, PayPal, Venmo, DataCollector) transitively. If Braintree is not linked, `SpreedlyBraintreeCheckout.present(config:)` publishes a failure gracefully (no crash).
 
@@ -1067,6 +1077,7 @@ Call this before presenting any payment form or initiating any payment operation
 | SpreedlyStripeAPM | Stripe APM (iDEAL, Bancontact, EPS, P24, SEPA) |
 | SpreedlyStripeRadar | Stripe Radar device data (`radar_session_id`; headless, no UI) |
 | SpreedlyBraintree | PayPal/Venmo via Braintree |
+| SpreedlyClickToPay | Mastercard SRC Click to Pay checkout (**1.6.0+**) |
 
 > **SpreedlyAnalytics** is an internal module used by SpreedlyCore for logging and Datadog integration. You do not need to import or interact with it directly.
 
@@ -1151,6 +1162,7 @@ Switch between environments by changing the `environmentKey` in `SpreedlyConfig`
 | **EBANX** | Pix, Boleto, OXXO, NuPay | `SpreedlyUI` (offsite) | Yes | Safari | Token |
 | **Offsite** | PayPal, Sprel | `SpreedlyUI` (offsite) | Yes | Safari | Token |
 | **ACH (Bank Account)** | US ABA + Canadian routing | `SpreedlyCore` + `SpreedlyUI` | Yes | `BankAccountFormDropIn` (drop-in) or custom | Token |
+| **Click to Pay** | Mastercard SRC wallet | `SpreedlyClickToPay` | Yes | Native sheet / button (**1.6.0+**) | Token |
 | **Gateway-Specific 3DS** | Card (e.g. Worldpay) | `SpreedlyCore` | N/A | Safari (challenge) | Transaction result |
 
 ### Backend Requirements Quick Reference
@@ -1181,6 +1193,7 @@ See each gateway's integration guide for full backend request examples and SDK c
 | PayPal / Venmo via native Braintree | [Braintree APM](braintree-apm.md) |
 | iDEAL, Bancontact, EPS, SEPA via Stripe | [Stripe APM](stripe-apm.md) |
 | Stripe Radar device data (optional fraud signal) | [Stripe Radar](stripe-radar.md) |
+| Mastercard Click to Pay (**1.6.0+**) | [Click to Pay](click-to-pay.md) |
 | Pix, Boleto, OXXO, NuPay via EBANX | [EBANX APM](ebanx-apm.md) |
 | CVV re-entry for saved cards | [Recaching](recaching.md) |
 | Objective-C integration | [Objective-C](objective-c.md) |
@@ -1205,9 +1218,13 @@ import Forter3DS
 #if canImport(SpreedlyStripeRadar)
 import SpreedlyStripeRadar
 #endif
+
+#if canImport(SpreedlyClickToPay)
+import SpreedlyClickToPay
+#endif
 ```
 
-This pattern is recommended for any optional dependency (SpreedlyBraintree, SpreedlyStripeAPM, SpreedlyStripeRadar, Forter3DS). The Spreedly example app links SpreedlyStripeRadar directly and imports it without `canImport` because the module is always present in the sample target.
+This pattern is recommended for any optional dependency (SpreedlyBraintree, SpreedlyStripeAPM, SpreedlyStripeRadar, SpreedlyClickToPay, Forter3DS). The Spreedly example app links SpreedlyStripeRadar directly and imports it without `canImport` because the module is always present in the sample target.
 
 ---
 
@@ -1266,6 +1283,7 @@ Use this before shipping to production users. Details live in the linked guides 
 | [express-checkout.md](express-checkout.md) | Pre-built CardFormDropIn payment form integration |
 | [custom-payment-forms.md](custom-payment-forms.md) | Building custom payment forms with SPLTextField |
 | [ach-bank-account.md](ach-bank-account.md) | ACH (US/Canada) bank-account tokenization |
+| [click-to-pay.md](click-to-pay.md) | Mastercard SRC Click to Pay (**1.6.0+**) |
 | [migration/from-legacy.md](migration/from-legacy.md) | iframe-ui to native hosted fields (state, mask, validation) |
 | [3ds-global.md](3ds-global.md) | 3DS Global (Forter) authentication flow |
 | [offsite-payments.md](offsite-payments.md) | Offsite payments (PayPal, Sprel) via Safari |

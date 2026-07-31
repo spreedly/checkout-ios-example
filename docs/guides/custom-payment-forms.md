@@ -976,9 +976,53 @@ If you omit the typed parameter (`nil`), you can still send the legacy boolean u
 
 When `eligibleForCardUpdater` is non-`nil` on `createCreditCard`, do not also set the same flag in `metadata` for that call.
 
+### Mandate passthrough
+
+Pass an optional **`mandate`** to attach mandate data to the payment method at tokenization. The SDK encodes it and forwards it to Spreedly at `payment_method.mandate` — a sibling of `credit_card`, not nested inside it — and omits the key entirely when the mandate is `nil` or empty. The SDK never interprets the contents.
+
+```swift
+let expiresAt = Date().addingTimeInterval(86_400)
+
+let mandate: SpreedlyMandate = [
+    "source": "acp",
+    "source_version": "1.0",
+    "raw_mandate": [
+        "reason": "one_time",
+        "max_amount": 5000,          // integer — see the note on numbers below
+        "currency": "usd",
+        "checkout_session_id": "cs_123",
+        "merchant_id": "mer_123",
+        "expires_at": expiresAt
+    ],
+    "valid_from": Date(),
+    "valid_until": expiresAt
+]
+
+let processingResult = Spreedly.shared().createCreditCard(
+    additionalFields: [:],
+    metadata: ["orderId": "12345"],
+    mandate: mandate
+)
+```
+
+`SpreedlyMandate` is `[String: Any]`, so a mandate can carry nested objects, arrays, numbers, and booleans — Spreedly owns the mandate schema and validates it server-side, which means schema changes do not require an SDK update.
+
+A few things to know:
+
+- **Native Swift values are encoded for you.** `Date` becomes an ISO-8601 string (identical to what the Web SDK sends), `URL` becomes its absolute string, `UUID` becomes its lowercase UUID string (Foundation's `UUID.uuidString` is uppercase; the wire form matches JS), and string- or number-backed enums become their raw value. Optionals are unwrapped, and a `nil` becomes JSON `null`. This mirrors `JSON.stringify` exactly.
+- **Numbers stay numbers.** Send `5000`, not `"5000"`. Spreedly currently accepts a bare digit string for `max_amount` and converts it, but that leniency is not part of the contract — it does not extend to `"5000.0"` or a locale-formatted `"5,000"`, and the SDK will not stringify numbers for you.
+- **Non-finite numbers become `null`.** `Double.nan` and `Double.infinity` encode to JSON `null`, matching `JSON.stringify(NaN) === "null"`.
+- **A value with no JSON representation fails tokenization.** `Data` and arbitrary class instances have no canonical encoding, so a mandate containing one throws an error naming the offending key path (e.g. `"mandate.raw_mandate.receipt"`) rather than being silently dropped or sending a partial mandate.
+- **Never put cardholder data in a mandate.** Its contents are never logged, never sent to telemetry, and never persisted on device, but it is not a place for PAN, CVV, or account numbers.
+- **The SDK does not validate mandate contents or size.** Spreedly enforces both.
+
+The same `mandate:` parameter is available on `createBankAccount(...)`, `createClickToPayPaymentMethod(...)`, `CreditCardRequest`, `BankAccountRequest`, and both drop-ins.
+
 ### Headless `CreditCardRequest` (advanced)
 
 If you build a **`CreditCardRequest`** (or **`BasePaymentMethodRequest`**) yourself instead of only using `createCreditCard`, pass **`eligibleForCardUpdater:`** on the initializer with the same semantics as the convenience API.
+
+Constructing one of these request types directly is now a throwing call (`try CreditCardRequest(...)` / `try BasePaymentMethodRequest(...)`), because a `mandate:` value with no JSON representation is caught at construction time and surfaces as a thrown error naming the offending key rather than a silently omitted key.
 
 ### AdditionalField Enum
 

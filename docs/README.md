@@ -79,6 +79,7 @@ Express snippets: [express-checkout.md](guides/express-checkout.md#code-sample--
 | [Express Checkout](guides/express-checkout.md) | Use the ready-made CardFormDropIn payment form |
 | [Custom Payment Forms](guides/custom-payment-forms.md) | Build your own payment form UI with SPLTextField |
 | [ACH Bank Account](guides/ach-bank-account.md) | Tokenize US ABA + Canadian routing numbers via BankAccountFormDropIn or headless (**1.5.0+**). |
+| [Click to Pay](guides/click-to-pay.md) | Mastercard SRC Click to Pay via `SpreedlyClickToPay` (**1.6.0+**) |
 | [Theme and Styling](guides/theme-and-styling.md) | Colors, typography, dark mode |
 | [Error Handling](guides/error-handling.md) | Error types, retry guidance, and user-friendly messages |
 | [Security](guides/security.md) | Screen prevention, PCI compliance |

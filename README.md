@@ -6,7 +6,7 @@ Demonstrates integrating the [Spreedly iOS SDK](https://github.com/spreedly/chec
 
 Each variant contains a **SwiftUI (Swift)** target and a **UIKit (Objective-C)** target, showing both language integration paths.
 
-**SDK Version:** 1.5.0
+**SDK Version:** 1.6.0
 
 ## Prerequisites
 
@@ -28,6 +28,7 @@ Each variant contains a **SwiftUI (Swift)** target and a **UIKit (Objective-C)**
   | **SpreedlyStripeAPM** | `SpreedlyStripeAPM` | SpreedlyStripeAPM framework |
   | **SpreedlyStripeRadar** | `SpreedlyStripeRadar` | SpreedlyStripeRadar framework |
   | **SpreedlyBraintree** | `SpreedlyBraintree` | SpreedlyBraintree framework |
+  | **SpreedlyClickToPay** | `SpreedlyClickToPay` | SpreedlyClickToPay framework |
 
 ## Credential Setup
 

@@ -11,14 +11,32 @@ concurrency:
 permissions:
   contents: read
 
+# Match checkout-ios-package XCFramework toolchain (built with Xcode 26.5 / Swift 6.3.2).
+# Default macos-15 Xcode 16.4 (Swift 6.1.2) cannot import SpreedlyClickToPay.
+env:
+  XCODE_VERSION: '26.5'
+
 jobs:
   build-spm:
     name: Build SPM Example
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: |
+          set -euo pipefail
+          XCODE_APP="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "::error::Xcode ${XCODE_VERSION} not found at ${XCODE_APP}"
+            ls /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "${XCODE_APP}/Contents/Developer"
+          xcodebuild -version
+          swift --version
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -40,11 +58,24 @@ jobs:
 
   build-cocoapods:
     name: Build CocoaPods Example
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: |
+          set -euo pipefail
+          XCODE_APP="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "::error::Xcode ${XCODE_VERSION} not found at ${XCODE_APP}"
+            ls /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "${XCODE_APP}/Contents/Developer"
+          xcodebuild -version
+          swift --version
 
       - name: Install XcodeGen
         run: brew install xcodegen

@@ -5,6 +5,14 @@ All notable changes to the Spreedly iOS SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-07-30
+
+### Added
+
+- **Click to Pay**: New optional `SpreedlyClickToPay` module for Mastercard SRC checkout via `SpreedlyClickToPayButton` (SwiftUI), `SpreedlyClickToPayButtonViewController` (UIKit/ObjC), headless `ClickToPayCheckoutController`, or `SpreedlyClickToPayCheckout.present(...)`. Configure with `ClickToPayCheckoutConfig` / `ClickToPayButtonConfig`; tokenize with `createClickToPayPaymentMethod(...)`. Includes OTP, Remember Me, returning-user/enrollment sheet behavior, and MM/YY new-card expiry. See [guides/click-to-pay.md](guides/click-to-pay.md).
+- **Click to Pay saved-cards detector**: Optional `ClickToPaySavedCardsDetector` runs a pre-checkout lookup so merchants can hide contact fields on recognized devices before presenting checkout.
+- **Mandate passthrough**: Optional `mandate` (`SpreedlyMandate`) on card, bank-account, and Click to Pay tokenization APIs and drop-ins. Opaque JSON-compatible payload encoded as `payment_method.mandate`; omitted when nil/empty. Never place cardholder data in a mandate.
+
 ## [1.5.0] - 2026-07-20
 
 ### Added

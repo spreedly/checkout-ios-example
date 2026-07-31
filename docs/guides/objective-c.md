@@ -17,17 +17,19 @@ Integrate the Spreedly iOS SDK into Objective-C projects using delegates and UIV
 9. [3DS Challenge](#3ds-challenge)
 10. [Gateway-Specific 3DS](#gateway-specific-3ds)
 11. [Additional Fields](#additional-fields)
-12. [Offsite Payments](#offsite-payments)
-13. [Stripe APM](#stripe-apm)
-14. [Stripe Radar](#stripe-radar)
-15. [EBANX](#ebanx)
-16. [Braintree](#braintree)
-18. [Theming](#theming)
-19. [URL Handling](#url-handling)
-20. [Cleanup and Teardown](#cleanup-and-teardown)
-21. [Submit Label Values](#submit-label-values)
-22. [Telemetry Events](#telemetry-events)
-23. [Related Documentation](#related-documentation)
+12. [Mandate Passthrough](#mandate-passthrough)
+13. [Click to Pay](#click-to-pay)
+14. [Offsite Payments](#offsite-payments)
+15. [Stripe APM](#stripe-apm)
+16. [Stripe Radar](#stripe-radar)
+17. [EBANX](#ebanx)
+18. [Braintree](#braintree)
+19. [Theming](#theming)
+20. [URL Handling](#url-handling)
+21. [Cleanup and Teardown](#cleanup-and-teardown)
+22. [Submit Label Values](#submit-label-values)
+23. [Telemetry Events](#telemetry-events)
+24. [Related Documentation](#related-documentation)
 
 ---
 
@@ -45,6 +47,8 @@ The Spreedly iOS SDK provides full Objective-C support through UIKit wrappers. A
 | BankAccountFormDropIn | BankAccountFormDropInViewController | ACH bank-account form |
 | SPLTextField | SPLTextFieldViewController | Individual field |
 | SpreedlyCVVRecachingView | CVVRecachingViewController | CVV recaching |
+| SpreedlyClickToPayButton | SpreedlyClickToPayButtonViewController | Click to Pay MC button (**1.6.0+**) |
+| SpreedlyClickToPayCheckout.present | ClickToPayCheckoutViewController presentWithConfig:from: | Click to Pay sheet |
 | DoChallengeIfNeeded | DoChallengeIfNeededViewController | 3DS challenge |
 
 ---
@@ -678,6 +682,105 @@ if (processingResult.isValidationFailed) {
 }
 ```
 
+## Mandate Passthrough
+
+To attach mandate data at tokenization, use the overload that takes a `mandate:` argument. It is encoded and sent at `payment_method.mandate` (a sibling of `credit_card`, not nested inside it) and omitted when `nil` or empty. Spreedly owns the mandate schema and validates it server-side; the SDK never interprets the contents.
+
+```objc
+NSDictionary *mandate = @{
+    @"source": @"acp",
+    @"source_version": @"1.0",
+    @"raw_mandate": @{
+        @"reason": @"one_time",
+        @"max_amount": @5000,        // NSNumber — must not be a string
+        @"currency": @"usd",
+        @"checkout_session_id": @"cs_123",
+        @"merchant_id": @"mer_123",
+        @"expires_at": @"2026-07-22T00:00:00Z"
+    },
+    @"valid_from": @"2026-07-21T00:00:00Z",
+    @"valid_until": @"2026-07-22T00:00:00Z"
+};
+
+PaymentProcessingResult *processingResult = [[Spreedly shared]
+    createCreditCardObjCWithAdditionalFields:additionalFields
+    metadata:metadata
+    eligibleForCardUpdater:nil
+    mandate:mandate];
+```
+
+The equivalent ACH and Click to Pay selectors are:
+
+```objc
+[[Spreedly shared] createBankAccountObjCWithAdditionalFields:additionalFields
+                                             bankAccountType:@"checking"
+                                       bankAccountHolderType:@"personal"
+                                                    bankName:nil
+                                                    metadata:metadata
+                                              allowBlankName:nil
+                                                shouldRetain:nil
+                                                     mandate:mandate];
+
+[[Spreedly shared] createClickToPayPaymentMethodWithMetadata:clickToPayMetadata
+                                             verificationValue:@"123"
+                                                 billingFields:billingFields
+                                                      metadata:metadata
+                                        eligibleForCardUpdater:nil
+                                                       mandate:mandate];
+```
+
+> **Note:** These are additive selectors — the existing `createCreditCardObjCWithAdditionalFields:metadata:` and `createBankAccountObjCWithAdditionalFields:...:shouldRetain:` selectors are unchanged and keep working.
+
+`NSDate`, `NSURL`, and `NSUUID` are encoded automatically (ISO-8601, absolute string, and lowercase UUID string respectively — `NSUUID.UUIDString` is uppercase, but the wire form is lowercased to match `JSON.stringify` on a JS UUID). Use `NSNumber` for numeric values and do **not** stringify amounts — send `@5000`, not `@"5000"`. Spreedly currently converts a bare digit string for `max_amount`, but that leniency is not part of the contract and does not cover decimal or locale-formatted strings. A non-finite `NSNumber` (`NaN`, infinity) encodes to JSON `null`, matching `JSON.stringify(NaN) === "null"`. A mandate containing a value with no JSON representation (`NSData`, an arbitrary object) fails tokenization with an error naming the offending key, delivered through `paymentDelegate` like any other failure, rather than being dropped. Never place cardholder data in a mandate.
+
+---
+
+## Click to Pay
+
+**Availability:** Package **1.6.0+** (`SpreedlyClickToPay`). Link the module and import `#import <SpreedlyClickToPay/SpreedlyClickToPay-Swift.h>`. Full config, events, and troubleshooting: [click-to-pay.md](click-to-pay.md).
+
+### Drop-in button
+
+```objc
+#import <SpreedlyClickToPay/SpreedlyClickToPay-Swift.h>
+
+ClickToPayInitConfig *initConfig = [[ClickToPayInitConfig alloc] initWithAmountCents:9900
+                                                           transactionCurrencyCode:@"USD"];
+ClickToPayCheckoutConfig *config = [[ClickToPayCheckoutConfig alloc] init];
+config.initConfig = initConfig;
+config.srcDpaId = @"your-sandbox-or-production-dpaid";
+config.customer = [[ClickToPayCustomer alloc] initWithEmail:@"shopper@example.com"
+                                              phoneNumber:nil
+                                              countryCode:nil
+                                         mainLookupMethod:ClickToPayMainLookupMethodEmail];
+config.dpaPresentationName = @"Your Store";
+
+SpreedlyClickToPayButtonViewController *buttonVC =
+    [[SpreedlyClickToPayButtonViewController alloc] initWithCheckoutConfig:config];
+[self addChildViewController:buttonVC];
+[stack addArrangedSubview:buttonVC.view];
+[buttonVC didMoveToParentViewController:self];
+```
+
+### Full-screen sheet
+
+Set `SpreedlyClickToPayCheckout.delegate` before present for `ClickToPayDelegate` callbacks (lookup, OTP, cards, errors, session). Then:
+
+```objc
+[ClickToPayCheckoutViewController presentWithConfig:config from:self];
+```
+
+### Headless / embedded
+
+```objc
+ClickToPayCheckoutViewController *checkoutVC =
+    [[ClickToPayCheckoutViewController alloc] initWithConfig:config];
+checkoutVC.clickToPayDelegate = self;
+// Embed checkoutVC.view in your hierarchy
+```
+
+Tokenize via Core when needed: `createClickToPayPaymentMethodWithMetadata:verificationValue:billingFields:metadata:eligibleForCardUpdater:mandate:` (see [Mandate Passthrough](#mandate-passthrough)).
+
 ---
 
 ## Offsite Payments
@@ -1097,6 +1200,7 @@ See [Structured Telemetry Events](getting-started.md#structured-telemetry-events
 - [offsite-payments.md](offsite-payments.md) - Offsite payments (PayPal, Sprel)
 - [stripe-apm.md](stripe-apm.md) - Stripe APM (iDEAL, Bancontact, EPS, P24, SEPA)
 - [stripe-radar.md](stripe-radar.md) - Stripe Radar device data / session ID
+- [click-to-pay.md](click-to-pay.md) - Mastercard Click to Pay (**1.6.0+**)
 - [braintree-apm.md](braintree-apm.md) - Braintree (PayPal/Venmo)
 - [ebanx-apm.md](ebanx-apm.md) - EBANX (Pix, Boleto, OXXO, NuPay)
 - [theme-and-styling.md](theme-and-styling.md) - Theming and customization
