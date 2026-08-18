@@ -11,7 +11,7 @@ packages:
     from: "1.6.1"
   stripe-ios-spm:
     url: https://github.com/stripe/stripe-ios-spm
-    from: "1.6.1"
+    from: "25.11.0"
   forter-ios:
     url: https://bitbucket.org/forter-mobile/forter-ios.git
     exactVersion: "2.1.0"
