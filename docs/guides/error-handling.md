@@ -65,7 +65,8 @@ Delivered asynchronously via `subscribeToPaymentResults` or the delegate, repres
 | `isCanceled` | Bool | User canceled the payment flow (e.g., dismissed the form, canceled a 3DS challenge, or backed out of an APM flow). Handle this as a non-error state — allow the user to retry. |
 | `isFailure` | Bool | Payment failed |
 | `token` | String? | Payment method token |
-| `paymentResponse` | PaymentMethodResponse? | Full response object |
+| `paymentResponse` | PaymentMethodResponse? | Full tokenize response (`transaction.paymentMethod` includes `lastFourDigits`, ACH/offsite fields, `binMetadata`) |
+| `paymentResponseDictionary` | NSDictionary? | ObjC nested dictionary (camelCase); nil when no payment response |
 | `shouldRetain` | Bool | Whether to save card (set by CardFormDropIn and by `createCreditCard(..., shouldRetain:)`) |
 | `failureDetails` | FailedDetails? | Error details when failed |
 | `state` | String? | Transaction state (for offsite/APM flows) |

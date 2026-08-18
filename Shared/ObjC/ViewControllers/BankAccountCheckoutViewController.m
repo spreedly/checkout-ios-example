@@ -806,7 +806,19 @@ static NSString *ACHFieldLabel(NSUInteger index) {
         }
         if (result.isSuccess) {
             NSString *masked = result.token ? [Spreedly maskedToken:result.token] : @"<no token>";
-            self.resultLabel.text = [NSString stringWithFormat:@"Bank account tokenized. Token: %@", masked];
+            NSMutableString *text = [NSMutableString stringWithFormat:@"Bank account tokenized. Token: %@", masked];
+            NSDictionary *pm = result.paymentResponseDictionary[@"transaction"][@"paymentMethod"];
+            if ([pm isKindOfClass:[NSDictionary class]]) {
+                NSString *lastFour = pm[@"lastFourDigits"];
+                if (lastFour.length > 0) {
+                    [text appendFormat:@"\nAccount ending in •••• %@", lastFour];
+                }
+                NSString *firstSix = pm[@"firstSixDigits"];
+                if (firstSix.length > 0) {
+                    [text appendFormat:@"\nCard starting in •••• %@", firstSix];
+                }
+            }
+            self.resultLabel.text = text;
             self.resultLabel.hidden = NO;
             self.errorLabel.hidden = YES;
         } else if (result.isFailure) {

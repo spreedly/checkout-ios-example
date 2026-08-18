@@ -297,6 +297,16 @@ struct CheckoutWithAdditionalFieldsView: View {
                                 .foregroundColor(theme.colors.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
+                        if let lastFour = result.paymentResponse?.transaction?.paymentMethod?.lastFourDigits {
+                            Text("Card ending in •••• \(lastFour)")
+                                .font(theme.typography.captionFont)
+                                .foregroundColor(theme.colors.textSecondary)
+                        }
+                        if let firstSixDigits = result.paymentResponse?.transaction?.paymentMethod?.firstSixDigits {
+                            Text("Card starting in •••• \(firstSixDigits)")
+                                .font(theme.typography.captionFont)
+                                .foregroundColor(theme.colors.textSecondary)
+                        }
                     }
                     .padding(theme.spacing.md)
                     .background(

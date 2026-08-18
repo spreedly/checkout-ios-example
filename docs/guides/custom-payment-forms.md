@@ -1013,8 +1013,8 @@ A few things to know:
 - **Numbers stay numbers.** Send `5000`, not `"5000"`. Spreedly currently accepts a bare digit string for `max_amount` and converts it, but that leniency is not part of the contract — it does not extend to `"5000.0"` or a locale-formatted `"5,000"`, and the SDK will not stringify numbers for you.
 - **Non-finite numbers become `null`.** `Double.nan` and `Double.infinity` encode to JSON `null`, matching `JSON.stringify(NaN) === "null"`.
 - **A value with no JSON representation fails tokenization.** `Data` and arbitrary class instances have no canonical encoding, so a mandate containing one throws an error naming the offending key path (e.g. `"mandate.raw_mandate.receipt"`) rather than being silently dropped or sending a partial mandate.
-- **Never put cardholder data in a mandate.** Its contents are never logged, never sent to telemetry, and never persisted on device, but it is not a place for PAN, CVV, or account numbers.
-- **The SDK does not validate mandate contents or size.** Spreedly enforces both.
+- **Never put cardholder data in a mandate.** Mandate *values* are never logged, never sent to telemetry, and never persisted on device. Validation *key paths* (for example `"mandate.raw_mandate.receipt"`) may appear in thrown errors and related failure reporting.
+- **The SDK does not validate mandate schema or size.** Spreedly enforces schema. The client applies a nesting-depth resource guard so adversarial nesting cannot terminate the host app during tokenization.
 
 The same `mandate:` parameter is available on `createBankAccount(...)`, `createClickToPayPaymentMethod(...)`, `CreditCardRequest`, `BankAccountRequest`, and both drop-ins.
 
@@ -1543,6 +1543,8 @@ let cancellable = Spreedly.shared().subscribeToPaymentResults { result in
     if result.isSuccess, let token = result.token {
         // PAN was read from secure storage, never from onChange.
         // Send token to your backend to create the purchase.
+        let lastFour = result.paymentResponse?.transaction?.paymentMethod?.lastFourDigits
+        // lastFour is from the tokenize API — not live SPLTextField input
     } else if result.isFailure {
         // Inspect result.failureDetails
     }

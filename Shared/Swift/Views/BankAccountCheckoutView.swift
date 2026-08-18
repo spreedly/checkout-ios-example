@@ -496,6 +496,16 @@ struct BankAccountCheckoutView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier(AccessibilityIdentifiers.BankAccountCheckout.transactionTokenText)
             }
+            if let lastFour = result.paymentResponse?.transaction?.paymentMethod?.lastFourDigits {
+                Text("Account ending in •••• \(lastFour)")
+                    .font(theme.typography.captionFont)
+                    .foregroundColor(theme.colors.textSecondary)
+            }
+            if let firstSixDigits = result.paymentResponse?.transaction?.paymentMethod?.firstSixDigits {
+                Text("Card starting in •••• \(firstSixDigits)")
+                    .font(theme.typography.captionFont)
+                    .foregroundColor(theme.colors.textSecondary)
+            }
         }
         .padding(theme.spacing.md)
         .background(

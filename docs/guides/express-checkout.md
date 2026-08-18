@@ -536,8 +536,21 @@ cancellable = Spreedly.shared().subscribeToPaymentResults { paymentResult in
 | `isSuccess` | `true` when payment succeeded |
 | `isFailure` | `true` when payment failed |
 | `token` | Payment method token on success |
+| `paymentResponse` | Full tokenize API envelope (`transaction` + optional `errors`) |
+| `paymentResponseDictionary` | ObjC-friendly nested dictionary (camelCase keys); `nil` when no `paymentResponse` |
 | `shouldRetain` | User's "save card" preference |
 | `failureDetails` | Failure details on failure; use `getDescription()` for error text |
+
+```swift
+cancellable = Spreedly.shared().subscribeToPaymentResults { result in
+    if result.isSuccess {
+        let lastFour = result.paymentResponse?.transaction?.paymentMethod?.lastFourDigits
+        // lastFour is from the tokenize API (e.g. "4242"), not live SPLTextField input
+    }
+}
+```
+
+> **Note:** Live `SPLTextField` / `HostedFieldState` still does **not** expose last four digits (PCI). Use the tokenize response above. `number` / `verificationValue` on the payment method are API-**masked** display values, not raw PAN/CVV.
 
 ---
 

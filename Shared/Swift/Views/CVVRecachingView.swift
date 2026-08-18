@@ -86,9 +86,9 @@ struct CVVRecachingView: View {
                                 title: "CVV Recached Successfully!",
                                 message: "Your payment method has been updated.",
                                 additionalContent: {
-                                    if let token = result.token {
-                                        return AnyView(
-                                            VStack(alignment: .leading, spacing: 4) {
+                                    return AnyView(
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            if let token = result.token {
                                                 Text("Updated Token: \(Spreedly.maskedToken(token))")
                                                     .font(theme.typography.captionFont)
                                                     .foregroundColor(theme.colors.textSecondary)
@@ -96,17 +96,25 @@ struct CVVRecachingView: View {
                                                     .accessibilityIdentifier(AccessibilityIdentifiers.CVVRecaching.updatedTokenText)
                                                     .accessibilityLabel(AccessibilityLabels.CVVRecaching.updatedTokenText)
                                                     .accessibilityHint(AccessibilityHints.CVVRecaching.updatedTokenText)
-                                                if let updatedAt = result.paymentMethodUpdatedAt {
-                                                    Text("Updated At: \(updatedAt)")
-                                                        .font(theme.typography.captionFont)
-                                                        .foregroundColor(theme.colors.textSecondary)
-                                                        .fixedSize(horizontal: false, vertical: true)
-                                                }
                                             }
-                                        )
-                                    } else {
-                                        return AnyView(EmptyView())
-                                    }
+                                            if let updatedAt = result.paymentMethodUpdatedAt {
+                                                Text("Updated At: \(updatedAt)")
+                                                    .font(theme.typography.captionFont)
+                                                    .foregroundColor(theme.colors.textSecondary)
+                                                    .fixedSize(horizontal: false, vertical: true)
+                                            }
+                                            if let lastFour = result.paymentResponse?.transaction?.paymentMethod?.lastFourDigits {
+                                                Text("Card ending in •••• \(lastFour)")
+                                                    .font(theme.typography.captionFont)
+                                                    .foregroundColor(theme.colors.textSecondary)
+                                            }
+                                            if let firstSixDigits = result.paymentResponse?.transaction?.paymentMethod?.firstSixDigits {
+                                                Text("Card starting in •••• \(firstSixDigits)")
+                                                    .font(theme.typography.captionFont)
+                                                    .foregroundColor(theme.colors.textSecondary)
+                                            }
+                                        }
+                                    )
                                 },
                                 iconAccessibilityIdentifier: AccessibilityIdentifiers.CVVRecaching.successIcon,
                                 iconAccessibilityLabel: AccessibilityLabels.CVVRecaching.successIcon,

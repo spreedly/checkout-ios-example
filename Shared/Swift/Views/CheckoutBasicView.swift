@@ -554,6 +554,16 @@ struct CheckoutBasicView: View {
                     .accessibilityLabel(AccessibilityLabels.BasicCheckout.transactionTokenText)
                     .accessibilityHint(AccessibilityHints.BasicCheckout.transactionTokenText)
             }
+            if let lastFour = result.paymentResponse?.transaction?.paymentMethod?.lastFourDigits {
+                Text("Card ending in •••• \(lastFour)")
+                    .font(theme.typography.captionFont)
+                    .foregroundColor(theme.colors.textSecondary)
+            }
+            if let firstSixDigits = result.paymentResponse?.transaction?.paymentMethod?.firstSixDigits {
+                Text("Card starting in •••• \(firstSixDigits)")
+                    .font(theme.typography.captionFont)
+                    .foregroundColor(theme.colors.textSecondary)
+            }
         }
         .padding(theme.spacing.md)
         .background(

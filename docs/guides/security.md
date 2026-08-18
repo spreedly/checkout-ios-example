@@ -414,6 +414,7 @@ Payment method tokens returned by Spreedly are non-sensitive and can be stored f
 The SDK helps you reduce PCI DSS scope:
 
 - **Sensitive data handling**: Card number and CVV are collected and processed within `SecureValueContainer`; no card data passes through your application code
+- **Tokenize response fields**: After tokenization, `PaymentMethod.number` and `verificationValue` (when present) are **masked** API display values (e.g. `XXXX-…-4444`, `XXX`) — not raw PAN/CVV. Prefer `lastFourDigits` / `firstSixDigits` for UI. Do not log or treat masked `number` as a full PAN.
 - **No card data in merchant app**: Sensitive cardholder data is encrypted and transmitted directly to Spreedly
 - **HTTPS/TLS**: All network communication uses HTTPS/TLS
 - **Screen prevention**: Protects against screenshot and screen recording capture of payment forms
