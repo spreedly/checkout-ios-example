@@ -1302,6 +1302,42 @@
         ]];
         lastView = transactionLabel;
     }
+
+    NSDictionary *pm = self.paymentResult.paymentResponseDictionary[@"transaction"][@"paymentMethod"];
+    if ([pm isKindOfClass:[NSDictionary class]]) {
+        NSString *lastFour = pm[@"lastFourDigits"];
+        if (lastFour.length > 0) {
+            UILabel *lastFourLabel = [[UILabel alloc] init];
+            lastFourLabel.text = [NSString stringWithFormat:@"Card ending in •••• %@", lastFour];
+            lastFourLabel.font = [ThemeHelper captionFont];
+            lastFourLabel.textColor = [ThemeHelper textSecondaryColor];
+            lastFourLabel.numberOfLines = 0;
+            lastFourLabel.translatesAutoresizingMaskIntoConstraints = NO;
+            [self.resultContainer addSubview:lastFourLabel];
+            [constraints addObjectsFromArray:@[
+                [lastFourLabel.topAnchor constraintEqualToAnchor:lastView.bottomAnchor constant:[ThemeHelper spacingSM]],
+                [lastFourLabel.leadingAnchor constraintEqualToAnchor:self.resultContainer.leadingAnchor constant:[ThemeHelper spacingMD]],
+                [lastFourLabel.trailingAnchor constraintEqualToAnchor:self.resultContainer.trailingAnchor constant:-[ThemeHelper spacingMD]]
+            ]];
+            lastView = lastFourLabel;
+        }
+        NSString *firstSix = pm[@"firstSixDigits"];
+        if (firstSix.length > 0) {
+            UILabel *firstSixLabel = [[UILabel alloc] init];
+            firstSixLabel.text = [NSString stringWithFormat:@"Card starting in •••• %@", firstSix];
+            firstSixLabel.font = [ThemeHelper captionFont];
+            firstSixLabel.textColor = [ThemeHelper textSecondaryColor];
+            firstSixLabel.numberOfLines = 0;
+            firstSixLabel.translatesAutoresizingMaskIntoConstraints = NO;
+            [self.resultContainer addSubview:firstSixLabel];
+            [constraints addObjectsFromArray:@[
+                [firstSixLabel.topAnchor constraintEqualToAnchor:lastView.bottomAnchor constant:[ThemeHelper spacingSM]],
+                [firstSixLabel.leadingAnchor constraintEqualToAnchor:self.resultContainer.leadingAnchor constant:[ThemeHelper spacingMD]],
+                [firstSixLabel.trailingAnchor constraintEqualToAnchor:self.resultContainer.trailingAnchor constant:-[ThemeHelper spacingMD]]
+            ]];
+            lastView = firstSixLabel;
+        }
+    }
     
     [constraints addObject:[lastView.bottomAnchor constraintEqualToAnchor:self.resultContainer.bottomAnchor constant:-[ThemeHelper spacingMD]]];
     

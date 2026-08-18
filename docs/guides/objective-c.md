@@ -113,6 +113,8 @@ Adopt the `SpreedlyPaymentDelegate` protocol to receive payment results:
 - (void)paymentDidComplete:(PaymentResult *)result {
     if (result.isSuccess) {
         NSString *token = result.token;
+        NSDictionary *pm = result.paymentResponseDictionary[@"transaction"][@"paymentMethod"];
+        NSString *lastFour = [pm isKindOfClass:[NSDictionary class]] ? pm[@"lastFourDigits"] : nil;
         if (result.shouldRetain) {
             // Merchant can save payment method token for future use
         } else {

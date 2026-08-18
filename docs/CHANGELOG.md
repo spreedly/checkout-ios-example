@@ -5,6 +5,18 @@ All notable changes to the Spreedly iOS SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-08-12
+
+### Added
+
+- **Payment method details on `PaymentResult`**: After successful card, bank-account, or offsite tokenize, and after successful CVV recache, merchants can read the API `payment_method` via `result.paymentResponse?.transaction?.paymentMethod` (Swift) — including `lastFourDigits`, `firstSixDigits`, card/ACH/offsite fields, and typed `binMetadata`. Objective-C: `paymentResponseDictionary` on `PaymentResult` (same nested camelCase shape).
+
+### Security
+
+- **Click to Pay host-page injection hardening**: `srcDpaId` and `locale` are validated before host load and safely encoded when substituted into the Click to Pay WebView host page; Mastercard `lib.js` query parameters are percent-encoded.
+- **Click to Pay WebView hardening**: Release builds no longer mark Click to Pay WebViews as inspectable; native bridge handlers accept main-frame messages only; inbound bridge payloads reject additional cardholder-data key aliases; sandbox Mastercard hosts are allowed only when `isSandbox` is true.
+- **Mandate nesting resource guard**: Mandates that nest beyond the client resource depth are rejected at request construction instead of risking a host-app crash during tokenization.
+
 ## [1.6.0] - 2026-07-30
 
 ### Added
@@ -12,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Click to Pay**: New optional `SpreedlyClickToPay` module for Mastercard SRC checkout via `SpreedlyClickToPayButton` (SwiftUI), `SpreedlyClickToPayButtonViewController` (UIKit/ObjC), headless `ClickToPayCheckoutController`, or `SpreedlyClickToPayCheckout.present(...)`. Configure with `ClickToPayCheckoutConfig` / `ClickToPayButtonConfig`; tokenize with `createClickToPayPaymentMethod(...)`. Includes OTP, Remember Me, returning-user/enrollment sheet behavior, and MM/YY new-card expiry. See [guides/click-to-pay.md](guides/click-to-pay.md).
 - **Click to Pay saved-cards detector**: Optional `ClickToPaySavedCardsDetector` runs a pre-checkout lookup so merchants can hide contact fields on recognized devices before presenting checkout.
 - **Mandate passthrough**: Optional `mandate` (`SpreedlyMandate`) on card, bank-account, and Click to Pay tokenization APIs and drop-ins. Opaque JSON-compatible payload encoded as `payment_method.mandate`; omitted when nil/empty. Never place cardholder data in a mandate.
+
+### Changed
+
+- **Breaking: throwing payment-method request initializers** — `BasePaymentMethodRequest`, `CreditCardRequest`, `BankAccountRequest`, and `ClickToPayPaymentMethodRequest` initializers are now `throws` so an unencodable `mandate` fails at construction with a key-path error instead of being silently omitted. Call sites that construct these types directly must use `try` (or migrate to the `create*` helpers, which already surface the failure via `PaymentResult`).
 
 ## [1.5.0] - 2026-07-20
 

@@ -712,6 +712,28 @@
         transactionLabel.accessibilityHint = @"Transaction token for the successful payment";
         [vStack addArrangedSubview:transactionLabel];
     }
+
+    NSDictionary *pm = self.paymentResult.paymentResponseDictionary[@"transaction"][@"paymentMethod"];
+    if ([pm isKindOfClass:[NSDictionary class]]) {
+        NSString *lastFour = pm[@"lastFourDigits"];
+        if (lastFour.length > 0) {
+            UILabel *lastFourLabel = [[UILabel alloc] init];
+            lastFourLabel.text = [NSString stringWithFormat:@"Card ending in •••• %@", lastFour];
+            lastFourLabel.font = [ThemeHelper captionFont];
+            lastFourLabel.textColor = [ThemeHelper textSecondaryColor];
+            lastFourLabel.numberOfLines = 0;
+            [vStack addArrangedSubview:lastFourLabel];
+        }
+        NSString *firstSix = pm[@"firstSixDigits"];
+        if (firstSix.length > 0) {
+            UILabel *firstSixLabel = [[UILabel alloc] init];
+            firstSixLabel.text = [NSString stringWithFormat:@"Card starting in •••• %@", firstSix];
+            firstSixLabel.font = [ThemeHelper captionFont];
+            firstSixLabel.textColor = [ThemeHelper textSecondaryColor];
+            firstSixLabel.numberOfLines = 0;
+            [vStack addArrangedSubview:firstSixLabel];
+        }
+    }
     
     [NSLayoutConstraint activateConstraints:@[
         [vStack.topAnchor constraintEqualToAnchor:self.resultContainer.topAnchor constant:[ThemeHelper spacingMD]],

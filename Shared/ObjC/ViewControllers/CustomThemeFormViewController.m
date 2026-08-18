@@ -854,6 +854,42 @@
         ]];
         lastView = transactionLabel;
     }
+
+    NSDictionary *pm = self.paymentResult.paymentResponseDictionary[@"transaction"][@"paymentMethod"];
+    if ([pm isKindOfClass:[NSDictionary class]]) {
+        NSString *lastFour = pm[@"lastFourDigits"];
+        if (lastFour.length > 0) {
+            UILabel *lastFourLabel = [[UILabel alloc] init];
+            lastFourLabel.text = [NSString stringWithFormat:@"Card ending in •••• %@", lastFour];
+            lastFourLabel.font = [self customThemeCaptionFont];
+            lastFourLabel.textColor = [self customThemeTextSecondaryColor];
+            lastFourLabel.numberOfLines = 0;
+            lastFourLabel.translatesAutoresizingMaskIntoConstraints = NO;
+            [self.resultContainer addSubview:lastFourLabel];
+            [constraints addObjectsFromArray:@[
+                [lastFourLabel.topAnchor constraintEqualToAnchor:lastView.bottomAnchor constant:12],
+                [lastFourLabel.leadingAnchor constraintEqualToAnchor:self.resultContainer.leadingAnchor constant:20],
+                [lastFourLabel.trailingAnchor constraintEqualToAnchor:self.resultContainer.trailingAnchor constant:-20]
+            ]];
+            lastView = lastFourLabel;
+        }
+        NSString *firstSix = pm[@"firstSixDigits"];
+        if (firstSix.length > 0) {
+            UILabel *firstSixLabel = [[UILabel alloc] init];
+            firstSixLabel.text = [NSString stringWithFormat:@"Card starting in •••• %@", firstSix];
+            firstSixLabel.font = [self customThemeCaptionFont];
+            firstSixLabel.textColor = [self customThemeTextSecondaryColor];
+            firstSixLabel.numberOfLines = 0;
+            firstSixLabel.translatesAutoresizingMaskIntoConstraints = NO;
+            [self.resultContainer addSubview:firstSixLabel];
+            [constraints addObjectsFromArray:@[
+                [firstSixLabel.topAnchor constraintEqualToAnchor:lastView.bottomAnchor constant:12],
+                [firstSixLabel.leadingAnchor constraintEqualToAnchor:self.resultContainer.leadingAnchor constant:20],
+                [firstSixLabel.trailingAnchor constraintEqualToAnchor:self.resultContainer.trailingAnchor constant:-20]
+            ]];
+            lastView = firstSixLabel;
+        }
+    }
     
     [constraints addObject:[lastView.bottomAnchor constraintEqualToAnchor:self.resultContainer.bottomAnchor constant:-20]];
     
