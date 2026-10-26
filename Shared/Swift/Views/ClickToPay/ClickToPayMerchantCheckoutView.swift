@@ -7,7 +7,6 @@ import SwiftUI
 import SpreedlyCore
 import SpreedlyUI
 import SpreedlyClickToPay
-import SpreedlySecurity
 
 /// Merchant-reference checkout — product + shopper email; card entry stays in the Click to Pay sheet.
 struct ClickToPayMerchantCheckoutView: View {

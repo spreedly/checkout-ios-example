@@ -2,6 +2,13 @@
 
 How to test your Spreedly iOS SDK integration before going to production.
 
+| | |
+|---|---|
+| **Audience** | Merchant engineers and QA validating an integration |
+| **Use this when** | Exercising a flow in sandbox, or working the go-live checklist |
+| **Use something else when** | A test is failing for an unknown reason → [Troubleshooting](troubleshooting.md) |
+| **Requires** | Sandbox credentials — a test environment key, and sandbox gateways for the flows you use |
+
 ## Table of Contents
 
 - [Test Environment Setup](#test-environment-setup)
@@ -107,10 +114,10 @@ Your purchase request must include `attempt_3dsecure: true` for 3DS to trigger.
 ```swift
 let config = SpreedlyConfig(
     environmentKey: "your-test-environment-key",
+    certificateToken: certificateToken,
     nonce: nonce,
     signature: signature,
-    timestamp: timestamp,
-    certificateToken: certificateToken
+    timestamp: timestamp
 )
 Spreedly.setup(config: config)
 
@@ -297,30 +304,15 @@ Before switching to production:
 
 When `blockJailbrokenDevices` is enabled, verify the SDK behaves correctly on compromised devices.
 
-### Using the DEBUG Override
+### How to reach a blocked state
 
-The SDK provides `SecurityManager.shared.setOverrideAssessment(_:)` in DEBUG builds. This forces a specific assessment result on the Simulator (where real checks always return `.clean`):
+Run your app on a **physical jailbroken test device** with `blockJailbrokenDevices` enabled. The
+Simulator always assesses as clean, and the SDK's internal override hook is compiled out of the
+released XCFrameworks, so it cannot be called from a merchant app.
 
-```swift
-#if DEBUG
-// Force a "compromised" state for testing
-let compromised = SecurityAssessment(level: .compromised, signals: [])
-SecurityManager.shared.setOverrideAssessment(compromised)
-
-// Now initialize with blocking enabled
-Spreedly.blockJailbrokenDevices = true
-Spreedly.initializeSDK()
-
-// Verify: isDeviceTrusted should be false
-assert(!Spreedly.isDeviceTrusted)
-assert(Spreedly.initializationError != nil)
-
-// Restore normal behavior
-SecurityManager.shared.setOverrideAssessment(nil)
-#endif
-```
-
-> The DEBUG override is only available in debug builds (release builds always use real device assessment). Pass an empty `signals` array when you only need to trigger the blocked state for UI testing; the SDK does not require specific signal names from your test code.
+To exercise your own handling code without a jailbroken device, publish a `PaymentResult.failure`
+from a test double on the channel you subscribe to and assert your UI reacts. That covers the part
+you own; the table below is what the SDK guarantees on a genuinely blocked device.
 
 ### What to Verify
 

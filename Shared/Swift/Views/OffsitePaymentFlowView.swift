@@ -142,7 +142,12 @@ struct OffsitePaymentFlowView: View {
         .onAppear {
             setupSubscriptions()
         }
-        .onDisappear(perform: cleanupSubscriptions)
+        .onDisappear {
+            // Safari presentation fires onDisappear. Cancelling here drops the
+            // checkout PaymentResult and leaves the button on "Waiting for checkout...".
+            guard !isLoading, stage == .idle else { return }
+            cleanupSubscriptions()
+        }
     }
     
     private var headerSection: some View {
@@ -274,7 +279,7 @@ struct OffsitePaymentFlowView: View {
     
     // Step 0: Subscribe to payment results (fires for both tokenization AND checkout)
     private func setupSubscriptions() {
-        paymentResultCancellable?.cancel()
+        guard paymentResultCancellable == nil else { return }
         paymentResultCancellable = Spreedly.shared().subscribeToPaymentResults { result in
             handlePaymentResult(result)
         }

@@ -9,6 +9,7 @@
 #import "CheckoutBasicViewController.h"
 #import "CheckoutWithAdditionalFieldsViewController.h"
 #import "CustomFormViewController.h"
+#import "CustomMerchantTextFieldsDemoViewController.h"
 #import "CustomThemeFormViewController.h"
 #import "CVVRecachingDemoViewController.h"
 #import "GlobalThreeDSPaymentFlowViewController.h"
@@ -122,6 +123,12 @@
             @"subtitle": @"Custom form built at application level using headless UI components",
             @"class": [CustomFormViewController class],
             @"accessibilityId": @"customFormLink"
+        },
+        @{
+            @"title": @"Custom Merchant TextFields",
+            @"subtitle": @"Your own UITextFields for catalogue data + SPLTextField for card / expiry / CVC",
+            @"class": [CustomMerchantTextFieldsDemoViewController class],
+            @"accessibilityId": @"customMerchantTextFieldsLink"
         },
         @{
             @"title": @"Custom Theme Form",

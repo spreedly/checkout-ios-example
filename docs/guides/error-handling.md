@@ -2,7 +2,12 @@
 
 Handle payment errors, validation failures, and network issues properly.
 
-**Estimated time:** ~10 minutes
+| | |
+|---|---|
+| **Audience** | Merchant engineers writing error paths |
+| **Use this when** | Deciding what to catch, what to show the shopper, and what to retry |
+| **Use something else when** | You have a specific symptom and want the fix → [Troubleshooting](troubleshooting.md) |
+| **Requires** | Any SDK version |
 
 ## Table of Contents
 
@@ -386,7 +391,7 @@ If the challenge times out, the result will typically be a failure with a networ
 
 **Solution:** Call `Spreedly.setup(config:)` with valid credentials before any payment operation. Ensure setup runs at app launch or before presenting payment UI.
 
-**Readiness check:** `Spreedly.isInitialized` is `true` when the SDK instance exists. It is **not** proof that signed credentials are loaded — call `setup(config:)` before checkout. It stays `false` when init was blocked — use `Spreedly.initializationError` and `Spreedly.isDeviceTrusted`. See [SDK lifecycle](getting-started.md#isinitialized--when-to-use-it). **Leave checkout / reset:** [SDK lifecycle](getting-started.md#sdk-lifecycle).
+**Readiness check:** `Spreedly.isInitialized` is `true` only after `setup(config:)` with a complete signed bundle — `environmentKey`, `certificateToken`, `nonce`, `signature`, `timestamp` all present. It is **`false`** after `initializeSDK()` alone. It confirms those credentials are **loaded**, not that the server **accepted** them, so a 401 is still possible on the next call. It also stays `false` when init was blocked — use `Spreedly.initializationError` and `Spreedly.isDeviceTrusted` to tell the two apart. See [SDK lifecycle](getting-started.md#isinitialized--when-to-use-it). **Leave checkout / reset:** [SDK lifecycle](getting-started.md#sdk-lifecycle).
 
 ### Missing Configuration (`setup` Not Called)
 

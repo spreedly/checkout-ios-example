@@ -17,19 +17,20 @@ Integrate the Spreedly iOS SDK into Objective-C projects using delegates and UIV
 9. [3DS Challenge](#3ds-challenge)
 10. [Gateway-Specific 3DS](#gateway-specific-3ds)
 11. [Additional Fields](#additional-fields)
-12. [Mandate Passthrough](#mandate-passthrough)
-13. [Click to Pay](#click-to-pay)
-14. [Offsite Payments](#offsite-payments)
-15. [Stripe APM](#stripe-apm)
-16. [Stripe Radar](#stripe-radar)
-17. [EBANX](#ebanx)
-18. [Braintree](#braintree)
-19. [Theming](#theming)
-20. [URL Handling](#url-handling)
-21. [Cleanup and Teardown](#cleanup-and-teardown)
-22. [Submit Label Values](#submit-label-values)
-23. [Telemetry Events](#telemetry-events)
-24. [Related Documentation](#related-documentation)
+12. [Custom field validators](#custom-field-validators)
+13. [Mandate Passthrough](#mandate-passthrough)
+14. [Click to Pay](#click-to-pay)
+15. [Offsite Payments](#offsite-payments)
+16. [Stripe APM](#stripe-apm)
+17. [Stripe Radar](#stripe-radar)
+18. [EBANX](#ebanx)
+19. [Braintree](#braintree)
+20. [Theming](#theming)
+21. [URL Handling](#url-handling)
+22. [Cleanup and Teardown](#cleanup-and-teardown)
+23. [Submit Label Values](#submit-label-values)
+24. [Telemetry Events](#telemetry-events)
+25. [Related Documentation](#related-documentation)
 
 ---
 
@@ -370,7 +371,7 @@ SPLTextFieldViewController *cvcField = [[SPLTextFieldViewController alloc]
 
 - **onValidationChange:** Block called when validation state changes.
 - **onSubmit:** Called when user taps the keyboard submit button; use for keyboard navigation.
-- **submitLabel:** `SpreedlySubmitLabelNext` for "Next" (form navigation) or `SpreedlySubmitLabelDone` for final field.
+- **submitLabel:** `SpreedlySubmitLabelNext` for "Next" (form navigation) or `SpreedlySubmitLabelDone` for final field. Pass it in the initializer. To change it later from Objective-C, call `[field updateSubmitLabel:SpreedlySubmitLabelNext]` (the Swift `submitLabel` property is not visible to Objective-C because it is optional).
 - **onFocus:** Called when the field gains focus.
 - **requiredMessage:** Optional `NSString` that overrides the default required-field validation error. Set on ACH name fields (e.g. `@"Name is required"`) so errors match [ach-bank-account.md](ach-bank-account.md) instead of card copy.
 
@@ -651,9 +652,25 @@ See [3ds-gateway-specific.md](3ds-gateway-specific.md) for the full flow and set
 
 ## Additional Fields
 
-Use `createCreditCardObjCWithAdditionalFields:metadata:` to create a credit card token with additional fields:
+Pass billing/shipping data at tokenize time with `createCreditCardObjCWithAdditionalFields:metadata:`. Use **dict keys** (same as Swift `AdditionalField.rawValue`), not the Swift case names.
 
-> **Note:** `createCreditCardObjC(additionalFields:metadata:)` does **not** have a `shouldRetain` parameter, unlike the Swift `createCreditCard` method.
+> **Note:** This selector does **not** take `shouldRetain` (unlike Swift `createCreditCard`). Use a separate retain API on your backend when needed.
+
+### Which keys to use
+
+| Goal | Example dict keys |
+|------|-------------------|
+| Separate name | `firstName`, `lastName` |
+| Full name | `full_name` |
+| Classic address | `address1`, `address2`, `city`, `state`, `zip`, `country` |
+| Street-split address | `house_number_or_name`, `street`, `street_line2` (+ city/state/zip/country) |
+| Contact | `email`, `company`, `phone_number` |
+| Split phone | `phone_number_country_code`, `phone_number_area_code` |
+| Shipping | `shipping_address1`, `shipping_house_number_or_name`, `shipping_zip`, … |
+
+Full catalogue (Swift enum ↔ dict key): [custom-payment-forms.md — AdditionalField catalog](custom-payment-forms.md#additionalfield-catalog-what-to-pass-in-additionalfields).
+
+### Classic billing example
 
 ```objc
 NSDictionary *additionalFields = @{
@@ -683,6 +700,119 @@ if (processingResult.isValidationFailed) {
     }
 }
 ```
+
+### Street-split example
+
+```objc
+NSDictionary *additionalFields = @{
+    @"firstName": @"John",
+    @"lastName": @"Doe",
+    @"house_number_or_name": @"12A",
+    @"street": @"Main Street",
+    @"street_line2": @"Suite 4",
+    @"city": @"Anytown",
+    @"zip": @"12345",
+    @"country": @"US",
+    @"phone_number_country_code": @"1",
+    @"phone_number_area_code": @"415"
+};
+```
+
+**Hosted UI vs dict:** If the shopper typed into a mounted Spreedly field, that value wins over the same key in `additionalFields`. Prefer one source — mount the field **or** pass the key. Merge rules: [custom-payment-forms.md](custom-payment-forms.md#what-gets-tokenized-merge-rules).
+
+**Your own `UITextField`s for billing:** Keep card/expiry/CVC on `SPLTextFieldViewController`, build the wire-key dictionary from your text fields, then call `createCreditCardObjC…`. Sample: **Custom Merchant TextFields** (`CustomMerchantTextFieldsDemoViewController`). Full guide: [Merchant-owned TextFields + hosted card](custom-payment-forms.md#merchant-owned-textfields--hosted-card).
+
+## Custom field validators
+
+> **Available since 1.7.0.**
+
+Add your own check on non-card fields. Built-in length/required rules still run first.
+
+### Steps
+
+1. Call `addValidationForField:validator:` once after SDK setup.
+2. Pass a **validator wire key** (snake_case allowlist — not always the same as the tokenize dict key).
+3. In `fields`, prefer `SpreedlyCustomValidatableField` constants (e.g. `fields[SpreedlyCustomValidatableField.country]`) instead of string literals.
+4. Return `[SpreedlyCustomValidationResult valid]`, `[SpreedlyCustomValidationResult invalid:@"message"]`, or `nil` (`nil` **fails closed** → generic `"{label} is invalid"`).
+5. On Pay in a custom form, call `runCustomValidationBeforeSubmitWithAdditionalFields:` with the same dictionary you pass to `createCreditCardObjC…`. It runs every registered validator once, shows the messages under the fields, and returns `YES` when all pass. Express (`CardFormDropIn`) needs no extra call.
+6. Call `removeValidationForField:` when done.
+
+```objc
+[[Spreedly shared] addValidationForField:@"zip" validator:^SpreedlyCustomValidationResult *(NSString *value, NSDictionary<NSString *, NSString *> *fields) {
+    NSString *country = fields[SpreedlyCustomValidatableField.country] ?: @"";
+    if (![country isEqualToString:@"US"]) {
+        return [SpreedlyCustomValidationResult valid];
+    }
+    NSPredicate *pred = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", @"^\\d{5}(-\\d{4})?$"];
+    if ([pred evaluateWithObject:value ?: @""]) {
+        return [SpreedlyCustomValidationResult valid];
+    }
+    return [SpreedlyCustomValidationResult invalid:@"Enter a valid US ZIP code"];
+}];
+
+// On Pay (custom form)
+NSDictionary<NSString *, NSString *> *additionalFields = @{
+    @"zip": self.zipTextField.text ?: @"",
+    @"country": @"US"
+};
+if (![[Spreedly shared] runCustomValidationBeforeSubmitWithAdditionalFields:additionalFields]) {
+    return; // messages are already shown under the failing fields
+}
+PaymentProcessingResult *result = [[Spreedly shared] createCreditCardObjCWithAdditionalFields:additionalFields metadata:nil];
+
+[[Spreedly shared] removeValidationForField:@"zip"];
+```
+
+### Validator wire keys (29 allowlisted)
+
+Pass these exact strings to `addValidationForField:` (same as Swift `CustomValidatableFieldName.rawValue`). Prefer `SpreedlyCustomValidatableField` constants when reading `fields`.
+
+| # | Validator key (`NSString`) | `SpreedlyCustomValidatableField` constant | Notes |
+|---|----------------------------|------------------------------------------|-------|
+| 1 | `first_name` | `firstName` | Tokenize dict accepts `firstName` or `first_name` |
+| 2 | `last_name` | `lastName` | Tokenize dict accepts `lastName` or `last_name` |
+| 3 | `full_name` | `fullName` | |
+| 4 | `email` | `email` | |
+| 5 | `company` | `company` | |
+| 6 | `address1` | `addressLine1` | |
+| 7 | `address2` | `addressLine2` | |
+| 8 | `city` | `city` | |
+| 9 | `state` | `state` | |
+| 10 | `zip` | `zipCode` | |
+| 11 | `country` | `country` | |
+| 12 | `phone_number` | `phoneNumber` | |
+| 13 | `house_number_or_name` | `houseNumberOrName` | |
+| 14 | `street` | `street` | |
+| 15 | `street_line2` | `streetLine2` | |
+| 16 | `phone_number_country_code` | `phoneNumberCountryCode` | |
+| 17 | `phone_number_area_code` | `phoneNumberAreaCode` | |
+| 18 | `shipping_address1` | `shippingAddressLine1` | |
+| 19 | `shipping_address2` | `shippingAddressLine2` | |
+| 20 | `shipping_city` | `shippingCity` | |
+| 21 | `shipping_state` | `shippingState` | |
+| 22 | `shipping_zip` | `shippingZipCode` | |
+| 23 | `shipping_country` | `shippingCountry` | |
+| 24 | `shipping_phone_number` | `shippingPhoneNumber` | |
+| 25 | `shipping_house_number_or_name` | `shippingHouseNumberOrName` | |
+| 26 | `shipping_street` | `shippingStreet` | |
+| 27 | `shipping_street_line2` | `shippingStreetLine2` | |
+| 28 | `shipping_phone_number_country_code` | `shippingPhoneNumberCountryCode` | |
+| 29 | `shipping_phone_number_area_code` | `shippingPhoneNumberAreaCode` | |
+
+Not allowed (ignored): PAN, CVC, expiry, ACH, unknown keys.
+
+### Behavior
+
+| Topic | Behavior |
+|-------|----------|
+| When it runs | Blur (if enabled) + card Pay / `createCreditCard` — **not** `createBankAccount` (ACH) |
+| Blur on headless | `SPLTextFieldViewController.evaluatesCustomValidationOnBlur = YES` (Express enables blur by default) |
+| Headless Pay | Combine `onValidationChange` with `[SpreedlyUIManager shared].customValidationErrorCount == 0` (or re-sync flags when errors clear) so custom failures keep Pay off. The Swift `customValidationErrors` map is enum-keyed and not visible to Objective-C |
+| Fail-closed | `nil` / malformed return → generic label |
+| Merchant message | Non-empty `invalid:@"…"` shows under the field and on tokenize failure |
+| Clear on edit | Editing clears the custom error; rule re-runs on next blur or Pay |
+
+Swift merchants should use `addValidation(field:)` with `CustomValidatableFieldName`. Full guide: [custom-payment-forms.md](custom-payment-forms.md#custom-field-validators).
 
 ## Mandate Passthrough
 
@@ -795,6 +925,9 @@ Tokenize via Core when needed: `createClickToPayPaymentMethodWithMetadata:verifi
 4. Call `[SpreedlyOffsiteCheckout presentWithTransactionToken:]` to present Safari.
 5. Handle redirect return in `scene:openURLContexts:` with `handleOffsiteReturnWithUrl:`.
 
+> The offsite flow is documented in full in [Offsite payments](offsite-payments.md). Keep the
+> example below in step with that guide — it is the canonical source for the flow.
+
 ### Example
 
 ```objc
@@ -804,6 +937,7 @@ Tokenize via Core when needed: `createClickToPayPaymentMethodWithMetadata:verifi
 }
 
 - (void)startOffsiteFlow {
+    self.stage = OffsiteStageCreatingPaymentMethod;
     OffsitePaymentConfig *config = [[OffsitePaymentConfig alloc]
         initWithPaymentMethodType:OffsitePaymentMethodTypeSprel
         redirectUrl:nil email:@"user@example.com" fullName:@"Test User"

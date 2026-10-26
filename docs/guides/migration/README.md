@@ -2,6 +2,13 @@
 
 Pick the guide that matches your upgrade path.
 
+| | |
+|---|---|
+| **Audience** | Merchants moving to the iOS SDK, or between its major versions |
+| **Use this when** | You already have a working integration and need the delta |
+| **Use something else when** | Integrating for the first time → [Getting started](../getting-started.md) |
+| **Requires** | Depends on the path — see each guide |
+
 ## From web iframe-ui
 
 | Guide | Covers |
@@ -10,6 +17,10 @@ Pick the guide that matches your upgrade path.
 | [Headless PAN API quick reference](../custom-payment-forms.md#headless-pan-api-quick-reference) | SwiftUI, UIKit, and Objective-C cheat sheet — field params, global mask APIs, `HostedFieldState`, pay/validate (headless only) |
 
 ## Major-version upgrades
+
+| Guide | Covers |
+|---|---|
+| [v1-to-v2.md](v1-to-v2.md) | Upgrading to 1.7.0: minimum iOS moves from 14.0 to 16.0. Deprecated APIs are still present. Apps that support iOS 14 or 15 stay on 1.6.x |
 
 When a new **major** iOS SDK version ships, migration guides are published here as `vN-to-vN+1.md` and linked from [`CHANGELOG.md`](../../CHANGELOG.md). Until a guide exists for your target major, use the CHANGELOG **Breaking Changes** section and re-run your integration tests after bumping the package version.
 

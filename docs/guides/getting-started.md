@@ -28,7 +28,8 @@ Set up the Spreedly iOS SDK in your project in under 15 minutes.
 
 Before integrating the Spreedly iOS SDK, ensure you have:
 
-- **iOS 14.0+** deployment target
+- **iOS 16.0+** deployment target from **1.7.0**. Apps that still support iOS 14 or 15 stay on
+  **1.6.x** — see [Upgrade to the iOS 16 minimum](migration/v1-to-v2.md)
 - **Xcode 26.0+** minimum, **26.5** recommended
 - **Swift 6.0+** for Swift projects
 - **Spreedly Account** with API credentials
@@ -69,7 +70,7 @@ struct ExampleCredentials {
 
 ### Use one package version for all Spreedly modules
 
-Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyStripeRadar**, **SpreedlyBraintree**, **SpreedlyClickToPay**) are released together under **one** version. Use the **same** resolved version for every Spreedly product in your app — always pick the [latest release tag](https://github.com/spreedly/checkout-ios-package/releases) (the snippets below use **1.6.0** as an example).
+Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyStripeRadar**, **SpreedlyBraintree**, **SpreedlyClickToPay**) are released together under **one** version. Use the **same** resolved version for every Spreedly product in your app — always pick the [latest release tag](https://github.com/spreedly/checkout-ios-package/releases) (the snippets below use **1.7.0** as an example).
 
 ### Option 1: Swift Package Manager (Recommended)
 
@@ -93,7 +94,7 @@ SPM distribution is from a separate repository: `https://github.com/spreedly/che
 ```swift
 dependencies: [
     // Example minimum version — Xcode resolves to the latest compatible release, or pin an exact tag.
-    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.6.0"),
+    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.7.0"),
     // Optional: add when using 3DS Global (Forter) — separate repo:
     // .package(url: "https://bitbucket.org/forter-mobile/forter-ios.git", exact: "2.1.0")
 ],
@@ -127,14 +128,14 @@ Add to your `Podfile`. Source is `https://github.com/spreedly/checkout-ios-packa
 target 'YourApp' do
   use_frameworks!
 
-  pod 'SpreedlyCore', '~> 1.6'
-  pod 'SpreedlySecurity', '~> 1.6'
-  pod 'SpreedlyUI', '~> 1.6'
+  pod 'SpreedlyCore', '~> 1.7'
+  pod 'SpreedlySecurity', '~> 1.7'
+  pod 'SpreedlyUI', '~> 1.7'
   # Add these only if needed:
-  # pod 'SpreedlyStripeAPM', '~> 1.6'
-  # pod 'SpreedlyStripeRadar', '~> 1.6'  # 1.5.0+
-  # pod 'SpreedlyBraintree', '~> 1.6'
-  # pod 'SpreedlyClickToPay', '~> 1.6'  # 1.6.0+
+  # pod 'SpreedlyStripeAPM', '~> 1.7'
+  # pod 'SpreedlyStripeRadar', '~> 1.7'  # 1.5.0+
+  # pod 'SpreedlyBraintree', '~> 1.7'
+  # pod 'SpreedlyClickToPay', '~> 1.7'  # 1.6.0+
 end
 ```
 Then run `pod install`.
@@ -146,14 +147,14 @@ target 'YourApp' do
   use_frameworks!
 
   # Example tags — replace with a release from checkout-ios-package.
-  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
-  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
-  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
+  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
+  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
+  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
   # Add these only if needed:
-  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
-  # pod 'SpreedlyStripeRadar', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
-  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
-  # pod 'SpreedlyClickToPay', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.6.0'
+  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
+  # pod 'SpreedlyStripeRadar', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
+  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
+  # pod 'SpreedlyClickToPay', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
 end
 ```
 
@@ -168,10 +169,10 @@ If you use **SpreedlyStripeAPM** with CocoaPods, you **must** add a `post_instal
 **Full Podfile example (private repo with Stripe APM):**
 
 ```ruby
-platform :ios, '14.0'
+platform :ios, '16.0'   # 1.7.0+ requires iOS 16; apps on iOS 14/15 stay on 1.6.x
 
 PACKAGE_REPO = 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git'
-PACKAGE_TAG  = '1.6.0'  # example — use a checkout-ios-package release tag
+PACKAGE_TAG  = '1.7.0'  # example — use a checkout-ios-package release tag
 
 target 'YourApp' do
   use_frameworks!
@@ -583,7 +584,7 @@ Call `configureSpreedly()` before presenting any payment form or initiating any 
 
 ## SDK lifecycle
 
-How to initialize the SDK, show checkout, leave checkout safely, and refresh credentials — without a web-style `destroy()` API.
+How to initialize the SDK, show checkout, leave checkout safely, and refresh credentials — without a `destroy()` API.
 
 ### The one rule
 
@@ -661,11 +662,12 @@ Legacy iframe **`ready`** maps to **`isInitialized`** after signed **`setup`**, 
 - Validation toggles from `setParam` — change them explicitly if needed
 - Subscriptions you created with `subscribeToPaymentResults` — **you** must cancel those
 
-### No `destroy()` (web iframe habit)
+<a id="no-destroy-web-iframe-habit"></a>
+### No `destroy()` (legacy iframe habit)
 
-iOS has no `Spreedly.destroy()`. If you integrated web iframe before:
+iOS has no `Spreedly.destroy()`. If you integrated the legacy iframe SDK before:
 
-| Web iframe | iOS SDK |
+| Legacy iframe | iOS SDK |
 |------------|---------|
 | `ready` | `isInitialized` after signed `setup(config:)` |
 | `reload()` | `reset()` or `resetPaymentState()` |
@@ -684,7 +686,7 @@ struct CheckoutView: View {
 
     var body: some View {
         // SPLTextField fields…
-        Button("Pay") { Spreedly.shared().createCreditCard(...) }
+        Button("Pay") { _ = Spreedly.shared().createCreditCard() }
             .disabled(!isConfigured)
     }
     .task {
@@ -722,7 +724,9 @@ Objective-C: `[[Spreedly shared] reset]` in `viewWillDisappear:`, remove child f
 ### More detail
 
 - [Custom Payment Forms](custom-payment-forms.md) — headless fields and mask APIs
-- [Express Checkout](express-checkout.md) — sheet open, dismiss, rotation
+- [Additional Fields (billing/shipping)](custom-payment-forms.md#additional-fields-billingshipping) — which API to use (`otherFields` vs `additionalFields`), street-split, merge rules
+- [Custom field validators](custom-payment-forms.md#custom-field-validators) — extra blur/Pay rules on non-PCI fields
+- [Express Checkout](express-checkout.md) — sheet open, dismiss, rotation; [extra sheet rows](express-checkout.md#additional-fields)
 - [Error Handling](error-handling.md) — subscriptions and delegates
 - [Troubleshooting](troubleshooting.md) — `isInitialized` false, blocked device
 
@@ -762,7 +766,7 @@ Spreedly.blockJailbrokenDevices = true
 Spreedly.initializeSDK()
 
 // Or via SpreedlyConfig:
-let config = SpreedlyConfig(environmentKey: "your-environment-key", ...)
+let config = SpreedlyConfig(environmentKey: "your-environment-key")
 config.blockJailbrokenDevices = true
 Spreedly.setup(config: config)
 ```
@@ -777,7 +781,7 @@ Check the status at any point:
 ```swift
 if !Spreedly.isDeviceTrusted {
     let error = Spreedly.initializationError
-    // Show fallback UI or redirect to web checkout
+    // Show fallback UI or redirect to an alternate checkout
 }
 ```
 
@@ -1098,16 +1102,17 @@ This is standard practice across major mobile payment SDKs (Stripe, Braintree, A
 
 ### Transitive Dependencies
 
-`SpreedlyCore` pulls in the following third-party dependencies automatically. You do not need to add them manually, but you should be aware of them for binary size planning and potential version conflicts:
+Some modules have third-party code compiled into their frameworks. SPM and CocoaPods do not download these libraries separately, and you do not add them yourself. Their license and notice texts are in [`THIRD-PARTY-LICENSES.md`](https://github.com/spreedly/checkout-ios-package/blob/main/THIRD-PARTY-LICENSES.md), which also ships at the root of the package and inside every framework zip.
 
-| Dependency | Version | Pulled By | Purpose |
-|------------|---------|-----------|---------|
-| DatadogCore | ~> 3.1.0 | SpreedlyCore | Observability and structured telemetry |
-| DatadogLogs | ~> 3.1.0 | SpreedlyCore | Log forwarding to Datadog |
+| Library | Version | Compiled into | License |
+|---------|---------|---------------|---------|
+| Datadog (DatadogCore, DatadogLogs) | 3.7.0 | `SpreedlyCore` | Apache-2.0 |
+| Stripe (StripeCore, StripePayments; `SpreedlyStripeAPM` also StripePaymentSheet and its UI modules) | 25.17.0 | `SpreedlyStripeAPM`, `SpreedlyStripeRadar` | MIT |
+| Braintree (BraintreeCore, BraintreePayPal, BraintreeVenmo, BraintreeDataCollector, PPRiskMagnes) | 7.4.0 | `SpreedlyBraintree` | MIT |
 
-**Binary size impact:** The Datadog frameworks add approximately 4-8 MB to your app binary.
+**Binary size impact:** These libraries are part of the size of the Spreedly framework that contains them; nothing extra is downloaded.
 
-**Version conflicts:** If your app already uses the Datadog iOS SDK, ensure your version is compatible with `~> 3.1.0`. SPM and CocoaPods will report a conflict if the versions are incompatible. For **merchant-added** Forter and Stripe pins, see [Optional Dependencies](#optional-dependencies) (Forter **exact 2.1.0**; Stripe app package **25.x** only).
+**Version conflicts:** Because these libraries are compiled in, SPM and CocoaPods do not resolve them and will not report a version conflict with a copy your app adds. For **merchant-added** Forter and Stripe pins, see [Optional Dependencies](#optional-dependencies) (Forter **exact 2.1.0**; Stripe app package **25.x** only).
 
 **Opting out:** Datadog telemetry is active only when `DatadogConfig.clientToken` is non-empty. In local builds the client token defaults to `""`, so no data flows to Datadog unless explicitly configured.
 
@@ -1185,8 +1190,10 @@ See each gateway's integration guide for full backend request examples and SDK c
 |------|-------|
 | Pre-built payment form, minimal code | [Express Checkout](express-checkout.md) |
 | Custom field layout and brand-specific UI | [Custom Payment Forms](custom-payment-forms.md) |
+| Billing/shipping/email on the token (UI or headless) | [Additional Fields](custom-payment-forms.md#additional-fields-billingshipping) · [Express otherFields](express-checkout.md#additional-fields) · [ObjC](objective-c.md#additional-fields) |
+| Custom ZIP/state/format rules on blur or Pay | [Custom field validators](custom-payment-forms.md#custom-field-validators) |
 | ACH bank-account tokenization (US/Canada) (**1.5.0+**) | [ACH Bank Account](ach-bank-account.md) |
-| Migrating from web iframe-ui | [Migration from legacy iframe-ui](migration/from-legacy.md) |
+| Migrating from legacy iframe-ui | [Migration from legacy iframe-ui](migration/from-legacy.md) — includes a headless-vs-express comparison for card entry |
 | 3D Secure authentication (multi-gateway) | [3DS Global](3ds-global.md) |
 | 3D Secure with gateway-specific flow (e.g. Worldpay) | [3DS Gateway-Specific](3ds-gateway-specific.md) |
 | PayPal / Sprel via Safari redirect | [Offsite Payments](offsite-payments.md) |
@@ -1262,7 +1269,7 @@ Use this before shipping to production users. Details live in the linked guides 
 | Errors and UX | Handle all `PaymentProcessingResult` / `PaymentResult` states; show user-friendly messages | [Error Handling](error-handling.md) |
 | Security | Prefer drop-ins (`CardFormDropIn` / ACH / CVV — built-in screen prevention); apply `.screenPrevention()` on custom payment screens | [Security](security.md) |
 | Privacy and telemetry | Understand Datadog logging and data handling; disclose in your privacy policy | [Privacy](privacy.md) |
-| Minimum iOS version | Your deployment target is at least **iOS 14.0** | [README](../../README.md) |
+| Minimum iOS version | Your deployment target is at least **iOS 16.0** for 1.7.0+ (**iOS 14.0** if you stay on 1.6.x) | [Upgrade to the iOS 16 minimum](migration/v1-to-v2.md) |
 | 3DS setup (if applicable) | Forter3DS SDK added via SPM/CocoaPods; `#if canImport(Forter3DS)` pattern used | [3DS Global](3ds-global.md), [Conditional Imports](#conditional-imports-for-optional-modules) |
 | ObjC compatibility (if applicable) | ObjC delegates and view controllers tested if your app uses Objective-C | [Objective-C](objective-c.md) |
 

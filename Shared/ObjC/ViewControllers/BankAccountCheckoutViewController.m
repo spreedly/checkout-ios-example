@@ -351,7 +351,7 @@ static NSString *ACHFieldLabel(NSUInteger index) {
             self.isLoading = NO;
             [self.loadingIndicator stopAnimating];
             self.showFormButton.enabled = YES;
-            self.errorLabel.text = [NSString stringWithFormat:@"Validation failed: %@", [processingResult getDescription]];
+            self.errorLabel.text = [processingResult getDescription];
             self.errorLabel.hidden = NO;
         }
     };
@@ -789,11 +789,9 @@ static NSString *ACHFieldLabel(NSUInteger index) {
 
 - (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
-    if (@available(iOS 13.0, *)) {
-        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
-            [self refreshSwatchFillColors];
-            [self refreshSwatchSelectionOutlines];
-        }
+    if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+        [self refreshSwatchFillColors];
+        [self refreshSwatchSelectionOutlines];
     }
 }
 

@@ -138,19 +138,15 @@ Blocked-device errors flow through the same channels merchants already subscribe
 
 Real integrity checks only run on **physical devices in RELEASE builds**. On the Simulator, all checks return clean.
 
-To test the blocking flow during development, use the DEBUG-only override in your example/test code:
+To see the blocking flow end to end, run your app on a **physical jailbroken test device** with
+`blockJailbrokenDevices` enabled. There is no supported way to simulate a compromised device from
+your own code: the SDK's internal override hook is compiled out of the released XCFrameworks, so it
+is not callable from a merchant app.
 
-```swift
-#if DEBUG
-SecurityManager.shared.setOverrideAssessment(
-    SecurityAssessment(level: .compromised, signals: [])
-)
-#endif
-```
-
-> Pass an empty `signals` array when you only need to trigger the blocked state for UI testing. The DEBUG override is only available in debug builds.
-
-Set the override **before** calling `Spreedly.setup(config:)`. The SDK will treat the device as compromised and block. Pass `nil` to restore normal behavior.
+What you can assert without a jailbroken device is the *handling* path — that your UI reacts
+correctly when a failure arrives. Drive that from your own test doubles by publishing a
+`PaymentResult.failure` on the channel you already subscribe to, rather than by trying to force the
+SDK's device assessment.
 
 ### Recovery
 

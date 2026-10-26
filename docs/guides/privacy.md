@@ -1,6 +1,15 @@
 # Privacy and Data Handling - Spreedly iOS SDK
 
-Privacy requirements and data handling for the Spreedly iOS SDK. The SDK processes payment card data in memory only -- nothing is stored on disk -- and transmits it to Spreedly over TLS for tokenization.
+Privacy requirements and data handling for the Spreedly iOS SDK. The SDK processes payment card
+data in memory only — nothing is stored on disk — and transmits it to Spreedly over TLS for
+tokenization.
+
+| | |
+|---|---|
+| **Audience** | Merchants completing an App Store privacy disclosure or a security review |
+| **Use this when** | Filling in App Privacy answers, or answering "what does the SDK collect?" |
+| **Use something else when** | Implementing jailbreak gating or screen prevention → [Security](security.md) |
+| **Requires** | Any SDK version |
 
 ## Data Handling Principles
 
@@ -11,7 +20,7 @@ Privacy requirements and data handling for the Spreedly iOS SDK. The SDK process
 
 ### Data Collection
 - **Payment data**: The SDK processes payment card data in memory for tokenization only
-- **Operational telemetry**: The SDK collects non-personal operational data for reliability monitoring, including: SDK version, OS version, device region, carrier name, ephemeral session ID, environment key (identifies the merchant account), API endpoint paths, HTTP methods, response status codes, error types, flow durations, and payment method types. Field-level interaction events (focus/blur on form fields) are also collected for form usability monitoring. No card numbers, CVVs, expiry dates, or PII are included in telemetry.
+- **Operational telemetry**: The SDK collects non-personal operational data for reliability monitoring, including: SDK version, OS version, device region, ephemeral session ID, environment key (identifies the merchant account), API endpoint paths, HTTP methods, response status codes, error types, flow durations, and payment method types. Field-level interaction events (focus/blur on form fields) are also collected for form usability monitoring. No card numbers, CVVs, expiry dates, or PII are included in telemetry.
 - **Telemetry destination**: Operational telemetry is sent to **Datadog** when configured. Telemetry is disabled if no Datadog client token is provided.
 - **Purpose**: Payment data is used for tokenization. Telemetry data is used to monitor SDK health, detect failures, measure latency, and improve reliability.
 
@@ -26,7 +35,7 @@ Privacy requirements and data handling for the Spreedly iOS SDK. The SDK process
 
 ### Third-Party Sharing
 - **Spreedly**: Card data is shared exclusively with Spreedly for tokenization. No card data is sent to any other party
-- **Datadog**: Non-sensitive operational telemetry (SDK version, OS version, region, carrier, session ID, flow success/failure events) is sent to Datadog for SDK reliability monitoring. No card data, tokens, or PII is included in telemetry payloads
+- **Datadog**: Non-sensitive operational telemetry (SDK version, OS version, region, session ID, flow success/failure events) is sent to Datadog for SDK reliability monitoring. No card data, tokens, or PII is included in telemetry payloads
 
 ## iOS-Specific Requirements
 
@@ -38,7 +47,9 @@ The SDK includes a `PrivacyInfo.xcprivacy` file that declares:
 - **NSPrivacyTrackingDomains**: Not used
 - **NSPrivacyAccessedAPITypes**: Declares only required APIs for core functionality
 
-The operational telemetry described above (SDK version, region, carrier, ephemeral session ID, etc.) is **not linked to the user's identity** and is used only for SDK reliability monitoring. Under Apple's App Store privacy framework, this is "Data Not Linked to You" and does not need to be declared in `NSPrivacyCollectedDataTypes`.
+This manifest ships inside the SDK — you do not add it to your app yourself.
+
+The operational telemetry described above (SDK version, region, ephemeral session ID, etc.) is **not linked to the user's identity** and is used only for SDK reliability monitoring. Under Apple's App Store privacy framework, this is "Data Not Linked to You" and does not need to be declared in `NSPrivacyCollectedDataTypes`.
 
 If your app reports App Store privacy nutrition labels, declare any payment-related data your **app** sends to Spreedly (such as card data for tokenization) under your own privacy disclosures, not the SDK's manifest.
 

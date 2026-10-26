@@ -1,12 +1,20 @@
 # Stripe Radar Integration Guide
 
-Collect Stripe Radar device data on iOS using the **SpreedlyStripeRadar** module. The SDK creates a Radar session and returns a session ID for your backend to attach to Spreedly purchase or authorization requests.
+Collect Stripe Radar device data on iOS. The SDK creates a Radar session and returns a session ID
+for your backend to attach to a Spreedly purchase or authorization.
 
-**Estimated integration time:** ~10 minutes
+| | |
+|---|---|
+| **Use this when** | You want Stripe's fraud signal on a Stripe Payment Intents purchase |
+| **Use something else when** | You need the APM payment sheet → [Stripe APM](stripe-apm.md). Radar is an optional addition, not an alternative |
+| **You build** | 2 things: a call to create the session · a backend that attaches the id |
+| **Modules** | `SpreedlyCore` + `SpreedlySecurity` + `SpreedlyUI` + `SpreedlyStripeRadar` |
+| **Requires** | SDK 1.5.0+ · iOS 16.0+ from 1.7.0 (iOS 14.0+ on 1.6.x) · Xcode 26.0+ |
+| **Integration time** | ~10 minutes |
+| **UI** | None — headless. Swift and Objective-C |
 
-## Scope — one job only
-
-**SpreedlyStripeRadar does exactly one thing:** ask Stripe for a Radar Session and return a `radar_session_id` string (or `nil` on failure). That is the entire module.
+**One job:** ask Stripe for a Radar session and return a `radar_session_id` string, or `nil` on
+failure. That is the entire module.
 
 | This module **does** | This module **does not** |
 |----------------------|---------------------------|
@@ -79,7 +87,7 @@ Radar complements Stripe APM when you use both: collect a session ID early, incl
 1. Complete [getting-started.md](getting-started.md) (installation, `Spreedly.initializeSDK()` / signed setup).
 2. **Stripe publishable key** (`pk_test_...` or `pk_live_...`) aligned with your Stripe Payment Intents gateway in Spreedly.
 3. **Radar Session** enabled for your Stripe account (confirm in Stripe Dashboard / Radar settings).
-4. **Minimum iOS** — See the root README modules list. When adding `stripe-ios-spm` on the app, use **25.x** only (`from: "25.11.0"`) — see [Stripe version (required)](#stripe-version-required).
+4. **Minimum iOS** — iOS 16.0+ from 1.7.0 (iOS 14.0+ on 1.6.x) (see [Upgrade to the iOS 16 minimum](migration/v1-to-v2.md)). When adding `stripe-ios-spm` on the app, use **25.x** only (`from: "25.11.0"`) — see [Stripe version (required)](#stripe-version-required).
 
 ---
 
@@ -91,7 +99,7 @@ Add **SpreedlyStripeRadar** when you need Radar session IDs. You may also add **
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/spreedly/checkout-ios-package.git", from: "1.4.0"),
+    .package(url: "https://github.com/spreedly/checkout-ios-package.git", from: "1.7.0"),
     .package(url: "https://github.com/stripe/stripe-ios-spm.git", from: "25.11.0"),
 ],
 targets: [
@@ -111,10 +119,20 @@ targets: [
 ### CocoaPods
 
 ```ruby
-pod 'SpreedlyCore', '~> 1.4'
-pod 'SpreedlyStripeRadar', '~> 1.4'
-# pod 'SpreedlyStripeAPM', '~> 1.4'  # if you use Payment Sheet APM
+pod 'SpreedlyCore', '~> 1.7'
+pod 'SpreedlySecurity', '~> 1.7'
+pod 'SpreedlyUI', '~> 1.7'
+pod 'SpreedlyStripeRadar', '~> 1.7'
+# pod 'SpreedlyStripeAPM', '~> 1.7'  # if you use Payment Sheet APM
 ```
+
+### Compatibility
+
+| SDK version | iOS | Xcode | Notes |
+|---|---|---|---|
+| 1.7.0+ | **16.0+** | 26.0+ | — |
+| 1.6.x | 14.0+ | 26.0+ | Stripe Radar since 1.5.0. Last line that supports iOS 14 and 15 — see [Migrating to iOS 16](migration/v1-to-v2.md) |
+| 1.4.x and earlier | — | — | **No Stripe Radar module.** Upgrade to 1.5.0+ |
 
 **Stripe dependency:** Link **`StripePayments`** on your **app** target — see [Link StripePayments on your app target](#link-stripepayments-on-your-app-target). This is required to avoid launch crashes on device. Add Stripe yourself separately only if your app also calls Stripe APIs outside Spreedly.
 
@@ -158,7 +176,7 @@ Xcode **File → Add Package Dependencies** often defaults to the newest Stripe 
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/spreedly/checkout-ios-package.git", from: "1.4.0"),
+    .package(url: "https://github.com/spreedly/checkout-ios-package.git", from: "1.7.0"),
     .package(url: "https://github.com/stripe/stripe-ios-spm.git", from: "25.11.0"),
 ],
 targets: [

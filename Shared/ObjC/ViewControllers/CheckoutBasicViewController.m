@@ -1114,7 +1114,7 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
                 self.isLoading = NO;
                 [self.loadingIndicator stopAnimating];
                 self.showFormButton.enabled = YES;
-                self.errorMessage = [NSString stringWithFormat:@"Validation failed: %@", [processingResult getDescription]];
+                self.errorMessage = [processingResult getDescription];
                 [self updateUI];
             }
         }];
@@ -1133,7 +1133,7 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
                 self.isLoading = NO;
                 [self.loadingIndicator stopAnimating];
                 self.showFormButton.enabled = YES;
-                self.errorMessage = [NSString stringWithFormat:@"Validation failed: %@", [processingResult getDescription]];
+                self.errorMessage = [processingResult getDescription];
                 [self updateUI];
             }
         }];

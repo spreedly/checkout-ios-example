@@ -1,6 +1,13 @@
 # Troubleshooting - Spreedly iOS SDK
 
-Common integration issues and their solutions.
+Common integration issues and their solutions, organised by symptom.
+
+| | |
+|---|---|
+| **Audience** | Merchant engineers hitting a build, runtime or integration problem |
+| **Use this when** | Something is broken and you want to search by what you observed |
+| **Use something else when** | You need the error-type catalogue and how to handle each case in code → [Error handling](error-handling.md) |
+| **Requires** | Any SDK version |
 
 ## Table of Contents
 
@@ -129,7 +136,7 @@ Spreedly.setup(config: SpreedlyConfig(
 
 **Cause:** Expecting a web iframe-style teardown API.
 
-**Fix:** There is no `destroy()`. When the customer leaves checkout: **`reset()`**, cancel your payment subscriptions, remove field view controllers. For a new nonce/signature: **`setup(config:)`** again. See [SDK lifecycle — No destroy](getting-started.md#no-destroy-web-iframe-habit) and [Common mistakes](getting-started.md#common-mistakes).
+**Fix:** There is no `destroy()`. When the customer leaves checkout: **`reset()`**, cancel your payment subscriptions, remove field view controllers. For a new nonce/signature: **`setup(config:)`** again. See [SDK lifecycle — No destroy](getting-started.md#no-destroy-legacy-iframe-habit) and [Common mistakes](getting-started.md#common-mistakes).
 
 ### Card form is blank or fields don't appear
 

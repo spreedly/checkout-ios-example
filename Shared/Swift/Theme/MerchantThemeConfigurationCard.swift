@@ -87,7 +87,7 @@ struct MerchantThemeConfigurationCard: View {
                 .padding(.top, 4)
             }
 
-            Text("Drop-ins that read `SpreedlyThemeManager.globalTheme` pick up this theme when their sheet opens — choose a theme here, then open a payment flow to preview it.")
+            Text("Click to Pay reads `SpreedlyThemeManager.globalTheme` when the checkout sheet opens — pick a theme here, then tap Pay to preview it in the C2P sheet.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

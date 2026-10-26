@@ -32,7 +32,7 @@ Everything below is **merchant-facing** in the current SDK. Use this checklist s
 | `Spreedly.shared().resetPaymentState()` | Full reset: secure values, field UI, validation, and hosted PAN/CVV display (alias of `reset()`) |
 | Express drop-in rotation | Typed fields stay on rotation in `CardFormDropIn` — no merchant API. [Sheet lifecycle](guides/express-checkout.md#sheet-lifecycle) |
 | When form reset preserving display config runs | [Payment reset](guides/custom-payment-forms.md#when-preserving-display-config-reset-runs) |
-| `Spreedly.shared().setParam(parameter: .allowInternationalZipCodes, value:)` | `true` (default) = international postal; `false` = US numeric ZIP only |
+| `Spreedly.shared().setParam(parameter: .allowInternationalZipCodes, value:)` | Default `true`. On iOS: ZIP format stays open either way; toggles ZIP keyboard (full vs number pad) |
 | `Spreedly.shared().createCreditCard(additionalFields:metadata:shouldRetain:eligibleForCardUpdater:)` | Tokenize the current `SPLTextField` values; opt the card into Spreedly's Account Updater service when `eligibleForCardUpdater: true`. ObjC: `createCreditCardObjCWithAdditionalFields:metadata:shouldRetain:eligibleForCardUpdater:`. |
 | `Spreedly.shared().subscribeToPaymentResults { ... }` | Receive the async `PaymentResult` after `createCreditCard` / drop-ins (Swift Combine; ObjC: `SpreedlyPaymentDelegate`). |
 | `Spreedly.shared().subscribeToRecacheResults { ... }` | Dedicated recache outcomes (Swift Combine; ObjC: `SpreedlyRecacheDelegate.recacheDidComplete:`). Separate from the payment channel above. |

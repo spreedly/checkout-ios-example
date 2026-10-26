@@ -22,7 +22,7 @@ enum MerchantThemePresets {
         }
     }
 
-    /// Applies SDK global theme for drop-ins that read `SpreedlyThemeManager.globalTheme`.
+    /// Applies SDK global theme for drop-ins that read `SpreedlyThemeManager.globalTheme` (e.g. Click to Pay sheet).
     static func applyGlobalTheme(
         useCustomTheme: Bool,
         lightTheme: SpreedlyTheme?,

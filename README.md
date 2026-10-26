@@ -6,14 +6,14 @@ Demonstrates integrating the [Spreedly iOS SDK](https://github.com/spreedly/chec
 
 Each variant contains a **SwiftUI (Swift)** target and a **UIKit (Objective-C)** target, showing both language integration paths.
 
-**SDK Version:** 1.6.1
+**SDK Version:** 1.7.0
 
 ## Prerequisites
 
 | Requirement       | Version        |
 |-------------------|----------------|
 | **Xcode**         | 26.0+  |
-| **iOS Deployment**| 14.0+    |
+| **iOS Deployment**| 16.0+    |
 | **Swift**         | 6.0+  |
 | **XcodeGen**      | 2.40+ (to regenerate `.xcodeproj`) |
 | **CocoaPods**     | 1.15+ (CocoaPods variant only) |

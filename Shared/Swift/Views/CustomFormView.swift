@@ -28,7 +28,7 @@
 //
 // MERCHANT APIs DEMONSTRATED (see Spreedly / SPLTextField doc comments in SDK):
 //   - Spreedly.setParam(.allowBlankName | .allowExpiredDate | .allowBlankDate) — validation toggles below
-//   - Spreedly.shared().setNumberFormat / toggleMask — global PAN+CVV display (iframe / web hosted-field parity)
+//   - Spreedly.shared().setNumberFormat / toggleMask — global PAN+CVV display (hosted card display)
 //   - Spreedly.resetPaymentState() — full reset (fields + mask); headless only — no preservePaymentStateOnNextShow here
 //   - SPLTextField.onFieldStateChange — HostedFieldState snapshots (no raw PAN/CVV); inspector panel below
 //   - SPLTextField.onChange — opaque on PAN/CVC; plaintext logged for name/expiry in this sample
@@ -128,6 +128,10 @@ struct CustomFormView: View {
     @State private var fieldStateInspectorCoordinator = FieldStateInspectorCoordinator()
     @State private var aggregateValidationReadout = ""
     @State private var onChangeReadout = "onChange: edit a field to see values (card/CVC stay opaque)."
+    /// Bumps when `customValidationErrors` changes so Pay re-evaluates after blur/Pay-stamped failures.
+    @State private var customValidationTick = 0
+    /// Prior custom-error map — used to detect clears so local validity can recover.
+    @State private var previousCustomValidationErrors: [FormFieldType: String] = [:]
     // Step 3: Focus management — tracks which field is focused for keyboard "Next"/"Done" navigation
     @State private var focusedFieldType: FormFieldType?
     
@@ -137,6 +141,10 @@ struct CustomFormView: View {
     @State private var allowBlankDate: Bool = false
     @State private var eligibleForCardUpdater: Bool = false // when true, opts card into Spreedly Account Updater
     @State private var combinedExpiryDate: Bool = false    // true = single MM/YY field, false = separate month + year
+    /// When true, mounts combined expiry AND month/year so mutual exclusion fails (demo).
+    @State private var forceConflictingExpiry: Bool = false
+    /// When true, Pay passes zip=00000 in additionalFields; mounted ZIP should win (hosted-wins).
+    @State private var demoHostedWinsConflict: Bool = false
     @State private var yearFormat: YearFormat = .fourDigit
     
     // Step 5: Retain flag — if true, the token is saved server-side for future charges
@@ -144,6 +152,29 @@ struct CustomFormView: View {
 
     /// QA: Wallet / edit-menu autofill on all hosted fields (`SPLTextField.enableAutofill`). Default matches SDK.
     @State private var enableAutofill: Bool = true
+
+    /// QA: explicit custom-validator recipe for full name (default None).
+    @State private var fullNameCustomRule: DemoCustomValidationKind = .none
+
+    /// Shared additional-field catalogue (same groups / Show-Hide as Checkout with Additional Fields).
+    @State private var catalogueRows: [AdditionalFieldToggleRow] = AdditionalFieldCatalogueDemo.defaultRows()
+    @State private var showAdditionalFieldsConfig = false
+    @State private var groupBillingAddress = false
+    @State private var groupShippingAddress = false
+    @State private var groupEmail = false
+    @State private var additionalFieldValidity: [String: Bool] = [:]
+
+    private var customValidationSelections: [CustomValidatableFieldName: DemoCustomValidationKind] {
+        var map = AdditionalFieldCatalogueDemo.customValidationSelections(from: catalogueRows)
+        // Full-name demo picker omits the US country rule — never register a stale selection.
+        let allowedFullName = DemoCustomValidationKind.pickerCases(for: FormFieldType?.none)
+        map[.fullName] = allowedFullName.contains(fullNameCustomRule) ? fullNameCustomRule : .none
+        return map
+    }
+
+    private var activeCustomRulesSummary: String {
+        DemoCustomValidationRecipes.activeRulesSummary(selections: customValidationSelections)
+    }
 
     // Theme picker — same pattern as CheckoutBasicView / CVVRecaching (light + dark passed to SPLTextField)
     @State private var useCustomTheme: Bool = false
@@ -164,13 +195,60 @@ struct CustomFormView: View {
                     .accessibilityIdentifier(AccessibilityIdentifiers.CustomForm.title)
                     .accessibilityHint(AccessibilityHints.CustomForm.title)
                 
-                Text("This demonstrates a custom form built at the application level using headless UI components from the SDK.")
+                Text("Headless SPLTextField form. Use Optional address groups or Show Additional Fields Configuration to mount extra fields. Full name Custom rule (and per-field rules in the catalogue) run on blur + Pay.")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .padding()
                     .accessibilityIdentifier(AccessibilityIdentifiers.CustomForm.description)
                     .accessibilityHint(AccessibilityHints.CustomForm.description)
-                
+
+                Text(activeCustomRulesSummary)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .accessibilityIdentifier("customForm_activeCustomRules")
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Custom validation")
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                    customFormRulePicker(
+                        title: "Full name",
+                        selection: Binding(
+                            get: {
+                                let allowed = DemoCustomValidationKind.pickerCases(for: FormFieldType?.none)
+                                return allowed.contains(fullNameCustomRule) ? fullNameCustomRule : .none
+                            },
+                            set: { fullNameCustomRule = $0 }
+                        ),
+                        id: "customForm_fullName_customRule"
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(cardBackgroundColor)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(cardBorderColor, lineWidth: 1)
+                )
+                .shadow(color: cardShadowColor, radius: 4, x: 0, y: 0)
+
+                AdditionalFieldCatalogueCards(
+                    catalogueRows: $catalogueRows,
+                    showConfig: $showAdditionalFieldsConfig,
+                    groupBilling: $groupBillingAddress,
+                    groupShipping: $groupShippingAddress,
+                    groupEmail: $groupEmail,
+                    accessibilityPrefix: "customForm",
+                    toggleTint: Color(red: 0.0 / 255.0, green: 119.0 / 255.0, blue: 200.0 / 255.0),
+                    onCatalogueChanged: {
+                        pruneAdditionalFieldValidity()
+                        applyCustomValidationSelections()
+                    }
+                )
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Form Components:")
                         .font(.headline)
@@ -198,6 +276,10 @@ struct CustomFormView: View {
                         .accessibilityIdentifier(AccessibilityIdentifiers.CustomForm.expiryDateComponent)
                         .accessibilityLabel(AccessibilityLabels.CustomForm.expiryDateComponent)
                         .accessibilityHint(AccessibilityHints.CustomForm.expiryDateComponent)
+
+                    Text("• Optional catalogue fields mount below when enabled")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
@@ -226,6 +308,23 @@ struct CustomFormView: View {
                         .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.0/255.0, green: 119.0/255.0, blue: 200.0/255.0)))
                         .accessibilityIdentifier(AccessibilityIdentifiers.CustomForm.combinedExpiryDateToggle)
                         .accessibilityHint(AccessibilityHints.CustomForm.combinedExpiryDateToggle)
+                        .disabled(forceConflictingExpiry)
+                    }
+
+                    HStack {
+                        Toggle(
+                            "Demo: mount combined + month/year (expect fail)",
+                            isOn: $forceConflictingExpiry
+                        )
+                        .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.0/255.0, green: 119.0/255.0, blue: 200.0/255.0)))
+                    }
+
+                    HStack {
+                        Toggle(
+                            "Demo: conflicting ZIP in additionalFields (hosted-wins)",
+                            isOn: $demoHostedWinsConflict
+                        )
+                        .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.0/255.0, green: 119.0/255.0, blue: 200.0/255.0)))
                     }
                     
                     HStack {
@@ -390,17 +489,6 @@ struct CustomFormView: View {
 
                 themeConfigurationCard
                 
-                // General error message (only for non-field-specific errors)
-                if let error = errorMessage {
-                    Text("Error: \(error)")
-                        .foregroundColor(.red)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
-                        .accessibilityIdentifier(AccessibilityIdentifiers.CustomForm.errorMessage)
-                        .accessibilityHint(AccessibilityHints.CustomForm.errorMessage)
-                }
-                
                 // Step 6: SPLTextField — headless fields (see SDK doc on SPLTextField.init for param detail).
                 // setParam toggles above map to ValidationParam on Spreedly.shared().
                 // Card + CVC: onFieldStateChange; PAN/CVV display driven by setNumberFormat / toggleMask above.
@@ -432,6 +520,7 @@ struct CustomFormView: View {
                                 logNonSensitiveFieldChange(.fullName, value: value)
                             }
                         )
+                        .enablingCustomValidationOnBlur()
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
@@ -502,7 +591,14 @@ struct CustomFormView: View {
                         cardBackgroundColor: cardBackgroundColor
                     )
 
-                    if combinedExpiryDate {
+                    if forceConflictingExpiry {
+                        Text("Expiry conflict demo: combined + month/year are both mounted — Pay should fail until this toggle is off.")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+
+                    // Show combined when selected, or when forcing conflict (both shapes mounted).
+                    if combinedExpiryDate || forceConflictingExpiry {
                         VStack(alignment: .leading, spacing: 8) {
                             // Combined Expiry Date component with proper theming and forced 2-digit year format
                             SPLTextField(
@@ -531,7 +627,8 @@ struct CustomFormView: View {
                                 }
                             )
                         }
-                    } else {
+                    }
+                    if !combinedExpiryDate || forceConflictingExpiry {
                         HStack(alignment: .top, spacing: 16) {
                             VStack(alignment: .leading, spacing: 8) {
                                 // Expiry Month component
@@ -594,6 +691,10 @@ struct CustomFormView: View {
                             }
                         }
                     }
+
+                    ForEach(catalogueRows.filter(\.isEnabled)) { row in
+                        catalogueHostedField(row)
+                    }
                 }
                 .padding()
                 
@@ -636,6 +737,19 @@ struct CustomFormView: View {
                 .padding(.horizontal)
                 .accessibilityIdentifier(AccessibilityIdentifiers.CustomForm.payButton)
                 .accessibilityHint(AccessibilityHints.CustomForm.payButton)
+
+                // General error message (only for non-field-specific errors) — directly under Pay
+                if let error = errorMessage {
+                    Text("Error: \(error)")
+                        .foregroundColor(.red)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(8)
+                        .padding(.horizontal)
+                        .accessibilityIdentifier(AccessibilityIdentifiers.CustomForm.errorMessage)
+                        .accessibilityHint(AccessibilityHints.CustomForm.errorMessage)
+                }
                 
                 if let result = paymentResult, result.isSuccess {
                     VStack(alignment: .leading, spacing: theme.spacing.sm) {
@@ -679,6 +793,7 @@ struct CustomFormView: View {
         }
         // Step 8: onAppear — sync validation toggle states and subscribe to async payment results
         .onAppear {
+            applyCustomValidationSelections()
             if !Spreedly.isDeviceTrusted {
                 errorMessage = Spreedly.initializationError?.message ?? "SDK blocked by security check"
             }
@@ -719,14 +834,80 @@ struct CustomFormView: View {
                 }
             }
         }
+        .onChange(of: fullNameCustomRule) { _ in applyCustomValidationSelections() }
+        .onReceive(SpreedlyUIManager.shared.$customValidationErrors) { errors in
+            syncLocalValidityWithCustomValidationErrors(errors)
+            customValidationTick += 1
+            refreshAggregateValidationReadout()
+        }
         // Step 9: Cleanup — cancel Combine subscription and reset SDK validation params
         .onDisappear {
+            DemoCustomValidationRecipes.removeAllManagedValidations()
             cancellable?.cancel()
             cancellable = nil
             ValidationParamReset.reset()
         }
     }
-    
+
+    @ViewBuilder
+    private func catalogueHostedField(_ row: AdditionalFieldToggleRow) -> some View {
+        SPLTextField(
+            type: row.type,
+            title: row.title,
+            isRequired: row.isRequired,
+            enableAutofill: enableAutofill,
+            theme: splLightTheme,
+            darkTheme: splDarkTheme,
+            onValidationChange: { valid in
+                additionalFieldValidity[row.id] = valid
+                refreshAggregateValidationReadout()
+            },
+            onSubmit: { handleFieldSubmit(for: row.type) },
+            submitLabel: getSubmitLabel(for: row.type),
+            shouldFocus: focusedFieldType == row.type,
+            onFocus: {
+                guard focusedFieldType != row.type else { return }
+                focusedFieldType = row.type
+            },
+            onChange: { value in
+                logNonSensitiveFieldChange(row.type, value: value)
+            }
+        )
+        .enablingCustomValidationOnBlur()
+        .id("catalogue-\(row.id)-\(row.isRequired)")
+        .accessibilityIdentifier("customForm_hosted_\(row.id)")
+    }
+
+    private func pruneAdditionalFieldValidity() {
+        let enabledIds = Set(catalogueRows.filter(\.isEnabled).map(\.id))
+        additionalFieldValidity = additionalFieldValidity.filter { enabledIds.contains($0.key) }
+    }
+
+    @ViewBuilder
+    private func customFormRulePicker(
+        title: String,
+        selection: Binding<DemoCustomValidationKind>,
+        id: String
+    ) -> some View {
+        HStack {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Spacer()
+            Picker(title, selection: selection) {
+                ForEach(DemoCustomValidationKind.pickerCases(for: FormFieldType?.none)) { kind in
+                    Text(kind.pickerLabel).tag(kind)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityIdentifier(id)
+        }
+    }
+
+    private func applyCustomValidationSelections() {
+        DemoCustomValidationRecipes.applySelections(customValidationSelections)
+    }
+
     // MARK: - Retain Payment Method Helper
     private func retainPaymentMethod(token: String) async {
         do {
@@ -737,8 +918,10 @@ struct CustomFormView: View {
         }
     }
     
-    // Step 10: Form validity — aggregates all per-field validation states to enable/disable the PAY button
+    // Step 10: Form validity — per-field onValidationChange flags. Custom-validator chrome is
+    // synced into those flags via `$customValidationErrors` (see onReceive below).
     private var isFormValid: Bool {
+        _ = customValidationTick
         let nameValid = fullNameIsValid
         let cardValid = cardNumberIsValid && cvcIsValid
         let expirationValid: Bool
@@ -747,8 +930,36 @@ struct CustomFormView: View {
         } else {
             expirationValid = expirationMonthIsValid && expirationYearIsValid
         }
-        
-        return nameValid && cardValid && expirationValid
+        let requiredCatalogueValid = catalogueRows
+            .filter { $0.isEnabled && $0.isRequired }
+            .allSatisfy { additionalFieldValidity[$0.id] == true }
+
+        // Optional mounted fields can also show custom chrome — block Pay until cleared.
+        let noCustomChrome = SpreedlyUIManager.shared.customValidationErrors.isEmpty
+
+        return nameValid && cardValid && expirationValid && requiredCatalogueValid && noCustomChrome
+    }
+
+    /// Keeps Pay in sync with custom-validator chrome: a parked error forces invalid; clearing it
+    /// restores valid only when built-in rules had already passed (custom tier only runs then).
+    private func syncLocalValidityWithCustomValidationErrors(
+        _ errors: [FormFieldType: String]
+    ) {
+        if errors[.fullName] != nil {
+            fullNameIsValid = false
+        } else if previousCustomValidationErrors[.fullName] != nil {
+            // Rule removed / message cleared while name text still passes built-in checks.
+            fullNameIsValid = true
+        }
+
+        for row in catalogueRows where row.isEnabled {
+            if errors[row.type] != nil {
+                additionalFieldValidity[row.id] = false
+            } else if previousCustomValidationErrors[row.type] != nil {
+                additionalFieldValidity[row.id] = true
+            }
+        }
+        previousCustomValidationErrors = errors
     }
     
     private func isSignatureGenerated() async -> Bool {
@@ -765,11 +976,14 @@ struct CustomFormView: View {
     // MARK: - Focus Management
     
     private var fieldOrder: [FormFieldType] {
+        var order: [FormFieldType]
         if combinedExpiryDate {
-            return [.fullName, .cardNumber, .cvc, .expirationDate]
+            order = [.fullName, .cardNumber, .cvc, .expirationDate]
         } else {
-            return [.fullName, .cardNumber, .cvc, .expirationMonth, .expirationYear]
+            order = [.fullName, .cardNumber, .cvc, .expirationMonth, .expirationYear]
         }
+        order.append(contentsOf: catalogueRows.filter(\.isEnabled).map(\.type))
+        return order
     }
     
     /// Get submit label for a field type
@@ -833,7 +1047,8 @@ struct CustomFormView: View {
         case .city: return "City"
         case .state: return "State"
         case .zipCode: return "ZIP code"
-        @unknown default: return "Field (\(type.rawValue))"
+        case .country: return "Country"
+        default: return "Field (\(type.rawValue))"
         }
     }
 
@@ -1169,12 +1384,18 @@ struct CustomFormView: View {
         case .expirationDate: return expirationDateIsValid
         case .expirationMonth: return expirationMonthIsValid
         case .expirationYear: return expirationYearIsValid
-        default: return true
+        default:
+            if let row = catalogueRows.first(where: { $0.type == type }) {
+                let local = additionalFieldValidity[row.id] == true
+                let hasCustom = SpreedlyUIManager.shared.customValidationErrors[type] != nil
+                return local && !hasCustom
+            }
+            return true
         }
     }
 
     private func refreshAggregateValidationReadout() {
-        let fieldTypes = parityFieldTypes
+        let fieldTypes = parityFieldTypes + catalogueRows.filter(\.isEnabled).map(\.type)
         let allValid = isFormValid
         let invalid = fieldTypes.filter { !isFieldValidForInspector($0) }
         let registered = SpreedlyUIManager.shared.getRegisteredFieldCount()
@@ -1240,8 +1461,12 @@ struct CustomFormView: View {
                     return
                 }
 
-                // additionalFields can carry extra billing/shipping data (empty here; see CheckoutWithAdditionalFieldsView)
-                let additionalFields: [AdditionalField: String] = [:]
+                // Hosted-wins demo: pass a conflicting ZIP; mounted ZIP field value should win.
+                var additionalFields: [AdditionalField: String] = [:]
+                if demoHostedWinsConflict {
+                    additionalFields[.zipCode] = "00000"
+                    additionalFields[.city] = "SHOULD_NOT_WIN"
+                }
                 
                 // createCreditCard reads card data from SecureValueContainer (populated by SPLTextField)
                 let processingResult = Spreedly.shared().createCreditCard(
@@ -1252,10 +1477,20 @@ struct CustomFormView: View {
                 
                 if processingResult.isValidationFailed {
                     self.isLoading = false
-                    self.errorMessage = "Validation failed: \(processingResult.getDescription())"
+                    if forceConflictingExpiry {
+                        self.errorMessage = "Expected failure (conflicting expiry mounts): \(processingResult.getDescription())"
+                    } else {
+                        self.errorMessage = processingResult.getDescription()
+                    }
                     self.paymentResult = nil
+                    self.customValidationTick += 1
+                    self.refreshAggregateValidationReadout()
                 } else if processingResult.isProcessing {
                     // API call in flight — result arrives via subscribeToPaymentResults
+                    if demoHostedWinsConflict {
+                        // Sanitized note only — no field values.
+                        self.errorMessage = nil
+                    }
                 }
             }
         }
@@ -1414,7 +1649,8 @@ private enum CustomFormInspectorFormatting {
         case .city: return "City"
         case .state: return "State"
         case .zipCode: return "ZIP code"
-        @unknown default: return "Field (\(type.rawValue))"
+        case .country: return "Country"
+        default: return "Field (\(type.rawValue))"
         }
     }
 

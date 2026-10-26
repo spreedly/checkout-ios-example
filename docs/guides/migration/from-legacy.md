@@ -70,6 +70,10 @@ Five steps to replace iframe hosted fields on iOS:
 
 Deep dives: [Custom Payment Forms](../custom-payment-forms.md) (headless), [Express Checkout](../express-checkout.md) (drop-in).
 
+This table compares the two **card-entry** approaches for a merchant porting an iframe integration.
+For "which guide do I need?" across every payment method, see
+[Getting Started — Choosing your integration path](../getting-started.md#choosing-your-integration-path).
+
 ---
 
 ## Not the same as iframe

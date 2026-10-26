@@ -5,6 +5,40 @@ All notable changes to the Spreedly iOS SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-10-16
+
+> [!WARNING]
+> **Minimum deployment target change**
+>
+> This release raises the SDK's minimum deployment target to iOS 16.0 (previously iOS 14.0). If your app still targets iOS 14 or 15, you can't adopt 1.7.0 without also raising your app's minimum deployment target. Devices that cannot run iOS 16 — including iPhone 7 and earlier, and the first-generation iPhone SE — cannot run an app that adopts it. Because 1.7.0 is a 1.x release, `from: "1.6.1"` (Swift Package Manager) and `~> 1.6` (CocoaPods) resolve to it on your next update. To stay on 1.6.x, pin `.upToNextMinor(from: "1.6.1")` or `'~> 1.6.0'`. See the [iOS 16 migration guide](guides/migration/v1-to-v2.md).
+
+### Added
+
+- **Custom field validators**: Register a rule per field with `Spreedly.shared().addValidation(field:)` / `removeValidation(field:)`, then run it on Pay with `runCustomValidationBeforeSubmit(additionalFields:)`. Your `.invalid("…")` message shows under the field and in `HostedFieldState.errorMessage`, fails card tokenize, and clears when the shopper edits. `areAllFieldsValid` reports the last result without re-running your validators. Opt in to checking when the shopper leaves a field with `enablingCustomValidationOnBlur()` (SwiftUI) or `evaluatesCustomValidationOnBlur` (UIKit/Objective-C). Card number, CVV, expiry, and `createBankAccount` are not covered. Objective-C: `addValidationForField:validator:`, `removeValidationForField:`, `runCustomValidationBeforeSubmitWithAdditionalFields:`.
+- **Expanded billing and shipping catalogue**: Mount or tokenize email, company, country, phone and phone parts, street-split address (`houseNumberOrName` / `street` / `streetLine2`), and shipping fields via `FormFieldType`, `AdditionalField`, and Express `otherFields`.
+- **Headless length helpers**: `AdditionalFieldCharLimits`, `AdditionalFieldCombinedNameLimit`, and `AdditionalFieldAPISafety.validateCharLimitOnly(field:value:)` expose the length checks the SDK applies to headless `additionalFields`.
+- **Third-party licenses**: The package root and every framework zip now include `THIRD-PARTY-LICENSES.md` with the license and notice texts for the Datadog, Stripe and Braintree code compiled into the frameworks; the Getting Started guide lists which framework contains each.
+- **`updateSubmitLabel` (Objective-C)**: Change the keyboard return-key label after init with `[field updateSubmitLabel:]` on `SPLTextFieldViewController`.
+
+### Fixed
+
+- **Hosted field display**: The card brand chip stays visible in dark mode, and long validation messages wrap instead of ending in `…`.
+- **Edit-menu Delete crash**: Tapping **Delete** in the long-press menu of a hosted field no longer crashes the app; it now removes the selected text.
+- **Objective-C name keys**: `createCreditCardObjC…` and `createBankAccountObjC…` now accept `first_name` / `last_name` as well as `firstName` / `lastName` in `additionalFields`; previously the snake_case spelling was silently ignored.
+- **Release archive signatures**: Framework zips no longer carry leftover signature files from earlier builds, which made `codesign --verify` fail after unzipping.
+- **SBOM**: The published `sbom.json` is now valid CycloneDX 1.5 and lists the Datadog, Stripe and Braintree code compiled into the frameworks, with the shipped version, purl and license of each, plus Forter3DS as a dependency your app supplies.
+
+### Changed
+
+- **Breaking: minimum iOS version is now 16.0** — apps with a deployment target below iOS 16 can no longer adopt the SDK; see the deployment target warning above.
+- **Breaking: looser client-side field rules** — Hosted card name accepts any non-blank value, address line 1 no longer needs 5+ characters, and ZIP only checks length beyond the required check. Headless `additionalFields` accepts blank values and only checks length and email format, so values the SDK used to reject may now return a server error instead. Keep required or format rules in your UI (`isRequired`, `allowBlankName`, or `addValidation`); `ZipCodeRule` / `AddressRule` are deprecated — use `ValidationUtils.zipCodeRules` / `addressLine1Rules`.
+- **Tokenize payload**: A mounted hosted field wins over the same `additionalFields` key; for unmounted fields an `additionalFields` entry wins even when blank — omit the key to keep the stored form value. First, last, and full name are each sent as entered; a lone first or last name is no longer merged into full name. Length caps: address and company 500, email 254, country 100, ZIP and phone 15, first + last name 350 combined (reported on the longer name). A custom validator cannot relax these limits.
+- **Validation feedback**: Error messages name the exact field (for example `Address line 1 is required`), with shipping-prefixed copy for shipping fields. `CardFormDropIn` Pay stays tappable (disabled only while processing) and shows field errors instead of disabling, announcing them to VoiceOver. Mounting combined expiration together with month/year fails validation until only one date shape remains.
+
+### Security
+
+- **Custom validator errors**: When a custom validator throws, the SDK no longer passes the error to its logs or to a logger set with `Spreedly.setLogger`; only the field name is recorded.
+
 ## [1.6.1] - 2026-08-12
 
 ### Added

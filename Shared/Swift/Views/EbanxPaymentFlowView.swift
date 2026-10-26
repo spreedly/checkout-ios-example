@@ -154,7 +154,12 @@ struct EbanxPaymentFlowView: View {
         .onAppear {
             setupSubscriptions()
         }
-        .onDisappear(perform: cleanupSubscriptions)
+        .onDisappear {
+            // Safari presentation fires onDisappear. Cancelling here drops the
+            // checkout PaymentResult and leaves the pay button spinning.
+            guard !isLoading, stage == .idle else { return }
+            cleanupSubscriptions()
+        }
     }
     
     // MARK: - Header
@@ -319,7 +324,7 @@ struct EbanxPaymentFlowView: View {
     
     // Step 0: Subscribe to payment results (fires for both tokenization AND checkout)
     private func setupSubscriptions() {
-        paymentResultCancellable?.cancel()
+        guard paymentResultCancellable == nil else { return }
         paymentResultCancellable = Spreedly.shared().subscribeToPaymentResults { result in
             handlePaymentResult(result)
         }

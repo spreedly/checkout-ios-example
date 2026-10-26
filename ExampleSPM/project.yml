@@ -8,7 +8,7 @@ options:
 packages:
   checkout-ios-package:
     url: https://github.com/spreedly/checkout-ios-package
-    from: "1.6.1"
+    from: "1.7.0"
   stripe-ios-spm:
     url: https://github.com/stripe/stripe-ios-spm
     from: "25.11.0"
