@@ -499,7 +499,7 @@ Spreedly.shared().resetPaymentState()
 
 Objective-C: `[[Spreedly shared] resetPaymentFormPreservingDisplayConfig]` and `resetPaymentState`.
 
-Card and CVC rows follow global hosted display state internally. Use **`Spreedly.shared().setNumberFormat(_:)`** / **`Spreedly.shared().toggleMask()`** from UI outside the sheet. Read **`Spreedly.shared().hostedCardDisplayState.cvvDisplayMasked`** for labels only — not a mask API. See [PAN/CVV display](custom-payment-forms.md#pancvv-display-iframe-and-web-hosted-field-parity) and [read flags vs mask actions](custom-payment-forms.md#hostedcarddisplaystate-read-vs-mask-actions).
+Card and CVC rows follow global hosted display state internally. Use **`Spreedly.shared().setNumberFormat(_:)`** / **`Spreedly.shared().toggleMask()`** from UI outside the sheet. Read **`Spreedly.shared().hostedCardDisplayState.cvvDisplayMasked`** for labels only — not a mask API. See [PAN/CVV display](custom-payment-forms.md#pancvv-display-global-hosted-display) and [read flags vs mask actions](custom-payment-forms.md#hostedcarddisplaystate-read-vs-mask-actions).
 
 For **`HostedFieldState`** / digit counts / brand while typing, per-field mask hooks, and UIKit/ObjC wiring, use **headless** `SPLTextField` — [Headless PAN API quick reference](custom-payment-forms.md#headless-pan-api-quick-reference) and [Migration from legacy iframe-ui](migration/from-legacy.md).
 
@@ -569,14 +569,16 @@ Spreedly.shared().setParam(parameter: .allowInternationalZipCodes, value: true)
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `allowBlankName` | `false` | Allow empty cardholder name |
+| `allowBlankName` | `false` | Allow empty **hosted** cardholder name (`SPLTextField` / Express). Does not gate blank values in a headless `additionalFields` map. |
 | `allowExpiredDate` | `false` | Allow expired dates |
 | `allowBlankDate` | `false` | Allow empty expiration month/year |
-| `allowInternationalZipCodes` | `true` | When `false`, ZIP/postal fields accept US numeric ZIP only (`12345` or `12345-6789`); when `true`, international postal codes with letters, spaces, and hyphens are allowed |
+| `allowInternationalZipCodes` | `true` | Does not change ZIP *format* rules on iOS (any characters up to the char limit). When `true`, ZIP fields use a full keyboard; when `false`, they use a number pad. Use `addValidation` for format rules. |
 
 ### Additional Fields
 
-Add address fields:
+Add extra rows on the Express sheet with `otherFields`. Each entry is a `FormField` (type + labels + required). The drop-in builds Spreedly-managed inputs; shopper values tokenize automatically.
+
+**Classic address**
 
 ```swift
 CardFormDropIn(
@@ -585,7 +587,9 @@ CardFormDropIn(
         FormField(id: "addressLine2", title: "Address Line 2", type: .addressLine2, isRequired: false),
         FormField(id: "city", title: "City", type: .city, isRequired: true),
         FormField(id: "state", title: "State", type: .state, isRequired: true),
-        FormField(id: "zipCode", title: "ZIP Code", type: .zipCode, isRequired: true)
+        FormField(id: "zipCode", title: "ZIP Code", type: .zipCode, isRequired: true),
+        FormField(id: "country", title: "Country", type: .country, isRequired: true),
+        FormField(id: "email", title: "Email", type: .email, isRequired: false)
     ],
     onProcessingResult: { result in
         if result.isProcessing { /* show loading */ }
@@ -594,7 +598,56 @@ CardFormDropIn(
 )
 ```
 
-Each **`FormField`** only carries **type**, **labels**, and **required** — the drop-in builds internal `SPLTextField` rows from them. You **cannot** attach `onFieldStateChange` / `onFocusChanged` / `onInputLength` to these entries; for iframe-style per-field callbacks use **headless** **`SPLTextField`** in [custom-payment-forms.md](custom-payment-forms.md#spltextfield-component).
+**Street-split address** (house + street instead of a single address line):
+
+```swift
+otherFields: [
+    FormField(id: "house", title: "House / building", type: .houseNumberOrName, isRequired: true),
+    FormField(id: "street", title: "Street", type: .street, isRequired: true),
+    FormField(id: "street2", title: "Street line 2", type: .streetLine2, isRequired: false),
+    FormField(id: "city", title: "City", type: .city, isRequired: true),
+    FormField(id: "zipCode", title: "ZIP", type: .zipCode, isRequired: true),
+    FormField(id: "phoneCountry", title: "Country code", type: .phoneNumberCountryCode, isRequired: false),
+    FormField(id: "phoneArea", title: "Area code", type: .phoneNumberAreaCode, isRequired: false)
+]
+```
+
+| You want… | Mount these `FormFieldType`s |
+|-----------|------------------------------|
+| Classic lines | `.addressLine1`, optional `.addressLine2`, city/state/ZIP/country |
+| Street split | `.houseNumberOrName`, `.street`, optional `.streetLine2`, plus locality |
+| Contact | `.email`, `.company`, `.phoneNumber` (or phone country/area parts) |
+| Shipping | `.shippingAddress1` … / `.shippingHouseNumberOrName` … twins |
+
+Prefer **one** address shape on the sheet so shoppers are not asked twice. Full catalogue and headless/`additionalFields` tokenize path: [custom-payment-forms.md — Additional Fields](custom-payment-forms.md#additional-fields-billingshipping).
+
+Each **`FormField`** only carries **type**, **labels**, and **required**. You **cannot** attach `onFieldStateChange` / `onFocusChanged` / `onInputLength` here — use headless **`SPLTextField`** in [custom-payment-forms.md](custom-payment-forms.md#spltextfield-component) for per-field callbacks.
+
+### Custom field validators
+
+Add your own format check on top of Spreedly’s built-in length/required rules (for example US ZIP only when country is US).
+
+```swift
+// Register once (e.g. before presenting CardFormDropIn)
+Spreedly.shared().addValidation(field: .zipCode) { value, fields in
+    if fields[.country] != "US" { return .valid }
+    let ok = value.range(of: #"^\d{5}(-\d{4})?$"#, options: .regularExpression) != nil
+    return ok ? .valid : .invalid("Enter a valid US ZIP code")
+}
+
+// Later
+Spreedly.shared().removeValidation(field: .zipCode)
+```
+
+| Topic | Express behavior |
+|-------|------------------|
+| API | `addValidation(field:)` with `CustomValidatableFieldName` (29 cases — names, address, email, street-split, shipping twins) |
+| When it runs | Blur + Pay on **card** Express / `createCreditCard` (built-in rules always run first). Does **not** run on `createBankAccount` (ACH). |
+| Pay button | Always tappable except while processing; invalid Pay shows errors and does **not** tokenize |
+| Fail-closed | Thrown validator / bad return → generic `"{label} is invalid"` |
+| Clear on edit | Editing the field clears the custom error; rule re-runs on next blur or Pay |
+
+Not allowed: card number, CVC, expiry, ACH. Full how-to (headless blur, ObjC wire keys): [Custom payment forms — custom field validators](custom-payment-forms.md#custom-field-validators).
 
 ### Year Format
 

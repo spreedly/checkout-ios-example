@@ -34,6 +34,8 @@ import SpreedlyUI
 // drop-in demos can share the same preset options.
 
 struct CheckoutBasicView: View {
+    @ObservedObject private var uiManager = SpreedlyUIManager.shared
+
     // Step 2: State variables — control what's shown and track payment lifecycle
     @State private var showForm = false                    // controls sheet presentation
     @State private var paymentResult: PaymentResult?       // holds successful payment result
@@ -244,7 +246,35 @@ struct CheckoutBasicView: View {
                             .accessibilityHint(AccessibilityHints.BasicCheckout.allowBlankDateToggle)
                             .accessibilityElement(children: .combine)
                         }
-                        
+
+                        // setNumberFormat / toggleMask are global, so the drop-in sheet picks up whatever is set here.
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(HostedCardDisplayFormatCopy.maskToggleCaption)
+                                .font(.subheadline)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Picker(
+                                "Card number format",
+                                selection: Binding(
+                                    get: { uiManager.hostedCardDisplayState.cardNumberFormat },
+                                    set: { Spreedly.shared().setNumberFormat($0) }
+                                )
+                            ) {
+                                Text("Pretty").tag(CardNumberFormat.pretty)
+                                Text("Plain").tag(CardNumberFormat.plain)
+                                Text("Masked").tag(CardNumberFormat.masked)
+                            }
+                            .pickerStyle(SegmentedPickerStyle())
+                            .accessibilityIdentifier("basic-checkout-pan-format-segmented")
+
+                            Button("toggleMask()") {
+                                Spreedly.shared().toggleMask()
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(Color(red: 0.0/255.0, green: 119.0/255.0, blue: 200.0/255.0))
+                            .accessibilityIdentifier("basic-checkout-toggle-mask-button")
+                            .accessibilityHint("Toggles plain revealed ↔ masked hidden for PAN and CVC")
+                        }
+
                         HStack {
                             Text("Year Format:")
                                 .accessibilityIdentifier(AccessibilityIdentifiers.BasicCheckout.yearFormatLabel)

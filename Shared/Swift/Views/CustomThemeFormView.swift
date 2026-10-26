@@ -252,7 +252,7 @@ struct CustomThemeFormView: View {
                 // Handle immediate processing result
                 if processingResult.isValidationFailed {
                     self.isLoading = false
-                    self.errorMessage = "Validation failed: \(processingResult.getDescription())"
+                    self.errorMessage = processingResult.getDescription()
                     self.paymentResult = nil
                 } else if processingResult.isProcessing {
                     // Keep loading state - actual result will come through the subscription

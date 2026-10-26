@@ -171,11 +171,9 @@
 
 + (UIFont *)bodyFont {
     UIFont *font = [UIFont systemFontOfSize:16 weight:UIFontWeightRegular];
-    if (@available(iOS 14.0, *)) {
-        UIFontDescriptor *descriptor = [font.fontDescriptor fontDescriptorWithDesign:UIFontDescriptorSystemDesignRounded];
-        if (descriptor) {
-            font = [UIFont fontWithDescriptor:descriptor size:16];
-        }
+    UIFontDescriptor *descriptor = [font.fontDescriptor fontDescriptorWithDesign:UIFontDescriptorSystemDesignRounded];
+    if (descriptor) {
+        font = [UIFont fontWithDescriptor:descriptor size:16];
     }
     return font;
 }

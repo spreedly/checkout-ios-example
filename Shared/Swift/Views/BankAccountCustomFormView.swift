@@ -744,7 +744,7 @@ struct BankAccountCustomFormView: View {
 
                 if processingResult.isValidationFailed {
                     self.isLoading = false
-                    self.errorMessage = "Validation failed: \(processingResult.getDescription())"
+                    self.errorMessage = processingResult.getDescription()
                     self.paymentResult = nil
                 }
             }

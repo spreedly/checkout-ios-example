@@ -361,11 +361,9 @@
 
 - (UIFont *)roundedFontOfSize:(CGFloat)size weight:(UIFontWeight)weight {
     UIFont *font = [UIFont systemFontOfSize:size weight:weight];
-    if (@available(iOS 14.0, *)) {
-        UIFontDescriptor *descriptor = [font.fontDescriptor fontDescriptorWithDesign:UIFontDescriptorSystemDesignRounded];
-        if (descriptor) {
-            return [UIFont fontWithDescriptor:descriptor size:size];
-        }
+    UIFontDescriptor *descriptor = [font.fontDescriptor fontDescriptorWithDesign:UIFontDescriptorSystemDesignRounded];
+    if (descriptor) {
+        return [UIFont fontWithDescriptor:descriptor size:size];
     }
     return font;
 }

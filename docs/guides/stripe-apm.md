@@ -1,35 +1,49 @@
-# Stripe APM Integration - Spreedly iOS SDK
+# Stripe APM — Spreedly iOS SDK
 
-Accept European payment methods via Stripe PaymentSheet (iDEAL, Bancontact, EPS, P24, SEPA).
+> **Action required if you also link Stripe directly:** pin Stripe to `25.x`. Stripe `26.x` will
+> fail SPM resolution while Spreedly resolves `25.x`. See [Install](#3-install).
 
-**Estimated integration time:** ~15 minutes
+Accept European bank-redirect payment methods — iDEAL, Bancontact, EPS, P24, SEPA Debit — through
+Stripe's native PaymentSheet.
 
-## Table of Contents
+|  |  |
+|---|---|
+| **Use this when** | You want European APMs and your Spreedly gateway is Stripe Payment Intents |
+| **Use something else when** | PayPal or Venmo → [Braintree APM](braintree-apm.md) · other redirect APMs → [Offsite payments](offsite-payments.md) |
+| **You build** | 3 things: a purchase endpoint · a checkout screen · a webhook handler |
+| **Modules** | `SpreedlyCore` + `SpreedlySecurity` + `SpreedlyUI` + `SpreedlyStripeAPM` |
+| **Requires** | SDK 1.7.0+ · iOS 16.0+ (iOS 14.0+ on 1.6.x) · Xcode 26.0+ |
+| **Integration time** | ~15 minutes |
+| **UI** | Partner-hosted Stripe PaymentSheet — SwiftUI · UIKit · Objective-C |
 
-1. [Introduction](#introduction)
-2. [Supported APM Types](#supported-apm-types)
-3. [Prerequisites](#prerequisites)
-4. [URL Handling](#url-handling)
-5. [SDK Methods](#sdk-methods)
-6. [Flow](#flow)
-7. [Backend API](#backend-api)
-8. [SwiftUI Integration](#swiftui-integration)
-9. [UIKit Integration](#uikit-integration)
-10. [Objective-C Integration](#objective-c-integration)
-11. [Result States](#result-states)
-12. [Important Notes](#important-notes)
-13. [Troubleshooting](#troubleshooting)
-14. [Related Documentation](#related-documentation)
+**Fast path:** [How it works](#1-how-it-works) → [What you need](#2-what-you-need) →
+[Install](#3-install) → [Configure your app](#4-configure-your-app) →
+[Build the flow](#5-build-the-flow) → [your platform](#6-integration-by-platform).
 
 ---
 
-## Introduction
+## 1. How it works
 
-Stripe APM lets users pay via alternative payment methods (iDEAL, Bancontact, EPS, P24, SEPA Debit) using Stripe's native PaymentSheet. Unlike EBANX and other offsite flows, Stripe APM does **not** require a separate payment method tokenization step. Your backend creates a pending purchase directly, and the Stripe PaymentSheet handles APM selection and payment confirmation natively.
+Three parts. Unlike offsite payments, there is **no tokenization step** — your server creates a
+pending purchase directly, and the PaymentSheet handles selection and confirmation.
 
-**Required for Stripe integration:** Stripe's code and resource bundles ship **inside** `SpreedlyStripeAPM`. Add `SpreedlyStripeAPM` (SPM or CocoaPods) to your app target and you're set — no separate Stripe package. Only add Stripe yourself if your app calls Stripe APIs outside the Spreedly module.
+| Part | Who builds it | Job |
+|---|---|---|
+| Purchase endpoint | **Your server** | Creates the pending purchase, returns a client secret and transaction token |
+| Checkout screen | **Your app** | Presents the PaymentSheet and handles the return URL |
+| Webhook handler | **Your server** | Receives the final outcome. Fulfil orders here, not on the SDK result |
 
-### Offsite vs Stripe APM vs Braintree
+A single successful payment:
+
+1. The shopper taps pay in your app.
+2. Your app asks your server for a pending purchase.
+3. Your server calls Spreedly and returns the client secret and transaction token.
+4. Your app presents the PaymentSheet; the shopper picks a method and authenticates at their bank.
+5. The bank redirects back into your app; the SDK publishes a `PaymentResult`.
+6. Stripe notifies Spreedly, Spreedly notifies your `callback_url`, and you fulfil the order.
+
+<details>
+<summary><b>How this differs from Offsite and Braintree</b></summary>
 
 | Feature | Offsite | Stripe APM | Braintree |
 |---------|---------|------------|-----------|
@@ -39,62 +53,70 @@ Stripe APM lets users pay via alternative payment methods (iDEAL, Bancontact, EP
 | Return flow | Deep link redirect | Deep link redirect | URL scheme / Universal Link |
 | Module | SpreedlyUI | SpreedlyStripeAPM | SpreedlyBraintree |
 
----
+</details>
 
-## Supported APM Types
-
-| Type | apm_types Value | Country | Currency |
-|------|-----------------|---------|----------|
-| iDEAL | `"ideal"` | Netherlands | EUR |
-| Bancontact | `"bancontact"` | Belgium | EUR |
-| EPS | `"eps"` | Austria | EUR |
-| P24 | `"p24"` | Poland | PLN, EUR |
-| SEPA Debit | `"sepa_debit"` | Eurozone | EUR |
-
-Pass one or more of these values in the `apm_types` array when creating the pending purchase on your backend. The Stripe PaymentSheet displays only the APMs you specify (filtered by the currency in the purchase request).
-
-**Typed constants (optional):** In Swift you can use `StripeAPMType` (e.g. `StripeAPMType.ideal.apmTypeValue`). In Objective-C use `StripeAPMTypeHelper.apmTypeValueForType:` (e.g. `[StripeAPMTypeHelper apmTypeValueForType:StripeAPMTypeEps]`). You can also pass string literals directly (e.g. `"ideal"`, `"sepa_debit"`).
+**Working on only one part?** Backend → [step 1](#step-1--create-a-pending-purchase--your-server) ·
+iOS → [step 2](#step-2--build-the-config--your-app) · Webhooks →
+[What you need](#2-what-you-need), row 4.
 
 ---
 
-## Prerequisites
+## 2. What you need
 
-Before integrating Stripe APM:
+Account and dashboard setup you cannot do from Xcode. Each missing item fails at **runtime**, not
+at compile time.
 
-1. Complete [getting-started.md](getting-started.md) (installation, basic setup)
-2. Ensure `Spreedly.initializeSDK()` is called at app launch (e.g., in your `App.init()` or `AppDelegate`)
-3. **Stripe account** with APM payment methods enabled in the Stripe dashboard
-4. **Stripe Payment Intents gateway** configured in Spreedly
-5. **Stripe publishable key** (from the Stripe dashboard, starts with `pk_test_` or `pk_live_`)
-6. **Stripe webhook** configured to send all Payment Intent events to Spreedly (required for delayed payment methods)
-7. **SpreedlyStripeAPM** added to your app target (Stripe is fully embedded; no separate Stripe dependency)
-8. **Info.plist:** Set **Bundle display name** (`CFBundleDisplayName`) in your app's `Info.plist`. The Stripe SDK requires it to be non-nil; otherwise you may see: *"CFBundleDisplayName must be non-nil. Please set 'Bundle display name' in your Info.plist."*
-9. **Info.plist:** Add `NSCameraUsageDescription` with a user-facing string. The Stripe SDK's `StripePaymentSheet` includes card scanning that references camera APIs internally. Apple rejects App Store builds without this key (`ITMS-90683`), even if card scanning is never used.
+| Category | You need | Where to get it |
+|---|---|---|
+| Spreedly | Stripe Payment Intents gateway | Spreedly dashboard → Gateways |
+| Gateway / partner | APMs enabled on your Stripe account | Stripe dashboard → Settings → Payment methods |
+| Credentials | Stripe publishable key (`pk_test_…` / `pk_live_…`) | Stripe dashboard → Developers → API keys |
+| Webhooks | Stripe webhook sending all Payment Intent events to Spreedly | Stripe dashboard → Developers → Webhooks. Required — SEPA and other delayed methods settle asynchronously and never report final status without it |
+| Your backend | An endpoint that creates the pending purchase | See [step 1](#step-1--create-a-pending-purchase--your-server) |
 
-Stripe APM lives in **SpreedlyStripeAPM**; PaymentSheet and its resources are part of that XCFramework. You do not manage a separate Stripe product or version for **APM-only** Spreedly checkout.
+### Compatibility
 
-### Stripe dependency (SPM and CocoaPods)
+| SDK version | iOS | Xcode | Notes |
+|---|---|---|---|
+| 1.7.0+ | **16.0+** | 26.0+ | Stripe embedded in `SpreedlyStripeAPM` |
+| 1.6.x | 14.0+ | 26.0+ | Last line that supports iOS 14 and 15 — see [Migrating to iOS 16](migration/v1-to-v2.md) |
 
-There is no separate `StripePaymentSheet` dependency to add for APM-only. SPM and CocoaPods both pull **SpreedlyStripeAPM** only; Stripe is built in.
+Assumed done: [Getting Started](getting-started.md) — installation plus `Spreedly.initializeSDK()`
+at launch and `Spreedly.setup(config:)` with a signed bundle from your server.
 
-**If you also add [stripe-ios-spm](https://github.com/stripe/stripe-ios-spm) on the app target** (required for [Stripe Radar](stripe-radar.md), or if your app calls Stripe APIs outside Spreedly), you **must** stay on **Stripe 25.x**:
+---
 
-| Rule | Value |
-|------|--------|
-| **SPM (recommended)** | `from: "25.11.0"` (Up to Next Major → **25.x** only) |
-| **Do not use** | Stripe **26.x** while Spreedly still resolves **25.x** — SPM will fail to resolve |
+## 3. Install
 
-Details and troubleshooting: [Stripe Radar — Stripe version](stripe-radar.md#stripe-version-required).
+> **You'll need:** the latest tag from
+> [checkout-ios-package](https://github.com/spreedly/checkout-ios-package/releases). Use one
+> version for every Spreedly module in your app.
 
-### CocoaPods: Stripe Bundle Patcher {#cocoapods-stripe-bundle-patcher}
+Stripe's code and resource bundles ship **inside** `SpreedlyStripeAPM`. Do not add a separate
+Stripe dependency for APM-only integrations.
 
-If you use **SpreedlyStripeAPM** with CocoaPods, you **must** add a `post_install` block so Stripe resource bundles are copied with the names the SDK expects. Without this, the app will crash at runtime with `Fatal error: unable to find bundle named Stripe_StripePaymentSheet`.
+**Swift Package Manager**
 
-**SPM users do not need this step** — when you add `SpreedlyStripeAPM` via SPM, `StripePaymentSheet` is resolved as a transitive dependency automatically and bundles already use the correct names.
+```swift
+.package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.7.0")  // use the latest release tag
+// Link SpreedlyCore, SpreedlySecurity, SpreedlyUI, SpreedlyStripeAPM to your app target.
+```
 
-**Why this is needed:** The Spreedly `SpreedlyStripeAPM` XCFramework is built against Stripe via SPM, which produces resource bundles named `Stripe_StripePaymentSheet`. When merchants install through CocoaPods, bundle names differ (`StripePaymentSheet_StripePaymentSheet`). The patcher renames/copies bundles so the embedded XCFramework finds them at runtime.
+**CocoaPods**
 
-Add the following to your Podfile (after your `pod` declarations), then run `pod install`:
+```ruby
+pod 'SpreedlyCore',      '~> 1.7'
+pod 'SpreedlySecurity',  '~> 1.7'
+pod 'SpreedlyUI',        '~> 1.7'
+pod 'SpreedlyStripeAPM', '~> 1.7'
+```
+
+<a id="cocoapods-stripe-bundle-patcher"></a>
+<details>
+<summary>CocoaPods only — required Stripe bundle patcher</summary>
+
+Without this block the app crashes at launch with
+`Fatal error: unable to find bundle named Stripe_StripePaymentSheet`. SPM users do not need it.
 
 ```ruby
 post_install do |installer|
@@ -103,6 +125,13 @@ post_install do |installer|
   SpreedlyStripeAPM::CocoaPods.apply_stripe_bundle_patch(installer)
 end
 ```
+
+Run `pod install` afterwards.
+
+**Why this is needed:** the `SpreedlyStripeAPM` XCFramework is built against Stripe via SPM, which
+produces resource bundles named `Stripe_StripePaymentSheet`. CocoaPods names them differently
+(`StripePaymentSheet_StripePaymentSheet`). The patcher renames or copies bundles so the embedded
+XCFramework finds them at runtime.
 
 Local development fallback (`:path => '../checkout-ios-package'`) is also supported:
 
@@ -113,78 +142,102 @@ post_install do |installer|
 end
 ```
 
-The `cocoapods_stripe_bundle_patcher.rb` script is shipped inside the `SpreedlyStripeAPM` pod via `preserve_paths`, so `installer.sandbox.pod_dir('SpreedlyStripeAPM')` locates it automatically — no manual file copy or path setup needed. This works for both remote (`:git =>`) and local (`:path =>`) pod installs.
+The `cocoapods_stripe_bundle_patcher.rb` script ships inside the pod via `preserve_paths`, so
+`installer.sandbox.pod_dir('SpreedlyStripeAPM')` locates it automatically — no manual file copy or
+path setup. This works for both remote (`:git =>`) and local (`:path =>`) installs. The script
+patches the Pods embed script and adds a "Copy Stripe bundle for SPM" Run Script phase to your app
+target.
 
-The script patches the Pods embed script and adds a "Copy Stripe bundle for SPM" Run Script phase to your app target so all required Stripe bundles are present with SPM-expected names at runtime.
+**React Native:** the `checkout-react-native` Podfile's `apply_spreedly_stripe_support` uses the
+same sandbox-based lookup.
 
-**React Native (checkout-react-native):** The RN Podfile's `apply_spreedly_stripe_support` uses the same sandbox-based lookup to find the patcher script automatically.
+</details>
+
+<details>
+<summary>If your app also links Stripe directly</summary>
+
+Only relevant if you use [Stripe Radar](stripe-radar.md) or call Stripe APIs outside Spreedly, via
+[stripe-ios-spm](https://github.com/stripe/stripe-ios-spm).
+
+| Rule | Value |
+|------|--------|
+| **SPM (recommended)** | `from: "25.11.0"` (Up to Next Major → **25.x** only) |
+| **Do not use** | Stripe **26.x** while Spreedly still resolves **25.x** — SPM will fail to resolve |
+
+Details and troubleshooting: [Stripe Radar — Stripe version](stripe-radar.md#stripe-version-required).
+
+</details>
 
 ---
 
-## URL Handling
+## 4. Configure your app
 
-Add a custom URL scheme to your app's `Info.plist` for redirect-based APMs. Example `CFBundleURLTypes` entry:
+> **You'll need:** a custom URL scheme you own, and your app's display name.
+
+| Key | Value | Why | Required |
+|---|---|---|---|
+| `CFBundleURLTypes` | your scheme, e.g. `myapp` | Bank redirects return the shopper to your app | Yes |
+| `CFBundleDisplayName` | your app name | Stripe traps at launch when it is nil | Yes |
+| `NSCameraUsageDescription` | any user-facing string | Stripe's PaymentSheet references camera APIs; App Store rejects with `ITMS-90683` without it, even though card scanning is never shown | Yes |
 
 ```xml
 <key>CFBundleURLTypes</key>
 <array>
-    <dict>
-        <key>CFBundleTypeRole</key>
-        <string>Editor</string>
-        <key>CFBundleURLName</key>
-        <string>com.yourcompany.yourapp.stripe</string>
-        <key>CFBundleURLSchemes</key>
-        <array>
-            <string>myapp</string>
-        </array>
-    </dict>
+  <dict>
+    <key>CFBundleTypeRole</key><string>Editor</string>
+    <key>CFBundleURLName</key><string>com.yourcompany.yourapp.stripe</string>
+    <key>CFBundleURLSchemes</key><array><string>myapp</string></array>
+  </dict>
 </array>
 ```
 
-> **Braintree users:** If your app also uses Braintree (PayPal/Venmo), you must add a separate URL scheme: `$(PRODUCT_BUNDLE_IDENTIFIER).spreedly.braintree`. See [getting-started.md](getting-started.md#required-infoplist-entries) for the complete `CFBundleURLTypes` setup including both Stripe and Braintree schemes.
-
-After the user completes authentication in Safari (e.g., iDEAL bank auth), they are redirected back into your app. The same `handleOffsiteReturn(url:)` call you already use for offsite payments handles Stripe APM redirects too. In **SwiftUI** use `onOpenURL`; in **UIKit/Objective-C** handle the URL in `SceneDelegate` (or `AppDelegate`). See the platform examples below.
-
-> **Note:** Stripe return URL handling is done via the SDK's URL pre-handler (`Spreedly.shared().setURLPreHandler`). When you present the Stripe PaymentSheet, the SDK registers a pre-handler that forwards Stripe redirect URLs to `SpreedlyStripeAPMCheckout.handleStripeReturnURL(_:)`. Your app's `onOpenURL` or `SceneDelegate` should still forward URLs to `handleOffsiteReturn(url:)`, which invokes the pre-handler chain.
-
-### redirect_url vs returnURL Clarification
-
-- **Backend `redirect_url`** (in the purchase API): Can be either a **Spreedly-hosted URL** (e.g. `https://spreedly.com/stripe-apm/redirect`) or your **custom scheme** (e.g. `myapp://stripe-redirect`).
-- **`StripeAPMConfig.returnURL`**: Your app's **custom URL scheme base** (e.g. `myapp://stripe-redirect`). This must match the scheme registered in `Info.plist` under `CFBundleURLTypes`.
-- **Token appended automatically:** When the SDK presents the Stripe PaymentSheet, it appends `transaction_token={token}` as a query parameter to your `returnURL` (joined with `?` or `&` depending on the URL). Register the **base** scheme/path in `Info.plist`; the SDK handles the token parameter for you.
-- **Example app:** The Spreedly example app uses a Spreedly-hosted URL for the backend `redirect_url` and a custom scheme for `returnURL`.
+> **Important:** `StripeAPMConfig.returnURL` must use the scheme you register here. The SDK appends
+> `transaction_token=…` to it for you — register the base scheme only.
 
 ---
 
-## SDK Methods
+## 5. Build the flow
 
-| # | Method | Module | Purpose |
-|---|--------|--------|---------|
-| 1 | Backend: create pending purchase | Merchant backend | Get `client_secret` and `transaction_token` |
-| 2 | `SpreedlyStripeAPMCheckout.present(config:)` / `present(config:from:)` / `present(config:appearance:)` / `present(config:appearance:from:)` | SpreedlyStripeAPM | Present Stripe PaymentSheet. The no-argument variant finds the topmost VC automatically. Use the `from:` variant to specify the presenting view controller. Use the `appearance:` variants to theme the PaymentSheet. |
-| 3 | `SpreedlyStripeAPMCheckout.handleStripeReturnURL(_ url: URL) -> Bool` | SpreedlyStripeAPM | Handle Stripe redirect URL; returns `true` if the URL was handled |
-| 4 | `subscribeToPaymentResults` | SpreedlyCore | Receive payment result |
-| 5 | `handleOffsiteReturn(url:)` | SpreedlyCore | Handle redirect when app re-opens |
+Five steps. Each is labelled with who writes it.
 
----
+<a id="backend-api"></a>
+### Step 1 — Create a pending purchase · `Your server`
 
-## Flow
+> **You'll need:** the gateway and enabled APMs from [What you need](#2-what-you-need).
 
-1. **Backend creates pending purchase:** Call Spreedly purchase API with `payment_method_type: "stripe_apm"`, `apm_types`, `redirect_url`, and `callback_url`. Receive `transaction.token`, `transaction.state == "pending"`, and `transaction.gateway_specific_response_fields.stripe_payment_intents.client_secret`.
+Your server calls the Spreedly purchase API. The shopper's app never holds your API secret.
 
-2. **Build StripeAPMConfig and present PaymentSheet:** Build `StripeAPMConfig` (publishable key, client secret, transaction token, merchant display name, return URL) and call `SpreedlyStripeAPMCheckout.present(config:)`. The SDK finds the topmost view controller; no need to pass a presenter.
+| Parameter | Required | Value and constraints |
+|---|---|---|
+| `payment_method_type` | Yes | `"stripe_apm"` |
+| `apm_types` | Yes | One or more of `ideal`, `bancontact`, `eps`, `p24`, `sepa_debit`. The sheet shows only what you pass, filtered by purchase currency |
+| `redirect_url` | Yes | A Spreedly-hosted URL or your own scheme. Must not contain personally identifiable information |
+| `callback_url` | Yes | Where Spreedly posts the final outcome. This is what you fulfil on |
 
-3. **Handle PaymentResult:** User completes payment (and any redirect). Receive `PaymentResult` via `subscribeToPaymentResults` (SwiftUI/Swift) or `SpreedlyPaymentDelegate.paymentDidComplete:` (UIKit/Objective-C).
+Keep these from the response:
 
-4. **Handle redirect URL:** When the user returns from an external flow (e.g. bank auth), forward the URL to `Spreedly.shared().handleOffsiteReturn(url:)` (SwiftUI: `onOpenURL`; UIKit/ObjC: SceneDelegate/AppDelegate).
+| Response field | Used for |
+|---|---|
+| `transaction.token` | `StripeAPMConfig.transactionToken` |
+| `transaction.gateway_specific_response_fields.stripe_payment_intents.client_secret` | `StripeAPMConfig.clientSecret` |
 
----
+`transaction.state` comes back as `"pending"`. Anything else means gateway, APM, or webhook setup
+is incomplete — go back to [What you need](#2-what-you-need).
 
-## Backend API
+Currency and country coverage: `ideal` NL/EUR · `bancontact` BE/EUR · `eps` AT/EUR ·
+`p24` PL/PLN or EUR · `sepa_debit` Eurozone/EUR.
 
-> The example app uses an in-app HTTP client to talk to a sample purchase server. In production, replace this with a call to your own backend.
+**Optional — Stripe Radar:** when your app collects a Radar session ID first
+([Stripe Radar](stripe-radar.md)), include it on the same purchase under
+`gateway_specific_fields.stripe_payment_intents.radar_session_id`. Omit the block when you have no
+session ID.
 
-Your backend calls Spreedly's API to create a pending purchase with `stripe_apm` payment method type:
+**Typed constants (optional):** in Swift use `StripeAPMType` (e.g. `StripeAPMType.ideal.apmTypeValue`).
+In Objective-C use `StripeAPMTypeHelper.apmTypeValueForType:` (e.g.
+`[StripeAPMTypeHelper apmTypeValueForType:StripeAPMTypeEps]`). String literals work too.
+
+<details>
+<summary><b>Full purchase request and response</b></summary>
 
 ```bash
 POST https://core.spreedly.com/v1/gateways/{stripe_pi_gateway_token}/purchase.json
@@ -222,119 +275,213 @@ Content-Type: application/json
 }
 ```
 
-Extract `transaction.token` (the Spreedly transaction token) and `transaction.gateway_specific_response_fields.stripe_payment_intents.client_secret` (the Stripe PaymentIntent client secret) for use in `StripeAPMConfig`.
+</details>
 
-**Optional — Stripe Radar:** When your app collects a Radar session ID first ([Stripe Radar](stripe-radar.md)), include it on the same purchase under `gateway_specific_fields.stripe_payment_intents.radar_session_id`. Omit the block when you have no session ID.
+### Step 2 — Build the config · `Your app`
 
-**`redirect_url`:** Can be a Spreedly-hosted URL (e.g. `https://spreedly.com/stripe-apm/redirect`) or your custom scheme (e.g. `myapp://stripe-redirect`). See [redirect_url vs returnURL Clarification](#redirect_url-vs-returnurl-clarification).
+> **You'll need:** your publishable key.
+
+```swift
+let config = StripeAPMConfig(
+    publishableKey: publishableKey,
+    clientSecret: clientSecret,
+    transactionToken: transaction.token,
+    merchantDisplayName: "Your Store",
+    returnURL: "myapp://stripe-redirect"
+)
+```
+
+### Step 3 — Subscribe to the result · `Your app`
+
+```swift
+cancellable = Spreedly.shared().subscribeToPaymentResults { result in
+    // See section 7
+}
+```
+
+Subscribe **before** presenting, so a fast completion cannot arrive before you are listening.
+
+### Step 4 — Present the PaymentSheet · `Your app`
+
+```swift
+SpreedlyStripeAPMCheckout.present(config: config)
+```
+
+The SDK finds the topmost view controller. If your navigation hierarchy defeats that, use
+`present(config:from:)` and pass the presenter yourself.
+
+### Step 5 — Forward the return URL · `Your app`
+
+```swift
+.onOpenURL { url in
+    Spreedly.shared().handleOffsiteReturn(url: url)
+}
+```
+
+Stripe-specific routing happens inside the SDK — no Stripe code belongs in your URL handler. In
+UIKit and Objective-C, do the same from `SceneDelegate.scene(_:openURLContexts:)`.
+
+> **Why:** when you present the sheet, the SDK registers a URL pre-handler
+> (`Spreedly.shared().setURLPreHandler`) that forwards Stripe redirects to
+> `SpreedlyStripeAPMCheckout.handleStripeReturnURL(_:)`. Your app still forwards everything to
+> `handleOffsiteReturn(url:)`, which invokes that pre-handler chain.
+
+### Step 6 — Theme the sheet (optional) · `Your app`
+
+Stripe's PaymentSheet has its own UI. To match your branding, build a `StripeAPMAppearanceConfig`
+and pass it to one of the appearance-aware `present` overloads.
+
+The config mirrors the publicly stable subset of Stripe's `PaymentSheet.Appearance`: corner radius,
+border widths, colors, primary-button styling, shadow, and font. Anything you do not set keeps
+Stripe's default — passing `nil`, or using the overloads without `appearance:`, gives you the
+unmodified Stripe look.
+
+```swift
+let appearance = StripeAPMAppearanceConfig()
+
+// Top-level
+appearance.cornerRadius = 8                 // NSNumber-bridged for ObjC; assign Swift literal
+appearance.borderWidth = 1.5
+
+// Colors
+appearance.colors.primary = .systemPurple
+appearance.colors.background = .systemBackground
+appearance.colors.danger = .systemRed
+
+// Primary button
+appearance.primaryButton.backgroundColor = .systemPurple
+appearance.primaryButton.textColor = .white
+appearance.primaryButton.cornerRadius = 8
+appearance.primaryButton.height = 52
+
+// Shadow
+appearance.shadow.color = .black
+appearance.shadow.opacity = 0.1
+
+// Font (family only — size and weight are ignored; use sizeScaleFactor to scale)
+appearance.font.base = UIFont(name: "AvenirNext-Regular", size: 17) ?? .systemFont(ofSize: 17)
+appearance.font.sizeScaleFactor = 1.1
+
+SpreedlyStripeAPMCheckout.present(config: config, appearance: appearance)
+```
+
+<details>
+<summary><b>Objective-C</b> and <b>appearance notes</b></summary>
+
+```objc
+StripeAPMAppearanceConfig *appearance = [[StripeAPMAppearanceConfig alloc] init];
+appearance.cornerRadius = @(8);
+appearance.colors.primary = UIColor.systemPurpleColor;
+appearance.primaryButton.backgroundColor = UIColor.systemPurpleColor;
+appearance.primaryButton.height = 52;
+
+[SpreedlyStripeAPMCheckout presentWithConfig:config appearance:appearance];
+```
+
+- `NSNumber?`-typed properties (`cornerRadius`, `selectedBorderWidth`, `primaryButton.cornerRadius`)
+  accept Swift number literals via implicit `NSNumber` bridging, and `NSNumber *` from Objective-C.
+  Set them to `nil` to inherit Stripe's adaptive default.
+- `font.base`'s **family** is used; Stripe ignores its size and weight. Use `font.sizeScaleFactor`
+  to scale all sizes.
+- The disabled-shadow helper is `StripeAPMAppearanceShadow.disabled()`, mirroring Stripe's
+  `Shadow.disabled`.
+- Experimental and iOS-26-only Stripe appearance fields (`iconStyle`, `sheetCornerRadius`,
+  `navigationBarStyle.glass`) are intentionally **not** exposed — they are `@_spi` or version-gated
+  in Stripe's SDK and the surface may change.
+
+</details>
+
+### Try it in sandbox
+
+Run the flow end to end before your production account is provisioned:
+
+| Value | Use |
+|---|---|
+| `pk_test_…` publishable key | Test mode. The sheet renders and redirects exactly as in production |
+| Stripe's test redirect page | Replaces the real bank. Gives you an authorize and a fail button, so you can exercise both result paths without a bank login |
+
+Test mode moves no money and settles no SEPA mandates. Full matrix:
+[Testing Guide](testing-guide.md).
 
 ---
 
-## SwiftUI Integration
+## 6. Integration by platform
+
+The same steps wired into each UI stack. Read only your own — the other two are collapsed.
+
+### SwiftUI
 
 ```swift
 import SwiftUI
 import Combine
 import SpreedlyCore
-import SpreedlyUI
 import SpreedlyStripeAPM
 
 struct StripeAPMPaymentView: View {
-    @State private var paymentResultCancellable: AnyCancellable?
-    @State private var stage: StripeAPMStage = .idle
+    @State private var cancellable: AnyCancellable?
+    @State private var message: String?
     @State private var isLoading = false
-    @State private var errorMessage: String?
-    @State private var successMessage: String?
-    @State private var selectedProduct: Product?
-    @State private var selectedAPMTypes: Set<String> = ["ideal"]
-
-    enum StripeAPMStage { case idle, creatingPendingPurchase, checkout }
 
     var body: some View {
-        VStack {
-            Button("Pay") { startStripeAPMFlow() }
-                .disabled(selectedProduct == nil || selectedAPMTypes.isEmpty || isLoading)
-            if let success = successMessage { Text(success).foregroundColor(.green) }
-            if let error = errorMessage { Text(error).foregroundColor(.red) }
+        VStack(spacing: 16) {
+            Button("Pay with iDEAL") { Task { await startPayment() } }
+                .disabled(isLoading)
+            if let message { Text(message) }
         }
         .onAppear {
-            paymentResultCancellable?.cancel()
-            paymentResultCancellable = Spreedly.shared().subscribeToPaymentResults { handlePaymentResult($0) }
-        }
-        // IMPORTANT: Place .onOpenURL in your root @main App struct, NOT here.
-        // It is shown inline for readability only.
-        // See getting-started.md for the canonical onOpenURL setup.
-        .onOpenURL { url in
-            _ = Spreedly.shared().handleOffsiteReturn(url: url)
-        }
-    }
-
-    func startStripeAPMFlow() {
-        guard let product = selectedProduct else { return }
-        isLoading = true
-        errorMessage = nil
-        successMessage = nil
-        stage = .creatingPendingPurchase
-
-        Task {
-            let client = YourAPIClient.shared
-            let response = try await client.stripeAPMPendingPurchase(
-                amount: product.price * 100,
-                currencyCode: "EUR",
-                redirectUrl: "myapp://stripe-redirect",
-                callbackUrl: "https://your-backend.com/callback",
-                apmTypes: Array(selectedAPMTypes)
-            )
-
-            await MainActor.run {
-                guard let transaction = response.transaction,
-                      transaction.state == "pending",
-                      let clientSecret = transaction.gatewaySpecificResponseFields?.stripePaymentIntents?.clientSecret else {
-                    isLoading = false
-                    stage = .idle
-                    errorMessage = "Failed to create pending purchase"
-                    return
-                }
-
-                stage = .checkout
+            cancellable = Spreedly.shared().subscribeToPaymentResults { result in
                 isLoading = false
-
-                let config = StripeAPMConfig(
-                    publishableKey: "pk_test_...",
-                    clientSecret: clientSecret,
-                    transactionToken: transaction.token,
-                    merchantDisplayName: "Your Store",
-                    returnURL: "myapp://stripe-redirect"
-                )
-                SpreedlyStripeAPMCheckout.present(config: config)
+                if result.isSuccess {
+                    message = result.state == "succeeded"
+                        ? "Payment completed."
+                        : "Payment submitted, confirmation pending."
+                } else if result.isCanceled {
+                    message = "Payment was canceled."
+                } else {
+                    message = result.failureDetails?.getDescription() ?? "Payment failed."
+                }
             }
         }
+        .onDisappear { cancellable?.cancel() }
+        .onOpenURL { Spreedly.shared().handleOffsiteReturn(url: $0) }
     }
 
-    func handlePaymentResult(_ result: PaymentResult) {
-        guard stage == .checkout else { return }
-        stage = .idle
-        isLoading = false
+    private func startPayment() async {
+        isLoading = true
+        // Step 1: your backend creates the pending purchase.
+        let purchase = try? await YourAPIClient.shared.stripeAPMPendingPurchase(
+            amountCents: 1099,
+            currencyCode: "EUR",
+            redirectUrl: "myapp://stripe-redirect",
+            callbackUrl: "https://your-backend.example.com/callback",
+            apmTypes: ["ideal"]
+        )
 
-        if result.isSuccess {
-            switch result.state {
-            case "succeeded": successMessage = "Payment completed!"
-            case "processing": successMessage = "Payment accepted, confirmation pending."
-            case "pending": successMessage = "Payment submitted."
-            default: successMessage = "Payment completed."
-            }
-        } else if result.isCanceled {
-            errorMessage = "Payment was canceled."
-        } else {
-            errorMessage = result.failureDetails?.getDescription() ?? "Payment failed"
+        guard let transaction = purchase?.transaction,
+              transaction.state == "pending",
+              let clientSecret = transaction
+                .gatewaySpecificResponseFields?.stripePaymentIntents?.clientSecret else {
+            isLoading = false
+            message = "Could not create the pending purchase."
+            return
         }
+
+        let config = StripeAPMConfig(
+            publishableKey: publishableKey,
+            clientSecret: clientSecret,
+            transactionToken: transaction.token,
+            merchantDisplayName: "Your Store",
+            returnURL: "myapp://stripe-redirect"
+        )
+        SpreedlyStripeAPMCheckout.present(config: config)
     }
 }
 ```
 
----
+### UIKit
 
-## UIKit Integration
+<details>
+<summary><b>Full UIKit implementation</b> — <code>StripeAPMPaymentViewController</code>, <code>SpreedlyPaymentDelegate</code>, <code>SceneDelegate</code></summary>
 
 ```swift
 import UIKit
@@ -417,9 +564,12 @@ func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>)
 }
 ```
 
----
+</details>
 
-## Objective-C Integration
+### Objective-C
+
+<details>
+<summary><b>Full Objective-C implementation</b> — <code>StripeAPMPaymentViewController</code>, <code>SpreedlyPaymentDelegate</code>, <code>SceneDelegate</code></summary>
 
 ```objc
 #import <SpreedlyCore/SpreedlyCore-Swift.h>
@@ -511,118 +661,94 @@ typedef NS_ENUM(NSInteger, StripeAPMStage) {
 }
 ```
 
----
+</details>
 
-## Theming the PaymentSheet
-
-Stripe's PaymentSheet has its own UI. To match your app's branding, build a `StripeAPMAppearanceConfig` and pass it to one of the appearance-aware `present` overloads.
-
-The config mirrors the publicly stable subset of Stripe's `PaymentSheet.Appearance`: corner radius, border widths, colors (primary, background, text, danger, etc.), primary-button styling (background/text/disabled/success colors, corner radius, border, font, shadow, height), shadow, and font (family + size scale factor).
-
-Anything you don't set keeps Stripe's default. Passing `nil` (or using the original overloads) gives you the unmodified Stripe defaults.
-
-### Swift
-
-```swift
-let appearance = StripeAPMAppearanceConfig()
-
-// Top-level
-appearance.cornerRadius = 8                 // NSNumber-bridged for ObjC; assign Swift literal
-appearance.borderWidth = 1.5
-
-// Colors
-appearance.colors.primary = .systemPurple
-appearance.colors.background = .systemBackground
-appearance.colors.danger = .systemRed
-
-// Primary button
-appearance.primaryButton.backgroundColor = .systemPurple
-appearance.primaryButton.textColor = .white
-appearance.primaryButton.cornerRadius = 8
-appearance.primaryButton.height = 52
-
-// Shadow
-appearance.shadow.color = .black
-appearance.shadow.opacity = 0.1
-
-// Font (family only — size/weight are ignored; use sizeScaleFactor to scale)
-appearance.font.base = UIFont(name: "AvenirNext-Regular", size: 17) ?? .systemFont(ofSize: 17)
-appearance.font.sizeScaleFactor = 1.1
-
-SpreedlyStripeAPMCheckout.present(config: config, appearance: appearance)
-```
-
-### Objective-C
-
-```objc
-StripeAPMAppearanceConfig *appearance = [[StripeAPMAppearanceConfig alloc] init];
-appearance.cornerRadius = @(8);
-appearance.colors.primary = UIColor.systemPurpleColor;
-appearance.primaryButton.backgroundColor = UIColor.systemPurpleColor;
-appearance.primaryButton.height = 52;
-
-[SpreedlyStripeAPMCheckout presentWithConfig:config appearance:appearance];
-```
-
-### Notes
-
-- `NSNumber?`-typed properties (`cornerRadius`, `selectedBorderWidth`, `primaryButton.cornerRadius`) accept Swift number literals via implicit `NSNumber` bridging and `NSNumber *` from ObjC. Set them to `nil` to inherit Stripe's adaptive default.
-- `font.base`'s **family** is used; Stripe ignores its size and weight. Use `font.sizeScaleFactor` to scale all sizes.
-- The disabled-shadow helper is available via `StripeAPMAppearanceShadow.disabled()` (mirrors Stripe's `Shadow.disabled`).
-- Experimental and iOS-26-only appearance fields from Stripe (e.g. `iconStyle`, `sheetCornerRadius`, `navigationBarStyle.glass`) are intentionally not exposed — they're marked `@_spi` or version-gated in Stripe's SDK and the surface may change.
+> **iOS only:** the Objective-C surface has no Android or React Native equivalent. React Native
+> consumers use the `checkout-react-native` bridge instead.
 
 ---
 
-## Result States
+## 7. Handle the result
 
-| Result property | Meaning | UX |
-|-----------------|---------|-----|
-| `isSuccess`, state `"succeeded"` | Payment completed, funds received | Show success |
-| `isSuccess`, state `"processing"` | Payment accepted, funds pending (e.g., SEPA debit) | Show "Payment accepted, confirmation pending" |
-| `isSuccess`, state `"pending"` | Payment submitted, awaiting final status | Show "Payment submitted" |
-| `isCanceled` | User dismissed the Stripe PaymentSheet without completing payment | Show "Payment was canceled." |
-| `isFailure` | Payment failed (network error, Stripe error, or backend failure) | Show error, offer retry |
+| Result | Meaning | What to show the shopper |
+|---|---|---|
+| `isSuccess`, state `succeeded` | Funds received | Success |
+| `isSuccess`, state `processing` | Accepted, funds pending — typical for SEPA | "Payment accepted, confirmation pending" |
+| `isSuccess`, state `pending` | Submitted, awaiting final status | "Payment submitted" |
+| `isCanceled` | Shopper dismissed the sheet | "Payment was canceled." |
+| `isFailure` | Network, Stripe, or backend failure | Error plus a retry action |
 
----
-
-## Important Notes
-
-- **No tokenization step:** Unlike EBANX/PayPal, Stripe APM does not use `submitOffsitePayment()`. The pending purchase is created directly on the backend.
-
-- **SDK finds topmost VC:** Call `SpreedlyStripeAPMCheckout.present(config:)` with only the config. The SDK finds the topmost view controller automatically. If your app has a complex navigation hierarchy where automatic detection doesn't work, use `SpreedlyStripeAPMCheckout.present(config:from:)` and pass the presenting view controller explicitly.
-
-- **URL handling:** Use `handleOffsiteReturn(url:)` in `onOpenURL` (SwiftUI) or in `SceneDelegate` (UIKit/Objective-C). The SDK forwards Stripe redirect URLs internally; no Stripe-specific code is required in the app.
-
-- **Delayed payment methods:** The SDK sets `allowsDelayedPaymentMethods = true` on the PaymentSheet. Currency (e.g., EUR for iDEAL) in the pending purchase determines which APMs are shown.
+> **Important:** `processing` and `pending` are not failures, and `succeeded` on the device is not
+> a guarantee of settlement. **Fulfil orders on your `callback_url` webhook, not on the SDK
+> result.** Shipping against the device result is the most expensive mistake in this flow.
 
 ---
 
-### Blocked Devices
+## 8. Errors and troubleshooting
 
-> **Important:** When `blockJailbrokenDevices` is enabled and the device is compromised, the SDK blocks this flow automatically. The `present()` call returns immediately without showing any UI, and a `PaymentResult.failure` is published. See [Security — Runtime Integrity](security.md#runtime-integrity) for details.
+| Symptom | Cause | Fix |
+|---|---|---|
+| `unable to find bundle named Stripe_StripePaymentSheet` | CocoaPods without the bundle patcher | Add the `post_install` block in [Install](#3-install), then `pod install` and clean build |
+| Added `SpreedlyStripeAPM` but still get the bundle error | Patcher missing or not running | The `post_install` block is required for CocoaPods. Confirm the module is in your target, then clean build |
+| Reinstalled Pods, still the same bundle error | Stale build artifacts | Clean build folder, clear Derived Data, `pod deintegrate` then a fresh `pod install`. Verify the patcher runs without errors |
+| `CFBundleDisplayName must be non-nil` | Missing display name | Set it in `Info.plist` ([Configure your app](#4-configure-your-app)) |
+| App Store rejection `ITMS-90683` | Missing `NSCameraUsageDescription` | Add the key — Apple's static analysis sees Stripe's camera references |
+| Shopper never returns to the app after bank auth | Scheme mismatch | `redirect_url`, `StripeAPMConfig.returnURL`, and `CFBundleURLTypes` must all use the same scheme |
+| Result never arrives | URL not forwarded | Route every custom-scheme open to `handleOffsiteReturn(url:)` |
+| Purchase comes back non-pending | Gateway, APM, or webhook not configured | Re-check [What you need](#2-what-you-need) |
+| SEPA payments never reach a final state | Stripe webhook not reaching Spreedly | Confirm the webhook is subscribed to all Payment Intent events |
 
-### Screen Prevention
-
-Stripe PaymentSheet is partner UI. Spreedly `.screenPrevention()` does **not** cover PaymentSheet — do not wrap it. See [Security](security.md).
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| Crash: `Fatal error: unable to find bundle named Stripe_StripePaymentSheet` | **SPM:** Link `SpreedlyStripeAPM` from `checkout-ios-package`, then clean and rebuild. **CocoaPods:** Add the required [bundle patcher](#cocoapods-stripe-bundle-patcher) `post_install` block, then `pod install` and rebuild. |
-| **CocoaPods:** Added `SpreedlyStripeAPM` but still get bundle error | Add the [CocoaPods Stripe Bundle Patcher](#cocoapods-stripe-bundle-patcher) `post_install` to your Podfile (required for CocoaPods). Confirm `SpreedlyStripeAPM` is in the target and run a clean build. |
-| **Reinstalled Pods but still crashes** with the same bundle error | Clean build folder, clear Derived Data, `pod deintegrate` / fresh `pod install`. Verify the [bundle patcher](#cocoapods-stripe-bundle-patcher) `post_install` is present and runs without errors. |
-| App Store rejection `ITMS-90683` (missing `NSCameraUsageDescription`) | Add `NSCameraUsageDescription` to your app's `Info.plist`. The Stripe SDK's `StripePaymentSheet` module includes card scanning functionality that references camera APIs internally. Apple's static analysis detects these references even if card scanning is never presented to the user. Without this key, App Store and TestFlight submissions will be rejected. |
-| `CFBundleDisplayName must be non-nil` | Set `CFBundleDisplayName` in your app's `Info.plist` with a string value (e.g. your app name). |
-| User not redirected back to app after bank auth | Ensure `redirect_url` in the purchase request matches your custom URL scheme (e.g. `myapp://stripe-redirect`), and that `returnURL` in `StripeAPMConfig` matches. Register the scheme in `Info.plist` under `CFBundleURLTypes`. |
-| `handleOffsiteReturn` not called | Forward all custom URL opens from `onOpenURL` (SwiftUI) or `SceneDelegate.scene(_:openURLContexts:)` (UIKit) to `Spreedly.shared().handleOffsiteReturn(url:)`. |
-| Pending purchase fails or returns non-pending state | Verify your Stripe Payment Intents gateway is configured in Spreedly, APMs are enabled in Stripe dashboard, and the Stripe webhook is sending Payment Intent events to Spreedly. |
+Broader error model: [Error Handling](error-handling.md).
 
 ---
 
-## Related Documentation
+## 9. Edge cases and cleanup
 
-- [stripe-radar.md](stripe-radar.md) - Optional `radar_session_id` on the same Stripe PI purchase
-- [offsite-payments.md](offsite-payments.md) - PayPal and Sprel offsite payments
-- [ebanx-apm.md](ebanx-apm.md) - Pix, Boleto, OXXO, NuPay
-- [braintree-apm.md](braintree-apm.md) - PayPal and Venmo via Braintree
+### Blocked devices
+
+> **Important:** When `blockJailbrokenDevices` is enabled and the device is compromised, the SDK
+> blocks this flow automatically. `present()` returns immediately without showing any UI and a
+> `PaymentResult.failure` is published. See
+> [Security — Runtime Integrity](security.md#runtime-integrity).
+
+### Screen prevention
+
+The PaymentSheet is partner UI. Spreedly's `.screenPrevention()` does **not** cover it — do not
+wrap it. See [Security](security.md).
+
+### Delayed payment methods
+
+The SDK sets `allowsDelayedPaymentMethods = true` on the PaymentSheet. Purchase currency decides
+which APMs appear — a USD purchase shows none of the EUR methods.
+
+### Cleanup
+
+Hold the `AnyCancellable` from `subscribeToPaymentResults` for the lifetime of the screen and let
+it deallocate with the view. Do not resubscribe on every render.
+
+---
+
+## 10. API at a glance
+
+| API | Module | Purpose |
+|---|---|---|
+| `StripeAPMConfig(publishableKey:clientSecret:transactionToken:merchantDisplayName:returnURL:)` | `SpreedlyStripeAPM` | Sheet configuration |
+| `SpreedlyStripeAPMCheckout.present(config:)` | `SpreedlyStripeAPM` | Present on the topmost view controller |
+| `SpreedlyStripeAPMCheckout.present(config:from:)` | `SpreedlyStripeAPM` | Present from a specific view controller |
+| `SpreedlyStripeAPMCheckout.present(config:appearance:)` / `present(config:appearance:from:)` | `SpreedlyStripeAPM` | Present with a themed sheet — see [step 6](#step-6--theme-the-sheet-optional--your-app) |
+| `StripeAPMAppearanceConfig` | `SpreedlyStripeAPM` | Sheet theming: colors, corner radius, primary button, shadow, font |
+| `StripeAPMType` / `StripeAPMTypeHelper` | `SpreedlyStripeAPM` | Typed APM constants for Swift and Objective-C |
+| `SpreedlyStripeAPMCheckout.handleStripeReturnURL(_:)` | `SpreedlyStripeAPM` | Called by the SDK's URL pre-handler; returns `true` when handled |
+| `Spreedly.shared().subscribeToPaymentResults { }` | `SpreedlyCore` | Receive the `PaymentResult` |
+| `Spreedly.shared().handleOffsiteReturn(url:)` | `SpreedlyCore` | Forward redirect URLs from your app |
+
+---
+
+## 11. Related documentation
+
+- [Stripe Radar](stripe-radar.md) — add a `radar_session_id` to the same purchase for fraud scoring
+- [Offsite payments](offsite-payments.md) — the tokenize-then-redirect alternative, for APMs Stripe does not cover
+- [Testing Guide](testing-guide.md) — sandbox keys, test flows, and the go-live checklist
+- [Getting Started](getting-started.md) — installation and SDK lifecycle
+- [Security](security.md) — runtime integrity and screen prevention
+

@@ -13,6 +13,8 @@
 #import "RetainPaymentMethodAPIClient.h"
 #import "RetainPaymentMethodModels.h"
 #import "ThemeHelper.h"
+#import "DemoCustomValidationRecipes.h"
+#import "AdditionalFieldCataloguePanel.h"
 
 @interface CustomFormViewController () <UIScrollViewDelegate, SpreedlyPaymentDelegate, FieldTextChangeListener>
 
@@ -20,6 +22,15 @@
 @property (nonatomic, strong) UIView *contentView;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *descriptionLabel;
+@property (nonatomic, strong) UILabel *activeCustomRulesLabel;
+@property (nonatomic, strong) UIView *customValidationContainer;
+@property (nonatomic, strong) UIButton *fullNameRuleButton;
+@property (nonatomic, assign) DemoCustomValidationKind fullNameCustomRule;
+@property (nonatomic, strong) AdditionalFieldCataloguePanel *cataloguePanel;
+@property (nonatomic, strong) UIStackView *catalogueHostedStack;
+@property (nonatomic, strong) NSMutableArray<SPLTextFieldViewController *> *catalogueHostedFields;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *additionalFieldValidity;
+@property (nonatomic, assign) NSInteger previousCustomValidationErrorCount;
 @property (nonatomic, strong) UIView *componentsContainer;
 @property (nonatomic, strong) UIView *configContainer;
 @property (nonatomic, strong) UIView *formContainer;
@@ -50,6 +61,7 @@
 @property (nonatomic, strong) UISwitch *allowExpiredDateSwitch;
 @property (nonatomic, strong) UISwitch *allowBlankDateSwitch;
 @property (nonatomic, strong) UISwitch *enableAutofillSwitch;
+@property (nonatomic, strong) UISwitch *demoHostedWinsConflictSwitch;
 @property (nonatomic, strong) UISegmentedControl *panFormatSegmentedControl;
 @property (nonatomic, strong) UIButton *resetPaymentStateButton;
 @property (nonatomic, strong) UIButton *toggleMaskButton;
@@ -110,6 +122,10 @@
     
     // Set up payment result delegate
     [Spreedly.shared setPaymentDelegate:self];
+    self.fullNameCustomRule = DemoCustomValidationKindNone;
+    self.additionalFieldValidity = [NSMutableDictionary dictionary];
+    self.catalogueHostedFields = [NSMutableArray array];
+    [self applyCustomValidationSelections];
     
     if (![Spreedly isDeviceTrusted]) {
         self.errorMessage = Spreedly.initializationError.message ?: @"SDK blocked by security check";
@@ -206,17 +222,39 @@
     
     // Description Label
     self.descriptionLabel = [[UILabel alloc] init];
-    self.descriptionLabel.text = @"This demonstrates a custom form built at the application level using headless UI components from the SDK.";
+    self.descriptionLabel.text = @"Headless SPLTextField form. Use Optional address groups or Show Additional Fields Configuration to mount extra fields. Full name Custom rule (and per-field rules in the catalogue) run on blur + Pay.";
     self.descriptionLabel.font = [ThemeHelper screenBodyFont];
     self.descriptionLabel.textColor = [ThemeHelper textColor];
     self.descriptionLabel.textAlignment = NSTextAlignmentCenter;
     self.descriptionLabel.numberOfLines = 0;
     self.descriptionLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.contentView addSubview:self.descriptionLabel];
+
+    self.activeCustomRulesLabel = [[UILabel alloc] init];
+    self.activeCustomRulesLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
+    self.activeCustomRulesLabel.textColor = [UIColor secondaryLabelColor];
+    self.activeCustomRulesLabel.numberOfLines = 0;
+    self.activeCustomRulesLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.activeCustomRulesLabel.accessibilityIdentifier = @"customForm_activeCustomRules";
+    [self.contentView addSubview:self.activeCustomRulesLabel];
+
+    self.customValidationContainer = [self createCustomValidationContainer];
+    [self.contentView addSubview:self.customValidationContainer];
+
+    self.cataloguePanel = [[AdditionalFieldCataloguePanel alloc] initWithAccessibilityPrefix:@"customForm"
+                                                                          leadingDetailViews:nil];
+    self.cataloguePanel.hostViewController = self;
+    __weak typeof(self) weakSelf = self;
+    self.cataloguePanel.onCatalogueChanged = ^{
+        [weakSelf reloadCatalogueHostedFields];
+        [weakSelf applyCustomValidationSelections];
+        [weakSelf updatePayButtonState];
+    };
+    [self.contentView addSubview:self.cataloguePanel];
     
     // Components Container
     self.componentsContainer = [self createInfoContainerWithTitle:@"Form Components:" 
-                                                          items:@[@"• Card Holder Name: SPLTextField with .fullName type", @"• Card Number: SPLTextField with .cardNumber type", @"• CVC: SPLTextField with .cvc type", @"• Expiry Date: SPLTextField with .expirationDate type"]
+                                                          items:@[@"• Card Holder Name: SPLTextField with .fullName type", @"• Card Number: SPLTextField with .cardNumber type", @"• CVC: SPLTextField with .cvc type", @"• Expiry Date: SPLTextField with .expirationDate type", @"• Optional catalogue fields mount below when enabled"]
                                                           backgroundColor:[ThemeHelper primaryColor]];
     
     // Config Container
@@ -505,6 +543,22 @@
     enableAutofillHelpLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [container addSubview:enableAutofillHelpLabel];
 
+    UILabel *hostedWinsLabel = [[UILabel alloc] init];
+    hostedWinsLabel.text = @"Demo: conflicting ZIP in additionalFields (hosted-wins)";
+    hostedWinsLabel.font = [ThemeHelper screenBodyFont];
+    hostedWinsLabel.textColor = [ThemeHelper textColor];
+    hostedWinsLabel.numberOfLines = 0;
+    hostedWinsLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:hostedWinsLabel];
+
+    self.demoHostedWinsConflictSwitch = [[UISwitch alloc] init];
+    self.demoHostedWinsConflictSwitch.onTintColor = [ThemeHelper primaryColor];
+    self.demoHostedWinsConflictSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+    self.demoHostedWinsConflictSwitch.accessibilityIdentifier = @"customFormDemoHostedWinsConflictToggle";
+    self.demoHostedWinsConflictSwitch.accessibilityHint = @"When on, Pay passes conflicting zip/city in additionalFields so mounted fields can win";
+    [self.demoHostedWinsConflictSwitch setOn:NO];
+    [container addSubview:self.demoHostedWinsConflictSwitch];
+
     UILabel *panFormatHelpLabel = [[UILabel alloc] init];
     panFormatHelpLabel.text = @"Pretty: grouped spaced digits (focus and blur). Plain: all digits visible. Masked: every digit * while typing. toggleMask() toggles plain ↔ masked (first tap from Pretty default → masked).";
     panFormatHelpLabel.font = [ThemeHelper screenBodyFont];
@@ -596,7 +650,15 @@
         [enableAutofillHelpLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
         [enableAutofillHelpLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
 
-        [panFormatHelpLabel.topAnchor constraintEqualToAnchor:enableAutofillHelpLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [hostedWinsLabel.topAnchor constraintEqualToAnchor:enableAutofillHelpLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [hostedWinsLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [hostedWinsLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.demoHostedWinsConflictSwitch.leadingAnchor constant:-[ThemeHelper spacingSM]],
+        [hostedWinsLabel.centerYAnchor constraintEqualToAnchor:self.demoHostedWinsConflictSwitch.centerYAnchor],
+
+        [self.demoHostedWinsConflictSwitch.topAnchor constraintEqualToAnchor:enableAutofillHelpLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.demoHostedWinsConflictSwitch.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [panFormatHelpLabel.topAnchor constraintEqualToAnchor:hostedWinsLabel.bottomAnchor constant:[ThemeHelper spacingMD]],
         [panFormatHelpLabel.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
         [panFormatHelpLabel.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
 
@@ -643,6 +705,17 @@
     // Recreate the expiration date field with the new isRequired value
     if (self.cvcField.view) {
         [self createExpirationDateFieldInContainer:self.formContainer belowView:self.cvcField.view];
+        if (self.catalogueHostedStack && self.expirationDateField.view) {
+            for (NSLayoutConstraint *constraint in self.formContainer.constraints) {
+                if (constraint.firstItem == self.catalogueHostedStack && constraint.firstAttribute == NSLayoutAttributeTop) {
+                    constraint.active = NO;
+                }
+            }
+            [NSLayoutConstraint activateConstraints:@[
+                [self.catalogueHostedStack.topAnchor constraintEqualToAnchor:self.expirationDateField.view.bottomAnchor constant:[ThemeHelper spacingMD]]
+            ]];
+        }
+        [self reloadCatalogueHostedFields];
     }
 }
 
@@ -660,6 +733,7 @@
     self.cardNumberIsValid = NO;
     self.cvcIsValid = NO;
     self.expirationDateIsValid = NO;
+    [self.additionalFieldValidity removeAllObjects];
     [self updatePayButtonState];
 }
 
@@ -674,6 +748,9 @@
     self.cvcField.enableAutofill = enabled;
     if (self.expirationDateField) {
         self.expirationDateField.enableAutofill = enabled;
+    }
+    for (SPLTextFieldViewController *field in self.catalogueHostedFields) {
+        field.enableAutofill = enabled;
     }
 }
 
@@ -700,6 +777,7 @@
         (void)[self.cardNumberField becomeFirstResponder];
     } submitLabel:SpreedlySubmitLabelNext onFocus: nil];
     self.cardHolderNameField.enableAutofill = [self hostedFieldsEnableAutofill];
+    self.cardHolderNameField.evaluatesCustomValidationOnBlur = YES;
     
     [self addChildViewController:self.cardHolderNameField];
     self.cardHolderNameField.view.translatesAutoresizingMaskIntoConstraints = NO;
@@ -750,6 +828,12 @@
     
     // Create expiration date field with current year format
     [self createExpirationDateFieldInContainer:container belowView:self.cvcField.view];
+
+    self.catalogueHostedStack = [[UIStackView alloc] init];
+    self.catalogueHostedStack.axis = UILayoutConstraintAxisVertical;
+    self.catalogueHostedStack.spacing = [ThemeHelper spacingMD];
+    self.catalogueHostedStack.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:self.catalogueHostedStack];
     
     // Setup constraints for form fields
     [NSLayoutConstraint activateConstraints:@[
@@ -767,7 +851,14 @@
         [self.cvcField.view.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
         [self.cvcField.view.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
         [self.cvcField.view.heightAnchor constraintGreaterThanOrEqualToConstant:60],
+
+        [self.catalogueHostedStack.topAnchor constraintEqualToAnchor:self.expirationDateField.view.bottomAnchor constant:[ThemeHelper spacingMD]],
+        [self.catalogueHostedStack.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.catalogueHostedStack.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+        [self.catalogueHostedStack.bottomAnchor constraintEqualToAnchor:container.bottomAnchor constant:-[ThemeHelper spacingMD]]
     ]];
+
+    [self reloadCatalogueHostedFields];
     
     return container;
 }
@@ -805,6 +896,7 @@
         (void)[self.cardNumberField becomeFirstResponder];
     } submitLabel:SpreedlySubmitLabelNext onFocus:nil];
     self.cardHolderNameField.enableAutofill = [self hostedFieldsEnableAutofill];
+    self.cardHolderNameField.evaluatesCustomValidationOnBlur = YES;
     
     [self addChildViewController:self.cardHolderNameField];
     self.cardHolderNameField.view.translatesAutoresizingMaskIntoConstraints = NO;
@@ -850,22 +942,12 @@
     YearFormat yearFormat = (self.yearFormatSegmentedControl.selectedSegmentIndex == 0) ?
         YearFormatTwoDigit : YearFormatFourDigit;
     
-    if (@available(iOS 15.0, *)) {
-        self.expirationDateField = [[SPLTextFieldViewController alloc] initWithField:FormFieldTypeExpirationDate title:@"Expiry Date" isRequired:isRequired placeholder:nil keyboardType:UIKeyboardTypeNumberPad textContentType:UITextContentTypeDateTime onValidationChange:^(BOOL valid) {
-            self.expirationDateIsValid = valid;
-            [self updatePayButtonState];
-        } onSubmit:^{
-            [self payButtonTapped];
-        } submitLabel:SpreedlySubmitLabelDone onFocus:nil];
-    } else {
-        // Fallback on earlier versions
-        self.expirationDateField = [[SPLTextFieldViewController alloc] initWithField:FormFieldTypeExpirationDate title:@"Expiry Date" isRequired:isRequired placeholder:nil keyboardType:UIKeyboardTypeNumberPad textContentType:UITextContentTypePostalCode onValidationChange:^(BOOL valid) {
-            self.expirationDateIsValid = valid;
-            [self updatePayButtonState];
-        } onSubmit:^{
-            [self payButtonTapped];
-        } submitLabel:SpreedlySubmitLabelDone onFocus:nil];
-    }
+    self.expirationDateField = [[SPLTextFieldViewController alloc] initWithField:FormFieldTypeExpirationDate title:@"Expiry Date" isRequired:isRequired placeholder:nil keyboardType:UIKeyboardTypeNumberPad textContentType:UITextContentTypeDateTime onValidationChange:^(BOOL valid) {
+        self.expirationDateIsValid = valid;
+        [self updatePayButtonState];
+    } onSubmit:^{
+        [self payButtonTapped];
+    } submitLabel:SpreedlySubmitLabelDone onFocus:nil];
     self.expirationDateField.yearFormat = yearFormat;
     self.expirationDateField.enableAutofill = [self hostedFieldsEnableAutofill];
     [self addChildViewController:self.expirationDateField];
@@ -879,9 +961,100 @@
             [self.expirationDateField.view.topAnchor constraintEqualToAnchor:aboveView.bottomAnchor constant:[ThemeHelper spacingMD]],
             [self.expirationDateField.view.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:16],
             [self.expirationDateField.view.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-16],
-            [self.expirationDateField.view.heightAnchor constraintGreaterThanOrEqualToConstant:60],
-            [self.expirationDateField.view.bottomAnchor constraintEqualToAnchor:container.bottomAnchor constant:-16]
+            [self.expirationDateField.view.heightAnchor constraintGreaterThanOrEqualToConstant:60]
         ]];
+    }
+}
+
+- (void)clearCatalogueHostedFields {
+    for (SPLTextFieldViewController *field in self.catalogueHostedFields) {
+        [field willMoveToParentViewController:nil];
+        [field.view removeFromSuperview];
+        [field removeFromParentViewController];
+    }
+    [self.catalogueHostedFields removeAllObjects];
+    for (UIView *view in [self.catalogueHostedStack.arrangedSubviews copy]) {
+        [self.catalogueHostedStack removeArrangedSubview:view];
+        [view removeFromSuperview];
+    }
+}
+
+- (void)reloadCatalogueHostedFields {
+    if (!self.catalogueHostedStack || !self.cataloguePanel) {
+        return;
+    }
+    [self clearCatalogueHostedFields];
+
+    NSMutableSet<NSString *> *enabledIds = [NSMutableSet set];
+    NSArray *enabledRows = [self.cataloguePanel.catalogueRows filteredArrayUsingPredicate:
+                            [NSPredicate predicateWithBlock:^BOOL(NSDictionary *row, NSDictionary *bindings) {
+        return [row[@"enabled"] boolValue];
+    }]];
+
+    NSInteger index = 0;
+    NSInteger count = enabledRows.count;
+    for (NSDictionary *row in enabledRows) {
+        NSString *fieldId = row[@"id"];
+        [enabledIds addObject:fieldId];
+        FormFieldType type = (FormFieldType)[row[@"type"] integerValue];
+        BOOL required = [row[@"required"] boolValue];
+        BOOL isLast = (index == count - 1);
+
+        __weak typeof(self) weakSelf = self;
+        SPLTextFieldViewController *field = [[SPLTextFieldViewController alloc]
+            initWithField:type
+                    title:row[@"title"]
+               isRequired:required
+              placeholder:nil
+             keyboardType:UIKeyboardTypeDefault
+          textContentType:nil
+     onValidationChange:^(BOOL valid) {
+         weakSelf.additionalFieldValidity[fieldId] = @(valid);
+         [weakSelf updatePayButtonState];
+     } onSubmit:^{
+         if (isLast) {
+             [weakSelf payButtonTapped];
+         } else if (index + 1 < (NSInteger)weakSelf.catalogueHostedFields.count) {
+             (void)[weakSelf.catalogueHostedFields[index + 1] becomeFirstResponder];
+         }
+     } submitLabel:(isLast ? SpreedlySubmitLabelDone : SpreedlySubmitLabelNext)
+             onFocus:nil];
+        field.enableAutofill = [self hostedFieldsEnableAutofill];
+        field.evaluatesCustomValidationOnBlur = YES;
+        field.view.accessibilityIdentifier = [NSString stringWithFormat:@"customForm_hosted_%@", fieldId];
+
+        [self addChildViewController:field];
+        field.view.translatesAutoresizingMaskIntoConstraints = NO;
+        [self.catalogueHostedStack addArrangedSubview:field.view];
+        [NSLayoutConstraint activateConstraints:@[
+            [field.view.heightAnchor constraintGreaterThanOrEqualToConstant:60]
+        ]];
+        [field didMoveToParentViewController:self];
+        [self.catalogueHostedFields addObject:field];
+        index += 1;
+    }
+
+    // Drop validity for fields that are no longer mounted.
+    for (NSString *key in [self.additionalFieldValidity.allKeys copy]) {
+        if (![enabledIds containsObject:key]) {
+            [self.additionalFieldValidity removeObjectForKey:key];
+        }
+    }
+
+    // Expiry Done vs Next depending on catalogue
+    if (self.expirationDateField) {
+        __weak typeof(self) weakSelf = self;
+        if (self.catalogueHostedFields.count > 0) {
+            self.expirationDateField.onSubmit = ^{
+                (void)[weakSelf.catalogueHostedFields.firstObject becomeFirstResponder];
+            };
+            [self.expirationDateField updateSubmitLabel:SpreedlySubmitLabelNext];
+        } else {
+            self.expirationDateField.onSubmit = ^{
+                [weakSelf payButtonTapped];
+            };
+            [self.expirationDateField updateSubmitLabel:SpreedlySubmitLabelDone];
+        }
     }
 }
 
@@ -889,6 +1062,18 @@
     // Recreate the expiration date field with the new year format
     if (self.cvcField.view) {
         [self createExpirationDateFieldInContainer:self.formContainer belowView:self.cvcField.view];
+        if (self.catalogueHostedStack && self.expirationDateField.view) {
+            // Re-pin catalogue stack under the new expiry field.
+            for (NSLayoutConstraint *constraint in self.formContainer.constraints) {
+                if (constraint.firstItem == self.catalogueHostedStack && constraint.firstAttribute == NSLayoutAttributeTop) {
+                    constraint.active = NO;
+                }
+            }
+            [NSLayoutConstraint activateConstraints:@[
+                [self.catalogueHostedStack.topAnchor constraintEqualToAnchor:self.expirationDateField.view.bottomAnchor constant:[ThemeHelper spacingMD]]
+            ]];
+        }
+        [self reloadCatalogueHostedFields];
     }
 }
 
@@ -916,9 +1101,21 @@
         [self.descriptionLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor constant:[ThemeHelper spacingLG]],
         [self.descriptionLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
         [self.descriptionLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.activeCustomRulesLabel.topAnchor constraintEqualToAnchor:self.descriptionLabel.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [self.activeCustomRulesLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.activeCustomRulesLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.customValidationContainer.topAnchor constraintEqualToAnchor:self.activeCustomRulesLabel.bottomAnchor constant:[ThemeHelper spacingLG]],
+        [self.customValidationContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.customValidationContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
+
+        [self.cataloguePanel.topAnchor constraintEqualToAnchor:self.customValidationContainer.bottomAnchor constant:[ThemeHelper spacingLG]],
+        [self.cataloguePanel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
+        [self.cataloguePanel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
         
         // Components Container
-        [self.componentsContainer.topAnchor constraintEqualToAnchor:self.descriptionLabel.bottomAnchor constant:[ThemeHelper spacingLG]],
+        [self.componentsContainer.topAnchor constraintEqualToAnchor:self.cataloguePanel.bottomAnchor constant:[ThemeHelper spacingLG]],
         [self.componentsContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingLG]],
         [self.componentsContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingLG]],
         
@@ -995,10 +1192,38 @@
 }
 
 - (void)updatePayButtonState {
+    [self syncLocalValidityWithCustomValidationErrors];
     BOOL isFormValid = [self isFormValid];
     self.payButton.enabled = isFormValid && !self.isLoading;
     self.payButton.backgroundColor = isFormValid && !self.isLoading ? [ThemeHelper primaryColor] : [[ThemeHelper primaryColor] colorWithAlphaComponent:0.6];
     [self refreshAggregateValidationReadout];
+}
+
+/// When custom-validator chrome clears, restore local flags from built-in `isValid`.
+/// While any custom error is parked, `isFormValid` already keeps Pay off via `customValidationErrorCount`.
+- (void)syncLocalValidityWithCustomValidationErrors {
+    NSInteger count = [SpreedlyUIManager shared].customValidationErrorCount;
+    if (count == 0 && self.previousCustomValidationErrorCount > 0) {
+        for (SPLTextFieldViewController *vc in self.catalogueHostedFields) {
+            NSString *fieldId = [self catalogueFieldIdForType:vc.field];
+            if (fieldId.length > 0 && vc.isValid) {
+                self.additionalFieldValidity[fieldId] = @YES;
+            }
+        }
+        if (self.cardHolderNameField.isValid) {
+            self.cardHolderNameIsValid = YES;
+        }
+    }
+    self.previousCustomValidationErrorCount = count;
+}
+
+- (nullable NSString *)catalogueFieldIdForType:(FormFieldType)type {
+    for (NSDictionary *row in self.cataloguePanel.catalogueRows) {
+        if ((FormFieldType)[row[@"type"] integerValue] == type) {
+            return row[@"id"];
+        }
+    }
+    return nil;
 }
 
 - (BOOL)isFormValid {
@@ -1010,8 +1235,21 @@
     
     // Expiration date validation: always required for format, but allowExpiredDate affects validation rules
     BOOL expirationValid = self.expirationDateIsValid;
+
+    BOOL requiredCatalogueValid = YES;
+    for (NSDictionary *row in self.cataloguePanel.catalogueRows) {
+        if (![row[@"enabled"] boolValue] || ![row[@"required"] boolValue]) { continue; }
+        NSString *fieldId = row[@"id"];
+        if (![self.additionalFieldValidity[fieldId] boolValue]) {
+            requiredCatalogueValid = NO;
+            break;
+        }
+    }
+
+    // Any parked custom-validator message (red chrome) keeps Pay disabled.
+    BOOL noCustomErrors = [SpreedlyUIManager shared].customValidationErrorCount == 0;
     
-    return nameValid && cardValid && expirationValid;
+    return nameValid && cardValid && expirationValid && requiredCatalogueValid && noCustomErrors;
 }
 
 - (void)toggleSaveCard:(id)sender {
@@ -1068,10 +1306,15 @@
             return;
         }
 
-        // Create additional fields - SPLTextFieldViewController with FormFieldTypeFullName
-        // automatically stores the value in the secure container, so we don't need to
-        // manually extract it. Pass empty dictionary and let the SDK handle it.
+        // Demo hosted-wins: only when toggle is on (default off), pass conflicting headless
+        // values so mounted ZIP/city fields win when present.
         NSDictionary *additionalFields = @{};
+        if (self.demoHostedWinsConflictSwitch.isOn) {
+            additionalFields = @{
+                @"zip": @"00000",
+                @"city": @"SHOULD_NOT_WIN"
+            };
+        }
         
         // Create metadata
         NSDictionary *metadata = @{};
@@ -1346,6 +1589,7 @@
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    [DemoCustomValidationRecipes removeAllManagedValidations];
     if ([Spreedly shared].paymentDelegate == self) {
         [Spreedly shared].paymentDelegate = nil;
     }
@@ -1505,6 +1749,129 @@
     // Card holder name field is now SPLTextFieldViewController, so this delegate method
     // is no longer needed for that field. It handles its own return key behavior.
     return NO;
+}
+
+#pragma mark - Custom field validators
+
+- (UIView *)createCustomValidationContainer {
+    UIView *container = [[UIView alloc] init];
+    container.backgroundColor = [ThemeHelper cardBackgroundColor];
+    container.layer.cornerRadius = [ThemeHelper borderRadiusXL];
+    container.layer.borderWidth = 1.0;
+    UIColor *borderColor = [ThemeHelper cardBorderColor];
+    container.layer.borderColor = [borderColor resolvedColorWithTraitCollection:self.traitCollection].CGColor;
+    container.translatesAutoresizingMaskIntoConstraints = NO;
+    [ThemeHelper applySmallShadowToView:container];
+
+    UILabel *title = [[UILabel alloc] init];
+    title.text = @"Custom validation (QA):";
+    title.font = [ThemeHelper screenHeadlineFont];
+    title.textColor = [ThemeHelper textColor];
+    title.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:title];
+
+    UIStackView *stack = [[UIStackView alloc] init];
+    stack.axis = UILayoutConstraintAxisVertical;
+    stack.spacing = 8;
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:stack];
+
+    self.fullNameRuleButton = [self ruleButtonWithId:@"customForm_fullName_customRule" action:@selector(fullNameRuleTapped:)];
+    [self syncCustomFormRuleButton:self.fullNameRuleButton kind:self.fullNameCustomRule];
+
+    [stack addArrangedSubview:[self labeledRuleRow:@"Full name" button:self.fullNameRuleButton]];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [title.topAnchor constraintEqualToAnchor:container.topAnchor constant:[ThemeHelper spacingMD]],
+        [title.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [title.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+        [stack.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [stack.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [stack.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-[ThemeHelper spacingMD]],
+        [stack.bottomAnchor constraintEqualToAnchor:container.bottomAnchor constant:-[ThemeHelper spacingMD]]
+    ]];
+    return container;
+}
+
+- (UIButton *)ruleButtonWithId:(NSString *)accessibilityId action:(SEL)action {
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentTrailing;
+    button.titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
+    button.accessibilityIdentifier = accessibilityId;
+    [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+    return button;
+}
+
+- (UIView *)labeledRuleRow:(NSString *)title button:(UIButton *)button {
+    UILabel *label = [[UILabel alloc] init];
+    label.text = title;
+    label.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
+    label.textColor = [UIColor secondaryLabelColor];
+    UIStackView *row = [[UIStackView alloc] initWithArrangedSubviews:@[label, button]];
+    row.axis = UILayoutConstraintAxisHorizontal;
+    row.spacing = 8;
+    row.alignment = UIStackViewAlignmentCenter;
+    return row;
+}
+
+- (void)syncCustomFormRuleButton:(UIButton *)button kind:(DemoCustomValidationKind)kind {
+    [button setTitle:[NSString stringWithFormat:@"%@ ▾", [DemoCustomValidationRecipes pickerLabelForKind:kind]]
+            forState:UIControlStateNormal];
+}
+
+- (void)presentCustomFormRulePickerFrom:(UIButton *)button
+                            currentKind:(DemoCustomValidationKind)current
+                             completion:(void (^)(DemoCustomValidationKind kind))completion {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Custom rule"
+                                                                   message:nil
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+    for (NSNumber *boxed in [DemoCustomValidationRecipes pickerKindsForNameFields]) {
+        DemoCustomValidationKind kind = (DemoCustomValidationKind)boxed.integerValue;
+        [sheet addAction:[UIAlertAction actionWithTitle:[DemoCustomValidationRecipes pickerLabelForKind:kind]
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(__unused UIAlertAction *a) {
+            if (completion) { completion(kind); }
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    if (sheet.popoverPresentationController) {
+        sheet.popoverPresentationController.sourceView = button;
+        sheet.popoverPresentationController.sourceRect = button.bounds;
+    }
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)fullNameRuleTapped:(UIButton *)sender {
+    [self presentCustomFormRulePickerFrom:sender currentKind:self.fullNameCustomRule completion:^(DemoCustomValidationKind kind) {
+        self.fullNameCustomRule = kind;
+        [self syncCustomFormRuleButton:self.fullNameRuleButton kind:kind];
+        [self applyCustomValidationSelections];
+    }];
+}
+
+- (void)applyCustomValidationSelections {
+    NSMutableDictionary *selections = [[self.cataloguePanel catalogueCustomValidationSelections] mutableCopy];
+    if (!selections) {
+        selections = [NSMutableDictionary dictionary];
+    }
+    DemoCustomValidationKind fullKind = self.fullNameCustomRule;
+    NSArray<NSNumber *> *nameKinds = [DemoCustomValidationRecipes pickerKindsForNameFields];
+    if (![nameKinds containsObject:@(fullKind)]) {
+        fullKind = DemoCustomValidationKindNone;
+        self.fullNameCustomRule = fullKind;
+        [self syncCustomFormRuleButton:self.fullNameRuleButton kind:fullKind];
+    }
+    selections[@"full_name"] = @(fullKind);
+    [DemoCustomValidationRecipes applySelections:selections];
+    self.activeCustomRulesLabel.text = [DemoCustomValidationRecipes activeRulesSummaryFromSelections:selections];
+}
+
+- (void)registerDemoCustomFieldValidators {
+    [self applyCustomValidationSelections];
+}
+
+- (void)removeDemoCustomFieldValidators {
+    [DemoCustomValidationRecipes removeAllManagedValidations];
 }
 
 #pragma mark - Retain Payment Method Helper

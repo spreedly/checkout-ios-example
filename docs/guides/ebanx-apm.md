@@ -621,7 +621,9 @@ typedef NS_ENUM(NSInteger, EbanxStage) {
 @end
 ```
 
-In `SceneDelegate.m` — handle redirect return:
+In `SceneDelegate.m` — handle redirect return. This is the same handler as every other offsite
+provider — see [Offsite payments](offsite-payments.md#3-handle-redirect-in-your-app), the canonical
+source:
 
 ```objc
 // Add this to your SceneDelegate.m

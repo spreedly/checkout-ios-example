@@ -13,6 +13,8 @@
 #import "RetainPaymentMethodAPIClient.h"
 #import "RetainPaymentMethodModels.h"
 #import "ThemeHelper.h"
+#import "DemoCustomValidationRecipes.h"
+#import "AdditionalFieldCataloguePanel.h"
 
 @interface CheckoutWithAdditionalFieldsViewController () <UIScrollViewDelegate, SpreedlyPaymentDelegate>
 
@@ -20,6 +22,7 @@
 @property (nonatomic, strong) UIView *contentView;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *descriptionLabel;
+@property (nonatomic, strong) UILabel *activeCustomRulesLabel;
 @property (nonatomic, strong) UIView *fieldsContainer;
 @property (nonatomic, strong) UILabel *fieldStatusHintLabel;
 @property (nonatomic, strong) UILabel *fieldStatusLabel;
@@ -33,6 +36,13 @@
 @property (nonatomic, strong) UISwitch *allowExpiredDateSwitch;
 @property (nonatomic, strong) UISwitch *allowBlankDateSwitch;
 @property (nonatomic, strong) UISegmentedControl *yearFormatSegmentedControl;
+
+/// Drop-in name custom rules (first/last) — catalogue lives on AdditionalFieldCataloguePanel.
+@property (nonatomic, assign) DemoCustomValidationKind firstNameCustomRule;
+@property (nonatomic, assign) DemoCustomValidationKind lastNameCustomRule;
+@property (nonatomic, strong) UIButton *firstNameRuleButton;
+@property (nonatomic, strong) UIButton *lastNameRuleButton;
+@property (nonatomic, strong) AdditionalFieldCataloguePanel *cataloguePanel;
 
 @property (nonatomic, strong) PaymentResult *paymentResult;
 @property (nonatomic, strong) NSString *errorMessage;
@@ -56,10 +66,14 @@
     
     // Set up payment result delegate
     [Spreedly.shared setPaymentDelegate:self];
+    self.firstNameCustomRule = DemoCustomValidationKindNone;
+    self.lastNameCustomRule = DemoCustomValidationKindNone;
+    [self applyCustomValidationSelections];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    [DemoCustomValidationRecipes removeAllManagedValidations];
     if ([Spreedly shared].paymentDelegate == self) {
         [Spreedly shared].paymentDelegate = nil;
     }
@@ -85,11 +99,8 @@
         self.fieldsContainer.layer.borderColor = resolvedBorderColor.CGColor;
         [ThemeHelper updateShadowForView:self.fieldsContainer];
     }
-    UIView *additionalFieldsContainer = objc_getAssociatedObject(self, "additionalFieldsContainer");
-    if (additionalFieldsContainer) {
-        additionalFieldsContainer.backgroundColor = [ThemeHelper cardBackgroundColor];
-        additionalFieldsContainer.layer.borderColor = resolvedBorderColor.CGColor;
-        [ThemeHelper updateShadowForView:additionalFieldsContainer];
+    if (self.cataloguePanel) {
+        self.cataloguePanel.backgroundColor = [UIColor clearColor];
     }
     if (self.configContainer) {
         self.configContainer.backgroundColor = [ThemeHelper cardBackgroundColor];
@@ -131,7 +142,7 @@
     
     // Description Label
     self.descriptionLabel = [[UILabel alloc] init];
-    self.descriptionLabel.text = @"This demonstrates the CardFormDropIn component with additional address fields for billing information.";
+    self.descriptionLabel.text = @"Drop-in checkout with optional additional fields. Use Optional address groups for quick enable, or Show Additional Fields Configuration for per-field Enable / Required / Custom rule. Custom rules run on blur + Pay.";
     self.descriptionLabel.font = [ThemeHelper screenBodyFont];
     self.descriptionLabel.textColor = [ThemeHelper textColor];
     self.descriptionLabel.textAlignment = NSTextAlignmentCenter;
@@ -139,16 +150,45 @@
     self.descriptionLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.descriptionLabel.accessibilityIdentifier = @"additionalFieldsDescription";
     [self.contentView addSubview:self.descriptionLabel];
+
+    self.activeCustomRulesLabel = [[UILabel alloc] init];
+    self.activeCustomRulesLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
+    self.activeCustomRulesLabel.textColor = [UIColor secondaryLabelColor];
+    self.activeCustomRulesLabel.numberOfLines = 0;
+    self.activeCustomRulesLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.activeCustomRulesLabel.accessibilityIdentifier = @"additionalFields_activeCustomRules";
+    [self.contentView addSubview:self.activeCustomRulesLabel];
     
     // Fields Container
     self.fieldsContainer = [self createInfoContainerWithTitle:@"Default Fields:" 
                                                        items:@[@"• First Name", @"• Last Name", @"• Card Number", @"• Expiry Month", @"• Expiry Year", @"• CVC"]
                                                        backgroundColor:[ThemeHelper primaryColor]];
     
-    // Additional Fields Container
-    UIView *additionalFieldsContainer = [self createInfoContainerWithTitle:@"Additional Fields:" 
-                                                                    items:@[@"• Address Line 1 (Required)", @"• Address Line 2 (Optional)", @"• City (Required)", @"• State (Required)", @"• ZIP Code (Required)"]
-                                                                    backgroundColor:[ThemeHelper primaryColor]];
+    // Additional Fields — shared optional groups + collapsible catalogue (with drop-in name rules)
+    UIButton *firstBtn = nil;
+    UIButton *lastBtn = nil;
+    UIView *firstNameRow = [self nameRuleRowWithTitle:@"First name Custom rule"
+                                    accessibilityId:@"additionalFields_firstName_customRule"
+                                             action:@selector(firstNameRuleTapped:)
+                                         outButton:&firstBtn];
+    UIView *lastNameRow = [self nameRuleRowWithTitle:@"Last name Custom rule"
+                                   accessibilityId:@"additionalFields_lastName_customRule"
+                                            action:@selector(lastNameRuleTapped:)
+                                        outButton:&lastBtn];
+    self.firstNameRuleButton = firstBtn;
+    self.lastNameRuleButton = lastBtn;
+    [self syncRuleButton:self.firstNameRuleButton kind:self.firstNameCustomRule];
+    [self syncRuleButton:self.lastNameRuleButton kind:self.lastNameCustomRule];
+
+    self.cataloguePanel = [[AdditionalFieldCataloguePanel alloc] initWithAccessibilityPrefix:@"additionalFields"
+                                                                          leadingDetailViews:@[firstNameRow, lastNameRow]];
+    self.cataloguePanel.hostViewController = self;
+    __weak typeof(self) weakSelf = self;
+    self.cataloguePanel.onCatalogueChanged = ^{
+        [weakSelf applyCustomValidationSelections];
+    };
+    [self.contentView addSubview:self.cataloguePanel];
+    [self refreshActiveCustomRulesLabel];
 
     self.fieldStatusHintLabel = [[UILabel alloc] init];
     self.fieldStatusHintLabel.text = @"Open the drop-in and type in card number or CVC — brand and digit counts appear below (HostedFieldState).";
@@ -209,9 +249,6 @@
     self.loadingIndicator.color = [ThemeHelper textColor];
     self.loadingIndicator.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.loadingIndicator];
-    
-    // Store reference to additional fields container for constraints
-    objc_setAssociatedObject(self, "additionalFieldsContainer", additionalFieldsContainer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 - (UIView *)createInfoContainerWithTitle:(NSString *)title items:(NSArray<NSString *> *)items backgroundColor:(UIColor *)backgroundColor {
@@ -261,6 +298,110 @@
     ]];
     
     return container;
+}
+
+- (UIView *)nameRuleRowWithTitle:(NSString *)title
+              accessibilityId:(NSString *)accessibilityId
+                       action:(SEL)action
+                   outButton:(UIButton * __strong *)outButton {
+    UILabel *label = [[UILabel alloc] init];
+    label.text = title;
+    label.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
+    label.textColor = [UIColor secondaryLabelColor];
+
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentTrailing;
+    button.titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
+    button.accessibilityIdentifier = accessibilityId;
+    [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+    if (outButton) { *outButton = button; }
+
+    UIStackView *row = [[UIStackView alloc] initWithArrangedSubviews:@[label, button]];
+    row.axis = UILayoutConstraintAxisHorizontal;
+    row.spacing = 8;
+    row.alignment = UIStackViewAlignmentCenter;
+    return row;
+}
+
+- (void)syncRuleButton:(UIButton *)button kind:(DemoCustomValidationKind)kind {
+    NSString *title = [NSString stringWithFormat:@"%@ ▾", [DemoCustomValidationRecipes pickerLabelForKind:kind]];
+    [button setTitle:title forState:UIControlStateNormal];
+}
+
+- (void)presentRulePickerFromButton:(UIButton *)button
+                        currentKind:(DemoCustomValidationKind)current
+                         completion:(void (^)(DemoCustomValidationKind kind))completion {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"Custom rule"
+                                                                   message:nil
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+    NSArray<NSNumber *> *kinds = [DemoCustomValidationRecipes pickerKindsForNameFields];
+    for (NSNumber *boxed in kinds) {
+        DemoCustomValidationKind kind = (DemoCustomValidationKind)boxed.integerValue;
+        UIAlertAction *action = [UIAlertAction actionWithTitle:[DemoCustomValidationRecipes pickerLabelForKind:kind]
+                                                         style:UIAlertActionStyleDefault
+                                                       handler:^(__unused UIAlertAction *a) {
+            if (completion) { completion(kind); }
+        }];
+        [sheet addAction:action];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    if (sheet.popoverPresentationController) {
+        sheet.popoverPresentationController.sourceView = button;
+        sheet.popoverPresentationController.sourceRect = button.bounds;
+    }
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)firstNameRuleTapped:(UIButton *)sender {
+    [self presentRulePickerFromButton:sender currentKind:self.firstNameCustomRule completion:^(DemoCustomValidationKind kind) {
+        self.firstNameCustomRule = kind;
+        [self syncRuleButton:self.firstNameRuleButton kind:kind];
+        [self applyCustomValidationSelections];
+    }];
+}
+
+- (void)lastNameRuleTapped:(UIButton *)sender {
+    [self presentRulePickerFromButton:sender currentKind:self.lastNameCustomRule completion:^(DemoCustomValidationKind kind) {
+        self.lastNameCustomRule = kind;
+        [self syncRuleButton:self.lastNameRuleButton kind:kind];
+        [self applyCustomValidationSelections];
+    }];
+}
+
+
+- (void)refreshActiveCustomRulesLabel {
+    self.activeCustomRulesLabel.text = [DemoCustomValidationRecipes activeRulesSummaryFromSelections:[self currentCustomValidationSelections]];
+}
+
+- (NSDictionary<NSString *, NSNumber *> *)currentCustomValidationSelections {
+    NSMutableDictionary<NSString *, NSNumber *> *map = [[self.cataloguePanel catalogueCustomValidationSelections] mutableCopy];
+    if (!map) {
+        map = [NSMutableDictionary dictionary];
+    }
+    map[@"first_name"] = @(self.firstNameCustomRule);
+    map[@"last_name"] = @(self.lastNameCustomRule);
+    return map;
+}
+
+- (void)applyCustomValidationSelections {
+    [DemoCustomValidationRecipes applySelections:[self currentCustomValidationSelections]];
+    [self refreshActiveCustomRulesLabel];
+}
+
+#pragma mark - Custom field validators
+
+- (void)registerDemoCustomFieldValidators {
+    [self applyCustomValidationSelections];
+}
+
+- (void)removeDemoCustomFieldValidators {
+    [DemoCustomValidationRecipes removeAllManagedValidations];
+}
+
+#pragma mark - Retain Payment Method Helper
+
+- (NSArray<FormField *> *)selectedOtherFieldsFromCatalogue {
+    return [self.cataloguePanel enabledFormFields];
 }
 
 - (UIView *)createConfigContainer {
@@ -396,7 +537,6 @@
 }
 
 - (void)setupConstraints {
-    UIView *additionalFieldsContainer = objc_getAssociatedObject(self, "additionalFieldsContainer");
     [NSLayoutConstraint activateConstraints:@[
         // Scroll View
         [self.scrollView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
@@ -420,18 +560,22 @@
         [self.descriptionLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor constant:[ThemeHelper spacingLG]],
         [self.descriptionLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
         [self.descriptionLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.activeCustomRulesLabel.topAnchor constraintEqualToAnchor:self.descriptionLabel.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [self.activeCustomRulesLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.activeCustomRulesLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
         
         // Fields Container
-        [self.fieldsContainer.topAnchor constraintEqualToAnchor:self.descriptionLabel.bottomAnchor constant:[ThemeHelper spacingLG]],
+        [self.fieldsContainer.topAnchor constraintEqualToAnchor:self.activeCustomRulesLabel.bottomAnchor constant:[ThemeHelper spacingLG]],
         [self.fieldsContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
         [self.fieldsContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
-        
-        // Additional Fields Container
-        [additionalFieldsContainer.topAnchor constraintEqualToAnchor:self.fieldsContainer.bottomAnchor constant:[ThemeHelper spacingSM]],
-        [additionalFieldsContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
-        [additionalFieldsContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
 
-        [self.fieldStatusHintLabel.topAnchor constraintEqualToAnchor:additionalFieldsContainer.bottomAnchor constant:[ThemeHelper spacingSM]],
+        // Shared optional groups + Additional Fields Configuration panel
+        [self.cataloguePanel.topAnchor constraintEqualToAnchor:self.fieldsContainer.bottomAnchor constant:[ThemeHelper spacingSM]],
+        [self.cataloguePanel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
+        [self.cataloguePanel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
+
+        [self.fieldStatusHintLabel.topAnchor constraintEqualToAnchor:self.cataloguePanel.bottomAnchor constant:[ThemeHelper spacingSM]],
         [self.fieldStatusHintLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:[ThemeHelper spacingMD]],
         [self.fieldStatusHintLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-[ThemeHelper spacingMD]],
 
@@ -506,14 +650,8 @@
     YearFormat yearFormat = (self.yearFormatSegmentedControl.selectedSegmentIndex == 0) ?
         YearFormatTwoDigit : YearFormatFourDigit;
     
-    // Create additional fields
-    NSArray *additionalFields = @[
-        [[FormField alloc] initWithId:@"addressLine1" title:@"Address Line 1" type: FormFieldTypeAddressLine1 placeholder:nil isRequired: YES],
-        [[FormField alloc] initWithId:@"addressLine2" title:@"Address Line 2" type: FormFieldTypeAddressLine2 placeholder:nil isRequired: NO],
-        [[FormField alloc] initWithId:@"city" title:@"City" type: FormFieldTypeCity placeholder:nil isRequired: YES],
-        [[FormField alloc] initWithId:@"state" title:@"State" type: FormFieldTypeState placeholder:nil isRequired: YES],
-        [[FormField alloc] initWithId:@"zipCode" title:@"ZIP Code" type: FormFieldTypeZipCode placeholder:nil isRequired: YES]
-    ];
+    // Create additional fields from Enable / Required catalogue toggles
+    NSArray *additionalFields = [self selectedOtherFieldsFromCatalogue];
         
     // Create CardFormDropIn view controller
     CardFormDropInViewController *dropInVC = [[CardFormDropInViewController alloc] initWithOtherFields:additionalFields yearFormat:yearFormat nameDisplayMode:DropInNameDisplayModeSeparateFields onProcessingResult:^(PaymentProcessingResult *processingResult) {
@@ -526,7 +664,7 @@
             self.isLoading = NO;
             [self.loadingIndicator stopAnimating];
             self.showFormButton.enabled = YES;
-            self.errorMessage = [NSString stringWithFormat:@"Validation failed: %@", [processingResult getDescription]];
+            self.errorMessage = [processingResult getDescription];
             [self updateUI];
         }
     }];
@@ -932,5 +1070,4 @@
     }];
 }
 
-
-@end 
+@end

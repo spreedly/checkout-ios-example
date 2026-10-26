@@ -1,67 +1,129 @@
-# Click to Pay Integration - Spreedly iOS SDK
+# Click to Pay — Spreedly iOS SDK
 
-Accept Mastercard Click to Pay checkout via the native `SpreedlyClickToPay` module (native SPL fields + MC bridge + Spreedly tokenize). Card PAN and CVV are collected inside the SDK checkout sheet (or your custom UI via `ClickToPayCheckoutController`) — not on a separate merchant card form.
+Let shoppers pay with cards already saved to the Mastercard SRC network, and tokenize the result
+through Spreedly.
 
-**Estimated integration time:** ~20 minutes
+|  |  |
+|---|---|
+| **Use this when** | You want Click to Pay's saved-card wallet at checkout |
+| **Use something else when** | Plain card entry → [Express checkout](express-checkout.md). Click to Pay is not a card form — a common pattern is two buttons side by side |
+| **You build** | 2 things: a checkout screen · a backend charge call |
+| **Modules** | `SpreedlyCore` + `SpreedlySecurity` + `SpreedlyUI` + `SpreedlyClickToPay` |
+| **Requires** | SDK 1.6.0+ · iOS 16.0+ from 1.7.0 (iOS 14.0+ on 1.6.x) · Xcode 26.0+ |
+| **Integration time** | ~20 minutes |
+| **UI** | Spreedly sheet wrapping Mastercard widgets — SwiftUI · UIKit · Objective-C |
 
-## Table of Contents
-
-1. [Introduction](#introduction)
-2. [Installation](#installation)
-3. [Prerequisites](#prerequisites)
-4. [Merchant-to-SDK Flow](#merchant-to-sdk-flow)
-5. [SDK Methods](#sdk-methods)
-6. [Configuration](#configuration)
-7. [Flow Events](#flow-events)
-8. [Result States](#result-states)
-9. [Advanced Integration](#advanced-integration)
-10. [SwiftUI Integration](#swiftui-integration)
-11. [UIKit / Swift Integration](#uikit--swift-integration)
-12. [Objective-C Integration](#objective-c-integration)
-13. [Differences from Web iframe](#differences-from-web-iframe)
-14. [Important Notes](#important-notes)
-15. [Troubleshooting](#troubleshooting)
-16. [Related Documentation](#related-documentation)
+**Fast path:** [How it works](#1-how-it-works) → [What you need](#2-what-you-need) →
+[Install](#3-install) → [Configure your app](#4-configure-your-app) →
+[Build the flow](#5-build-the-flow) → [your platform](#6-integration-by-platform).
 
 ---
 
-## Introduction
+## 1. How it works
 
-Click to Pay lets shoppers pay with cards saved to the Mastercard SRC network. The iOS SDK loads Mastercard's integration script inside a `WKWebView`, runs identity lookup / OTP / card selection, then tokenizes through Spreedly Core with a `click_to_pay` metadata block and CVV.
+Two parts you build, plus a third the SDK runs for you.
 
-### Key characteristics
+| Part | Who builds it | Job |
+|---|---|---|
+| Checkout screen | **Your app** | Shows the Mastercard button, receives a `payment_method_token` |
+| Charge call | **Your server** | Uses the token for `purchase` or `authorize` |
+| Checkout sheet | **The SDK** | Loads Mastercard's script in a web view, runs lookup, OTP, and card selection, collects CVV in native fields, then tokenizes |
 
-- **Drop-in button** — `SpreedlyClickToPayButton` embeds MC `<src-button>` (iframe parity); tap opens checkout
-- **Checkout config** — `ClickToPayCheckoutConfig` holds init, customer, UI, and checkout options (Android / RN parity)
-- **MC bridge** — `WKWebView` runs MC `lib.js`; default sheet uses MC WebView widgets (iframe parity)
-- **PAN for new users** — default sheet uses native `SPLTextField` → `checkoutWithNewCard` (iframe `add-new-card` parity); saved cards and OTP use MC WebView widgets
-- **Native CVV only** — security code is collected with `SPLTextField`; never taken from MC COMPLETE payload
-- **Tokenize on COMPLETE** — `createClickToPayPaymentMethod` runs automatically after `checkoutActionCode: COMPLETE`
+A single successful checkout:
 
-### Optional module
+1. The shopper taps the Mastercard button on your screen.
+2. The SDK opens its sheet and loads Mastercard's script.
+3. Mastercard looks the shopper up — `getCards` first, then `idLookup` when that is empty and a
+   valid customer is configured. Phone lookup needs a country code.
+4. A returning shopper picks a saved card; a new one enters a card in native Spreedly fields.
+5. CVV is always collected in a native Spreedly field, never taken from Mastercard's payload.
+6. On Mastercard `COMPLETE`, the SDK tokenizes with Spreedly and publishes a `PaymentResult`.
+7. You send that token to your backend to charge.
 
-Add **`SpreedlyClickToPay`** from `checkout-ios-package` only when you use Click to Pay. It requires **SpreedlyCore**, **SpreedlySecurity**, and **SpreedlyUI** (same version as your other Spreedly modules).
+> **Important:** CVV never appears on the event stream, and the SDK only tokenizes on `COMPLETE`.
+> Every other Mastercard action code emits an event and resets the UI.
+
+### Choose your integration path
+
+| Path | You get | Pick this if |
+|---|---|---|
+| **Drop-in button** | `SpreedlyClickToPayButton` — Mastercard's own button, tap opens the sheet | Default. Matches the web integration |
+| **Programmatic present** | Your button, the SDK's sheet | You need your own button styling or trigger |
+| **Headless controller** | The web view host only; you build every screen | You have a design system that owns the whole checkout |
+
+> **Important:** Click to Pay is for SRC wallet flows only. For standard card entry use
+> [`CardFormDropIn`](express-checkout.md) or headless `createPaymentMethod` / `createCreditCard` —
+> not a fallback inside the Click to Pay sheet. A common pattern is two buttons on checkout: `SpreedlyClickToPayButton` and
+> **Pay with card**.
+
+<details>
+<summary><b>What the shopper sees</b> — the sheet's eight phases</summary>
+
+| Phase | What the shopper sees |
+|-------|-------------------------|
+| Bootstrap | Centered loader while the Mastercard script loads |
+| Identity lookup | Native email, phone, country code and **Look up** when no valid `customer` is configured |
+| Auto lookup | Loader with optional email context when `customer` is prefilled |
+| Saved cards | Mastercard card list with a pinned native CVV bar, optional native **Remember me** toggle when `otp.rememberMe` is enabled, and a pay button |
+| OTP | Mastercard OTP widget with the shopper's **Remember me** checkbox; the choice is forwarded at checkout |
+| New user | Native SPL card form (number → expiry → CVV → name), cardholder name prefilled from `tokenizeBilling` |
+| Bank confirmation | Full-screen confirmation WebView |
+| Tokenize | Processing loader while Spreedly tokenizes after Mastercard `COMPLETE` |
+
+The sheet's navigation title is always the localized **Click to Pay** (`c2p_nav_default_title`);
+`dpaPresentationName` names your store inside Mastercard's own UI. Headless integrators can mirror
+these phases — the sheet is not required. Use `ClickToPayFlowState.checkoutTitle` for long-form
+status copy in custom chrome.
+
+</details>
+
+**Working on only one part?** iOS → [step 3](#step-3--add-the-button--your-app) · Backend →
+[step 5](#step-5--charge-the-token--your-server).
 
 ---
 
-## Installation
+<a id="prerequisites"></a>
+## 2. What you need
 
-Use the **same** [checkout-ios-package](https://github.com/spreedly/checkout-ios-package) version for every Spreedly module. See [Getting Started — Installation](getting-started.md#installation) for private-repo access and version pinning.
+| Category | You need | Where to get it |
+|---|---|---|
+| Spreedly | Click to Pay enabled on your environment key | Contact Spreedly Support |
+| Credentials | A sandbox or production `srcDpaId` (DPAID) | Contact Spreedly Support — there is no self-serve path |
+| Your app | Mastercard SRC hosts allowed by App Transport Security | Your `Info.plist` — see [Configure your app](#4-configure-your-app) |
+| Your app | A shopper first and last name available at checkout | Required at tokenize time. See [step 2](#step-2--build-the-config--your-app) |
+| Your backend | An endpoint that charges a `payment_method_token` | See [step 5](#step-5--charge-the-token--your-server) |
 
-> **Availability:** Included from package **1.6.0+** (`SpreedlyClickToPay` XCFramework). Use the **same** package version for Core, Security, UI, and Click to Pay.
+> **Important:** the first name and last name requirement is the most common cause of a
+> Click to Pay integration failing at the last step. Without them, tokenization fails with
+> HTTP 422 after the shopper has already completed the entire Mastercard flow.
 
-### Swift Package Manager
+### Compatibility
 
-In Xcode **File → Add Package Dependencies**, add `https://github.com/spreedly/checkout-ios-package`, then select:
+| SDK version | iOS | Xcode | Notes |
+|---|---|---|---|
+| 1.7.0+ | **16.0+** | 26.0+ | — |
+| 1.6.x | 14.0+ | 26.0+ | Click to Pay since 1.6.0. Last line that supports iOS 14 and 15 — see [Migrating to iOS 16](migration/v1-to-v2.md) |
+| 1.5.x and earlier | — | — | **No Click to Pay module.** Upgrade to 1.6.0+ |
 
-- **Required:** `SpreedlyCore`, `SpreedlySecurity`, `SpreedlyUI`
-- **Click to Pay:** `SpreedlyClickToPay`
+Assumed done: [Getting Started](getting-started.md) — installation plus `Spreedly.initializeSDK()`
+at launch and `Spreedly.setup(config:)` with a signed bundle from your server.
 
-In `Package.swift`:
+---
+
+## 3. Install
+
+> **You'll need:** the latest tag from
+> [checkout-ios-package](https://github.com/spreedly/checkout-ios-package/releases). Use one
+> version for every Spreedly module in your app.
+
+`SpreedlyClickToPay` is optional — add it only if you use Click to Pay. It requires `SpreedlyCore`,
+`SpreedlySecurity`, and `SpreedlyUI` at the same version.
+
+**Swift Package Manager**
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.6.0")
+    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.7.0")  // use the latest release tag
 ],
 targets: [
     .target(
@@ -76,25 +138,29 @@ targets: [
 ]
 ```
 
-### CocoaPods
+**CocoaPods**
 
 ```ruby
-pod 'SpreedlyCore', '~> 1.6'
-pod 'SpreedlySecurity', '~> 1.6'
-pod 'SpreedlyUI', '~> 1.6'
-pod 'SpreedlyClickToPay', '~> 1.6'
+pod 'SpreedlyCore',       '~> 1.7'
+pod 'SpreedlySecurity',   '~> 1.7'
+pod 'SpreedlyUI',         '~> 1.7'
+pod 'SpreedlyClickToPay', '~> 1.7'
 ```
 
-No extra `post_install` block is required for Click to Pay (unlike Stripe APM).
+No `post_install` block is needed — unlike [Stripe APM](stripe-apm.md).
 
 ---
 
-## Prerequisites
+## 4. Configure your app
 
-1. Complete [getting-started.md](getting-started.md) (`Spreedly.setup`)
-2. **Sandbox or production `srcDpaId` (DPAID)** from Spreedly Support
-3. **C2P enabled** on your Spreedly environment key
-4. **ATS** — allow Mastercard SRC hosts in `Info.plist`:
+> **You'll need:** to know whether you are integrating against sandbox or production.
+
+Mastercard's widgets load in a web view, so App Transport Security has to allow their hosts.
+
+| Key | Value | Why | Required |
+|---|---|---|---|
+| `NSAppTransportSecurity` → `sandbox.src.mastercard.com` | Exception domain | Sandbox widgets fail to load without it | Only while `isSandbox` is `true` |
+| `NSAppTransportSecurity` → `src.mastercard.com` | Exception domain | Production widgets | Yes, before go-live |
 
 ```xml
 <key>NSAppTransportSecurity</key>
@@ -117,184 +183,149 @@ No extra `post_install` block is required for Click to Pay (unlike Stripe APM).
 </dict>
 ```
 
-Adjust for your security policy; production apps typically allow HTTPS to these hosts without disabling ATS globally.
+> **Security:** this allows HTTPS to two named hosts. It does not disable ATS globally, and it
+> should not — adjust to your own security policy, but do not reach for
+> `NSAllowsArbitraryLoads`.
+
+No URL scheme and no capability are needed. Click to Pay never leaves your app.
 
 ---
 
-## Merchant-to-SDK Flow
+## 5. Build the flow
 
+Five steps.
+
+### Step 1 — Subscribe to results · `Your app`
+
+```swift
+cancellable = Spreedly.shared().subscribeToPaymentResults { result in
+    if result.isSuccess, let token = result.token {
+        // Send token to your backend — step 5
+    } else if result.isFailure {
+        // result.failureDetails?.getDescription()
+    }
+}
 ```
-Step 1: Spreedly.setup(environmentKey:accessSecret:) — required before any checkout
 
-Step 2: Build ClickToPayCheckoutConfig
-        — set srcDpaId (required at runtime)
-        — set tokenizeBilling.firstName + lastName (required for default-sheet auto-tokenize)
-        — optional: customer, initConfig amount/currency, otp/displayCards options
+This is the **source of truth** for the outcome. The event stream in
+[section 7](#7-handle-the-result) is for progress, not for the token.
 
-Step 3: Subscribe to payment results
-        Spreedly.shared().subscribeToPaymentResults { result in ... }
+### Step 2 — Build the config · `Your app`
 
-Step 4: Add SpreedlyClickToPayButton(checkoutConfig:) to your checkout screen
-        — optional: prepareForPresentation { refresh signed Spreedly.setup config }
+> **You'll need:** your `srcDpaId`, and the shopper's first and last name.
 
-Step 5: Shopper taps MC button → SDK presents checkout → token in PaymentResult
+```swift
+var billing = ClickToPayTokenizeBilling()
+billing.firstName = "Jane"          // required
+billing.lastName  = "Doe"           // required
+billing.email     = "shopper@example.com"
+
+let config = ClickToPayCheckoutConfig(
+    initConfig: ClickToPayInitConfig(amountCents: 9900, transactionCurrencyCode: "USD"),
+    srcDpaId: "your-sandbox-or-production-dpaid",
+    dpaPresentationName: "Your Store",
+    customer: ClickToPayCustomer(email: "shopper@example.com"),
+    tokenizeBilling: billing
+)
 ```
 
-If your app refreshes signed `Spreedly.setup` config before checkout, use `prepareForPresentation` on the button (or refresh in `onAppear` before the shopper taps).
+Only four things matter to get started:
 
----
+| Property | Required | Notes |
+|---|---|---|
+| `srcDpaId` | **Yes** | From Spreedly Support. Sandbox and production values differ |
+| `tokenizeBilling.firstName` / `.lastName` | **Yes** | Tokenization fails without both |
+| `initConfig` | No | Amount and currency for Mastercard. `amountCents:` converts for you |
+| `customer` | No | Prefills lookup. Omit it and the sheet shows a native identity form instead |
 
-## SDK Methods
-
-| Swift API | iframe equivalent | Purpose |
-|-----------|-------------------|---------|
-| `SpreedlyClickToPayButton(checkoutConfig:)` | `<src-button>` click → `c2pInit` | MC-branded pay button on merchant checkout |
-| `ClickToPayButtonConfig` | `<src-button card-brands="...">` + MC Storybook controls | Button `card-brands`, `isDark`, `buttonWidth`/`buttonHeight`, `theme`, `isEnabled`, accessibility |
-| `SpreedlyClickToPayCheckout.present(config:from:)` | `c2pInit` (advanced) | Full-screen checkout without drop-in button |
-| `SpreedlyClickToPayCheckout.cancel()` | — | Dismiss active checkout |
-| `SpreedlyClickToPayCheckout.isActive` | — | Whether a checkout session is in progress |
-| `SpreedlyClickToPayCheckout.lookup(customer:)` | `c2pLookup` | Manual identity lookup (active checkout required) |
-| `SpreedlyClickToPayCheckout.signOut(onComplete:)` | `c2pSignOut()` | Clear MC device session (does not dismiss the sheet) |
-| `SpreedlyClickToPayCheckout.initiateOtp()` | — | Start OTP validation (headless; channel must be selected first when using external picker) |
-| `SpreedlyClickToPayCheckout.validateOtp(_:)` | MC `validate` | Submit OTP code (headless / custom UI) |
-| `SpreedlyClickToPayCheckout.present(config:)` | — | Present from key-window top VC (fails via `PaymentResult` if none found) |
-| `SpreedlyClickToPayCheckout.delegate` | `Spreedly.on` | ObjC `ClickToPayDelegate` for sheet **and** headless VC |
-| `SpreedlyClickToPayCheckout.setAutoTokenizeAuthRefresher` | — | Refresh signed `Spreedly.setup` before auto-tokenize |
-| `SpreedlyClickToPayButton.prepareForPresentation` | — | Run auth refresh before opening sheet |
-| `ClickToPayCheckoutController.setRememberMeSelected(_:)` | Remember me | Sync Remember me before saved-card or new-card checkout (headless) |
-| `SpreedlyClickToPayCheckout.selectOtpChannel(_:)` | OTP channel picker | External OTP channel selection |
-| `SpreedlyClickToPayCheckout.selectCard(_:)` | — | Select saved card (merchant-hosted list) |
-| `SpreedlyClickToPayCheckout.checkoutSelectedCard(...)` | `c2pCheckout` | Checkout saved card + CVV |
-| `SpreedlyClickToPayCheckout.checkoutWithNewCard(...)` | new card checkout | Checkout with SPL-collected PAN |
-| `SpreedlyClickToPayCheckout.events` | `Spreedly.on('c2p-…')` | Combine event stream |
-| `SpreedlyClickToPayCheckout.state` | — | Flow phase snapshot publisher |
-| `SpreedlyClickToPayCheckout.makeController(config:)` | headless `c2pInit` | Headless controller factory |
-| `ClickToPayCheckoutController` + `webViewHost()` | headless UI | Custom merchant UI |
-| `controller.beginCheckout()` | `c2pInit` (+ `doLookup`) | Start MC init |
-| `Spreedly.shared().createClickToPayPaymentMethod(clickToPay:verificationValue:…)` | `paymentMethod` | Core tokenize (advanced) |
-| `subscribeToPaymentResults` | `paymentMethod` / `errors` | Async tokenize result |
-| `ClickToPaySavedCardsDetector` | — | Optional hidden `getCards` probe before checkout (Android: `ClickToPaySavedCardsProbe`) |
-| `ClickToPayCheckoutConfig.asSavedCardsDetectorConfig()` | — | Detector-safe config clone (`customer: nil`, `merchantHostedCardList: true`) |
-| `ClickToPaySavedCardsDetectorController.signOut(onComplete:)` | `c2pSignOut()` | Clear MC session from the detector without starting checkout |
-
----
-
-## Configuration
-
-### `ClickToPayCheckoutConfig` (sole merchant config)
-
-| Property | Required | Default | iframe | Notes |
-|----------|----------|---------|--------|-------|
-| `initConfig` | No | `ClickToPayInitConfig()` | `c2pConfig` transaction block | Amount, currency, brands — see below |
-| `srcDpaId` | **Yes** (runtime) | `""` | `c2pConfig.srcDpaId` | Sandbox or production DPAID from Spreedly Support |
-| `locale` | No | `en_US` | `dpaLocale` | MC WebView widget locale |
-| `isSandbox` | No | `true` | `options.isTest` | MC script host (`sandbox.src` vs `src`) |
-| `isTest` | No | `false` | — | Optional override for `click_to_pay.test` on tokenize; when `false`, follows `isSandbox` |
-| `dpaPresentationName` / `dpaName` | No | sandbox strings | `dpaData` | MC init metadata (not the native sheet nav title) |
-| `customer` | No | `nil` | `customer` | Prefill for lookup; omit to show native identity form |
-| `doLookup` | No | `true` | `doLookup` | Auto lookup after init (`getCards` → `idLookup` when empty) |
-| `displayCards` | No | `ClickToPayDisplayCardsConfig()` | `options.displayCards` | MC card-list chrome — see below |
-| `otp` | No | `ClickToPayOtpConfig()` | `options.otp` | OTP / Remember me — see below |
-| `merchantHostedCardList` | No | `false` | — | `true`: merchant calls `selectCard` + `checkoutSelectedCard` |
-| `tokenizeBilling` | No* | `nil` | billing on `c2pCheckout` | *`firstName` + `lastName` **required** for default-sheet auto-tokenize — see below |
-| `tokenizeMetadata` | No | `nil` | `metadata` on `c2pCheckout` | Optional payment-method metadata on auto-tokenize |
-| `eligibleForCardUpdater` | No | `nil` | `eligible_for_card_updater` | Swift-only; optional Account Updater flag |
-
-### `ClickToPayInitConfig`
+<details>
+<summary><b>Every <code>ClickToPayCheckoutConfig</code> property</b></summary>
 
 | Property | Required | Default | Notes |
-|----------|----------|---------|-------|
-| `transactionAmount` | No | `100` | Major units for MC init (use `amountCents:` convenience for cents) |
-| `transactionCurrencyCode` | No | `"USD"` | ISO currency |
-| `dynamicDataType` | No | `"NONE"` | MC dynamic data type |
-| `cardBrands` | No | all four networks | `[.mastercard, .visa, .discover, .amex]` |
+|---|---|---|---|
+| `initConfig` | No | `ClickToPayInitConfig()` | Amount, currency, brands |
+| `srcDpaId` | **Yes** | `""` | Sandbox or production DPAID |
+| `locale` | No | `en_US` | Locale for Mastercard's widgets |
+| `isSandbox` | No | `true` | Selects the Mastercard script host |
+| `isTest` | No | `false` | Overrides `click_to_pay.test` on tokenize; otherwise follows `isSandbox` |
+| `dpaPresentationName` / `dpaName` | No | sandbox strings | Shown inside Mastercard's UI. Does **not** change the native sheet title |
+| `customer` | No | `nil` | Prefill for lookup |
+| `doLookup` | No | `true` | Auto lookup after init |
+| `displayCards` | No | `ClickToPayDisplayCardsConfig()` | Mastercard card-list chrome |
+| `otp` | No | `ClickToPayOtpConfig()` | OTP and Remember me |
+| `merchantHostedCardList` | No | `false` | `true` hands card selection to your UI |
+| `tokenizeBilling` | See above | `nil` | First and last name required |
+| `tokenizeMetadata` | No | `nil` | Payment-method metadata |
+| `eligibleForCardUpdater` | No | `nil` | Swift only. Account Updater opt-in (`eligible_for_card_updater` on the wire) |
 
-### `ClickToPayDisplayCardsConfig`
+**`ClickToPayInitConfig`** — `transactionAmount` (major units, default `100`),
+`transactionCurrencyCode` (`"USD"`), `dynamicDataType` (`"NONE"`),
+`cardBrands` (defaults to all four networks).
 
-| Property | Required | Default | Notes |
-|----------|----------|---------|-------|
-| `displaySignOut` | No | `true` | MC card-list sign-out link |
-| `displayAddCard` | No | `true` | Add-new-card entry on MC list |
-| `displayPreferredCard` | No | `true` | Highlight preferred card |
-| `cardSelectionType` | No | `.radioButton` | `.radioButton` or `.gridView` |
+**`ClickToPayCustomer`** — `email`, `phoneNumber`, `countryCode`, `mainLookupMethod`. Email **or**
+phone plus country code is required for lookup. Helpers: `hasEmail()`, `hasPhoneLookup()`,
+`isValidForLookup()`.
 
-### `ClickToPayOtpConfig`
+**`ClickToPayDisplayCardsConfig`** — `displaySignOut` (`true`), `displayAddCard` (`true`),
+`displayPreferredCard` (`true`), `cardSelectionType` (`.radioButton` or `.gridView`).
 
-| Property | Required | Default | Notes |
-|----------|----------|---------|-------|
-| `rememberMe` | No | `false` | When `true`, optional **native** saved-card CVV bar Remember me toggle. **Returning-user OTP skip** is controlled by the shopper's MC WebView OTP checkbox — merchants do not need to set this for persistence. |
-| `presentation` | No | `.overlay` | MC OTP presentation (`.none` hides MC overlay type) |
-| `channelSelection` | No | `.inline` | `.external` shows native channel picker before OTP |
-| `requestedValidationChannelId` | No | `nil` | Pre-select OTP channel |
+**`ClickToPayOtpConfig`** — `rememberMe` (`false`), `presentation` (`.overlay`),
+`channelSelection` (`.inline` or `.external`), `requestedValidationChannelId`.
 
-### `ClickToPayCustomer`
-
-| Property | Required | Default | Notes |
-|----------|----------|---------|-------|
-| `email` | No* | `nil` | *Email **or** phone+country required for lookup |
-| `phoneNumber` | No* | `nil` | Used with `countryCode` for phone lookup |
-| `countryCode` | No* | `nil` | Required when using phone without email |
-| `mainLookupMethod` | No | `.email` | When both email and phone set, which drives `idLookup` |
-
-Helpers: `hasEmail()`, `hasPhoneLookup()`, `isValidForLookup()`.
-
-### `ClickToPayTokenizeBilling`
-
-All properties optional on the type; **`firstName` and `lastName` are required at tokenize time** for the default sheet. Address, shipping, and other fields are optional — only values you set are sent.
+**`ClickToPayTokenizeBilling`** — all properties are optional on the type, but `firstName` and
+`lastName` are **required at tokenize time** for the default sheet. Only values you set are sent.
 
 | Property | Notes |
 |----------|-------|
-| `firstName`, `lastName` | **Required** for auto-tokenize; prefill native new-card name fields |
+| `firstName`, `lastName` | **Required** for auto-tokenize; prefill the native new-card name fields |
 | `fullName`, `email`, `phoneNumber`, `company` | Optional |
-| `month`, `year` | Optional expiry on payment method |
+| `month`, `year` | Optional expiry on the payment method |
 | `addressLine1`, `addressLine2`, `city`, `state`, `zip`, `country` | Optional billing address |
 | `shippingAddressLine1`, `shippingAddressLine2`, `shippingCity`, `shippingState`, `shippingZip`, `shippingCountry`, `shippingPhoneNumber` | Optional shipping |
 
 Use `toBillingFields(fallbackEmail:)` → `ClickToPayBillingFields` for headless tokenize.
 
-### `ClickToPayNewCardFields` (headless new-card checkout)
+**`ClickToPayNewCardFields`** (headless new-card checkout only — the default sheet collects these
+via native `SPLTextField`):
 
 | Property | Required | Notes |
 |----------|----------|-------|
-| `cardNumber`, `cardExpiryMonth`, `cardExpiryYear`, `cardSecurityCode` | Yes | SPL-collected values |
+| `primaryAccountNumber` | Yes | SPL-collected card number |
+| `panExpirationMonth` | Yes | Two digits, `"01"`–`"12"` |
+| `panExpirationYearTwoDigit` | Yes | **Two digits**, not four — `"29"`, not `"2029"` |
+| `cardSecurityCode` | Yes | SPL-collected CVV |
 | `cardholderFirstName`, `cardholderLastName` | Yes | Passed to `checkoutWithNewCard` |
 
-The default sheet collects these via native `SPLTextField` — merchants only construct `ClickToPayNewCardFields` for headless `checkoutWithNewCard`.
+All six are `let` on a public memberwise init, so build the value in one call:
 
 ```swift
-let initConfig = ClickToPayInitConfig(amountCents: 9900, transactionCurrencyCode: "USD")
-var config = ClickToPayCheckoutConfig(
-    initConfig: initConfig,
-    srcDpaId: "your-sandbox-or-production-dpaid",
-    customer: ClickToPayCustomer(email: "shopper@example.com"),
-    dpaPresentationName: "Your Store"
+let fields = ClickToPayNewCardFields(
+    primaryAccountNumber: pan,
+    panExpirationMonth: "09",
+    panExpirationYearTwoDigit: "29",
+    cardSecurityCode: cvv,
+    cardholderFirstName: "Jane",
+    cardholderLastName: "Doe"
 )
-var billing = ClickToPayTokenizeBilling()
-billing.email = "shopper@example.com"
-billing.firstName = "Jane"
-billing.lastName = "Doe"
-billing.addressLine1 = "300 Morris Rd"
-billing.city = "Durham"
-billing.state = "NC"
-billing.zip = "27701"
-billing.country = "US"
-config.tokenizeBilling = billing
-config.tokenizeMetadata = ["order_id": "12345"]
-config.eligibleForCardUpdater = true
 ```
 
-### `ClickToPayButtonConfig` (drop-in button)
+</details>
 
-| Property | iframe / MC | Default |
-|----------|-------------|---------|
-| `cardBrands` | `<src-button card-brands="...">` (`[ClickToPayCardBrand]`) | `checkoutConfig.initConfig.cardBrands` |
-| `isDark` | MC `dark` attribute | `false` |
-| `buttonWidth` | MC `width` (px); max **500** | `0` (intrinsic MC width) |
-| `buttonHeight` | MC `height` (px); **32–60** (layout uses painted size) | `0` (intrinsic MC height) |
-| `theme` | Deprecated MC `theme` attribute | `nil` (omit; prefer `isDark`) |
-| `isEnabled` | disable via shadow DOM / pointer-events | `true` |
-| `buttonAccessibilityLabel` | — | `"Click to Pay"` |
-| `accessibilityIdentifier` | UI tests | `"spreedly_click_to_pay_button"` |
+### Step 3 — Add the button · `Your app`
+
+```swift
+SpreedlyClickToPayButton(checkoutConfig: config)
+```
+
+That is the whole integration. The button is Mastercard's own `<src-button>`; tapping it opens
+the SDK's checkout sheet.
+
+> **Gotcha:** if your app refreshes the signed `Spreedly.setup` config before checkout, use
+> `SpreedlyClickToPayButton.prepareForPresentation` to run that refresh before the sheet opens —
+> or refresh in `onAppear` before the shopper taps.
+
+<details>
+<summary><b>Styling the button</b> — <code>ClickToPayButtonConfig</code></summary>
 
 ```swift
 let buttonConfig = ClickToPayButtonConfig(
@@ -305,321 +336,93 @@ let buttonConfig = ClickToPayButtonConfig(
 SpreedlyClickToPayButton(checkoutConfig: config, buttonConfig: buttonConfig)
 ```
 
-`ClickToPayCardBrand` maps to MC wire strings (`mastercard`, `visa`, `discover`, `amex`). Use `ClickToPayCardBrand.defaultCheckoutBrands` for all four networks. Objective-C: `cardBrandWireValues` on `ClickToPayButtonConfig` / `ClickToPayInitConfig`.
+| Property | Default | Notes |
+|---|---|---|
+| `cardBrands` | from `initConfig` | `[.mastercard, .visa, .discover, .amex]` |
+| `isDark` | `false` | Mastercard's dark treatment |
+| `buttonWidth` | intrinsic | Maximum **500** px — the SDK clamps higher values |
+| `buttonHeight` | intrinsic | **32–60** px — the SDK clamps outside that range |
+| `isEnabled` | `true` | — |
+| `theme` | `nil` | Deprecated Mastercard `theme` attribute — prefer `isDark` |
+| `buttonAccessibilityLabel` | `"Click to Pay"` | — |
+| `accessibilityIdentifier` | `"spreedly_click_to_pay_button"` | For UI tests |
 
-**`<src-button>` size limits** ([Mastercard UCS UI Components](https://developer.mastercard.com/unified-checkout-solutions/documentation/ui-components/)): `buttonWidth` max **500** px; `buttonHeight` **32–60** px. The SDK clamps out-of-range values before sending them to MC. Constants: `ClickToPayButtonConfig.mcButtonWidthMax`, `mcButtonHeightMin`, `mcButtonHeightMax`.
+Size limits come from
+[Mastercard's UI component spec](https://developer.mastercard.com/unified-checkout-solutions/documentation/ui-components/).
+Constants: `ClickToPayButtonConfig.mcButtonWidthMax`, `mcButtonHeightMin`, `mcButtonHeightMax`.
 
-### Default checkout sheet (after button tap)
+`ClickToPayCardBrand` maps to Mastercard wire strings (`mastercard`, `visa`, `discover`, `amex`).
+Use `ClickToPayCardBrand.defaultCheckoutBrands` for all four. Objective-C uses
+`cardBrandWireValues` on `ClickToPayButtonConfig` and `ClickToPayInitConfig`.
 
-| Phase | What the shopper sees |
-|-------|-------------------------|
-| Bootstrap | Centered loader while MC `lib.js` loads |
-| Identity lookup | Native email, phone, country code, and **Look up** when no valid `customer` is configured |
-| Auto lookup | Loader with optional email context when `customer` is prefilled |
-| Saved cards | MC card list in the WebView with a pinned native CVV bar, optional native **Remember me** toggle when `otp.rememberMe` is enabled, and pay button |
-| OTP | MC OTP widget (full-bleed WebView) with shopper **Remember me** checkbox; choice is forwarded to MC at checkout |
-| New user | Native SPL card form (card number → expiry → CVV → name), cardholder name prefilled from `tokenizeBilling` when set, and **Pay with new card** |
-| DCF | Full-screen bank confirmation WebView |
-| Tokenize | Processing loader while Spreedly tokenizes after MC `COMPLETE` |
+</details>
 
-The sheet navigation title is the fixed localized string **Click to Pay** (`c2p_nav_default_title`). Set `dpaPresentationName` to your store or brand name for Mastercard's checkout UI inside the WebView — it does not replace the native navigation title.
+<a id="theming"></a>
+### Step 4 — Theme it (optional) · `Your app`
 
-Headless integrators building a custom UI with `ClickToPayCheckoutController` can mirror the same phases; the default sheet is not required. Use `ClickToPayFlowState.checkoutTitle` for long-form status copy in custom chrome.
-
-### Card-only checkout (outside Click to Pay)
-
-The Click to Pay module is for SRC wallet flows only. If you need standard card tokenization without Click to Pay, use [`CardFormDropIn`](getting-started.md) (SwiftUI/UIKit) or headless `createPaymentMethod` / `createCreditCard` — not a fallback inside the C2P sheet. A common pattern is two buttons on checkout: **`SpreedlyClickToPayButton`** and **Pay with card** (`CardFormDropIn`).
-
-### Theming
-
-The default sheet uses the same **`SpreedlyTheme` / `SpreedlyThemeManager`** objects as `CardFormDropIn` and headless `SPLTextField` — but **there is no `theme` parameter on `ClickToPayCheckoutConfig` or the button**. Set the global theme **before** checkout:
+There is **no** `theme` parameter on the config or the button. Set the global theme before
+checkout:
 
 ```swift
 import SpreedlyUI
 
 SpreedlyThemeManager.setGlobalTheme(lightTheme: merchantLight, darkTheme: merchantDark)
-// SpreedlyClickToPayButton inherits theme for native overlays; MC src-button uses MC styling.
 ```
 
-The coordinator wraps the sheet with `.spreedlyAdaptiveGlobalTheme()`, so native chrome picks up `SpreedlyThemeManager.globalTheme` automatically (including light/dark mode changes). See [Theme and styling](theme-and-styling.md).
+| Themed | Not themed |
+|---|---|
+| Native buttons, loaders, section copy, `SPLTextField`, the Remember me toggle (switch tint uses `colors.primary`) | Mastercard's web widgets — the saved-card list, OTP input, and bank confirmation |
 
-**Themed (native SDK UI):** primary/secondary buttons, loaders, section copy, native `SPLTextField` (new-card and saved-card CVV), and the **Remember me** toggle (switch tint uses `colors.primary`).
+For Mastercard's surfaces, use `locale` and `dpaPresentationName` instead.
 
-**Not merchant-themed:** Mastercard WebView widgets (saved card list, OTP, DCF). Use `config.locale` and `dpaPresentationName` for MC-facing presentation.
+**Localization splits the same way.** Native chrome — the sheet title, buttons, loaders and form
+labels — uses bundled `c2p_*` strings in the **iOS app locale**, and the navigation title is always
+the localized **Click to Pay** (`c2p_nav_default_title`). Mastercard's WebView widgets (saved card
+list, OTP input) follow **`config.locale`**, matching the web iframe.
 
-**Headless** (`ClickToPayCheckoutController` + your own UI): apply `.spreedlyTheme(...)` or the same global theme to your SwiftUI hierarchy; C2P still does not accept per-present theme parameters.
+### Step 5 — Charge the token · `Your server`
 
-### Localization
-
-- **Native chrome** — sheet navigation title is always localized **Click to Pay**; buttons, loaders, and form labels use bundled `c2p_*` strings in the **iOS app locale**.
-- **MC WebView widgets** (saved card list, OTP input) follow **`config.locale`** (e.g. `en_US`), matching the web iframe.
-
----
-
-## Flow Events
-
-Every `ClickToPayEvent` includes `checkoutId` (RN / Android parity).
-
-**Which callback to use**
-
-| Need | API |
-|------|-----|
-| Payment token / failure | `subscribeToPaymentResults` (Swift) or `SpreedlyPaymentDelegate` (ObjC) — **source of truth** |
-| Flow progress (lookup, OTP, cards, errors) | `SpreedlyClickToPayCheckout.events` (Combine) or `ClickToPayDelegate` (ObjC) |
-| Phase + masked cards snapshot | `SpreedlyClickToPayCheckout.state` → `ClickToPayCheckoutFlowSnapshot` |
-
-CVV is **never** included on `ClickToPayEvent` cases. Collect CVV with native `SPLTextField`, then pass it to `checkoutSelectedCard` or headless `ClickToPayCheckoutController.tokenize`.
-
-The default sheet collects CVV and tokenizes internally after `.checkoutComplete` — you do not receive CVV on the event stream.
-
-### Event catalog
-
-| Event | When fired | Associated values | ObjC `userInfo` keys |
-|-------|------------|-------------------|----------------------|
-| `.checkoutStarted` | Checkout session begins | — | `checkoutId` |
-| `.initialized` | MC `init` completes | `success`, `availableCardBrands` | `success`, `availableCardBrands` |
-| `.newUser` | Lookup → consumer not enrolled | — | `checkoutId` |
-| `.existingUser` | Lookup → consumer found, OTP next | — | `checkoutId` |
-| `.verifiedUser` | Saved cards loaded after OTP / lookup | — | `checkoutId` |
-| `.otpInitiated` | OTP validation started | `maskedValidationChannel`, `channels`, `network`, `rememberMe` | same + `channels[]` |
-| `.otpChannelSelectionRequired` | External channel picker needed | `channels` | `channels[]` |
-| `.otpResponse` | OTP validate result | `success`, `errorReason?` | `success`, `errorReason?` |
-| `.otpResend` | Shopper tapped resend | — | `checkoutId` |
-| `.otpNotYou` | Shopper tapped Not you | — | `checkoutId` |
-| `.displayCardsReady` | Masked cards ready (merchant-hosted list) | `cards: [ClickToPayMaskedCard]` | `cards[]` |
-| `.addNewCard` | Add-new-card path | `brands` | `brands` |
-| `.checkoutCancelled` | DCF / checkout cancelled | — | `checkoutId` |
-| `.checkoutDifferentPaymentMethod` | MC alternate payment action | — | `checkoutId` |
-| `.checkoutError` | MC checkout error action | `actionCode` | `actionCode` |
-| `.checkoutWindowOpened` | DCF window opened | — | `checkoutId` |
-| `.checkoutWindowClosed` | DCF window closed | — | `checkoutId` |
-| `.sessionDeleted` | Sign out completed | `deviceRecognized?` | `deviceRecognized?` |
-| `.checkoutComplete` | MC `COMPLETE` | `metadata: ClickToPayMetadata` | `correlationId`, `flowId` |
-| `.paymentMethodTokenized` | Informational token emit | `token` | `token` (prefer `subscribeToPaymentResults`) |
-| `.error` | Terminal / validation error | `code: ClickToPayErrorCode`, `message` | `code` (rawValue), `message` |
-| `.validationErrors` | Field-level errors | `errors: [ClickToPayFieldError]` | `errors[]` with `key`, `attribute`, `message` |
-
-### `ClickToPayErrorCode`
-
-| Case | Typical cause |
-|------|----------------|
-| `c2pInit` | MC init / script load failure |
-| `c2pLookup` | Invalid identity or lookup failure |
-| `c2pOtp` | OTP initiation or validation failure |
-| `c2pCheckout` | Checkout / DCF failure |
-| `c2pTokenize` | Spreedly tokenize failure |
-| `networkTimeout` | Bootstrap / MC lib load timeout (15s) |
-| `unknown` | Unmapped error |
-
-```swift
-SpreedlyClickToPayCheckout.events
-    .sink { event in
-        switch event {
-        case .initialized(_, let success, let brands):
-            break
-        case .checkoutComplete(_, let metadata):
-            break // token via subscribeToPaymentResults
-        case .error(_, let code, let message):
-            break
-        default:
-            break
-        }
+```bash
+curl -X POST https://core.spreedly.com/v1/gateways/${GATEWAY_TOKEN}/purchase.json \
+  -u ${ENVIRONMENT_KEY}:${ACCESS_SECRET} \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transaction": {
+      "payment_method_token": "ABC...payment_method_token",
+      "amount": 9900,
+      "currency_code": "USD"
     }
-    .store(in: &cancellables)
+  }'
 ```
 
-Objective-C: set `SpreedlyClickToPayCheckout.delegate` and implement `clickToPay(_:didReceiveEvent:userInfo:)` — works for **singleton sheet present** and embedded `ClickToPayCheckoutViewController`.
+| Parameter | Required | Value and constraints |
+|---|---|---|
+| `payment_method_token` | Yes | The `token` from `PaymentResult` |
+| `amount` | Yes | Minor units. Match what you passed as `amountCents` |
+| `currency_code` | Yes | Match `transactionCurrencyCode` |
+
+### Try it in sandbox
+
+| Value | Use |
+|---|---|
+| Sandbox `srcDpaId` from Spreedly Support | Runs against `sandbox.src.mastercard.com` |
+| `isSandbox: true` (the default) | Selects the sandbox script host |
+| A sandbox-enrolled email or phone | Needed to see the returning-shopper path — an unenrolled address always shows the new-card form |
+
+Full matrix: [Testing Guide](testing-guide.md).
 
 ---
 
-## Result States
+## 6. Integration by platform
 
-Subscribe to **`SpreedlyClickToPayCheckout.state`** for a `ClickToPayCheckoutFlowSnapshot`:
+The same steps wired into each UI stack. Read only your own — the other two are collapsed.
 
-| Snapshot field | Description |
-|----------------|-------------|
-| `checkoutId` | Active checkout session id |
-| `phase` | `ClickToPayFlowState` (see table below) |
-| `message` | Human-readable status (may match loader copy) |
-| `awaitingExternalOtpChannel` | `true` when external OTP channel picker should show |
-| `otpValidationChannels` | Available OTP channels |
-| `selectedOtpChannelId` | Currently selected channel |
-| `maskedCards` | Typed saved cards when loaded |
-| `selectedCardId` | Selected `srcDigitalCardId` |
-| `cardsReady` | Saved cards loaded and selectable |
-
-Phases match `ClickToPayFlowState`:
-
-| Phase | Meaning |
-|-------|---------|
-| `idle` | No active checkout |
-| `loadingWebView` / `mcScriptReady` | Loading MC script and UI kit |
-| `initialized` | MC init complete |
-| `lookupComplete` | Lookup in progress |
-| `otpRequired` | Awaiting OTP |
-| `cardsLoaded` | Saved cards ready |
-| `newUserEnrollment` | New-user card entry |
-| `checkoutInProgress` | DCF checkout open |
-| `complete` / `tokenizing` | MC COMPLETE; Spreedly tokenize in flight |
-| `finished` | Token event emitted after successful tokenize (`paymentMethodTokenized`) |
-| `failed` | Terminal error — sheet dismisses; read `subscribeToPaymentResults` for tokenize outcome |
-
-**Payment outcome:** Always use `subscribeToPaymentResults` — `PaymentResult.isSuccess` and `PaymentResult.token` are the source of truth for the `payment_method_token`. After tokenize succeeds, flow state moves to `finished` and `.paymentMethodTokenized` fires on `events`.
-
-**Cancellation:** `.checkoutCancelled` is emitted on DCF cancel; the singleton sheet dismisses automatically. Headless integrators should reset UI when receiving this event.
-
-**Sign-out:** The sheet toolbar **Sign out** clears the MC device session, dismisses the checkout sheet, and emits `.sessionDeleted`. Reset merchant UI when you receive `sessionDeleted` (for example return to your product screen). Programmatic `SpreedlyClickToPayCheckout.signOut(onComplete:)` clears the session **without** dismissing the sheet — use it to clear stale Remember-me cards, then call `lookup(customer:)` again. OTP **Not you** dismisses the sheet after cleanup (`.otpNotYou` then `.sessionDeleted`). MC card-list sign-out during saved-cards may restart lookup in-sheet (iframe parity).
-
----
-
-## Advanced Integration
-
-### Programmatic present (no drop-in button)
-
-Use `SpreedlyClickToPayCheckout.present(config:from:)` when you build a custom merchant pay button or drive checkout from your own UI. The SDK still runs the same full-screen sheet. Check `SpreedlyClickToPayCheckout.isActive` before presenting if you need to guard double-taps.
-
-### Headless / custom UI
-
-Use `SpreedlyClickToPayCheckout.makeController(config:)` (or `ClickToPayCheckoutController` from your own factory):
-
-> **Note:** Prefer `makeController` so singleton helpers (`cancel`, `lookup`, static OTP/card methods) target the same session. `ClickToPayCheckoutController(config:)` creates an isolated flow with its own event bus.
+### SwiftUI
 
 ```swift
-let controller = SpreedlyClickToPayCheckout.makeController(config: config)
-// Embed controller.webViewHost() in your SwiftUI hierarchy
-controller.beginCheckout()
-
-controller.events
-    .sink { event in /* handle ClickToPayEvent */ }
-    .store(in: &cancellables)
-
-controller.state // @Published snapshot on the controller instance
-```
-
-Wire OTP manually when using external channel selection:
-
-```swift
-SpreedlyClickToPayCheckout.selectOtpChannel(channelId)
-SpreedlyClickToPayCheckout.initiateOtp()
-// OTP entry: MC src-otp-input in the WebView, or headless:
-SpreedlyClickToPayCheckout.validateOtp("123456") // forwards to MC validate
-```
-
-**Saved cards (headless):** Prefer `controller.typedMaskedCards` (`[ClickToPayMaskedCard]`) or `controller.flowSnapshot.maskedCards` over raw `maskedCards` dictionaries.
-
-**Lookup validation:** `ClickToPayCheckoutController.lookup` rejects empty email/phone the same way as `SpreedlyClickToPayCheckout.lookup` (validation error events, no MC call).
-
-### Merchant-hosted card list
-
-Set `config.merchantHostedCardList = true`, then drive checkout from your UI:
-
-```swift
-SpreedlyClickToPayCheckout.selectCard(srcDigitalCardId)
-SpreedlyClickToPayCheckout.checkoutSelectedCard(
-    srcDigitalCardId: srcDigitalCardId,
-    verificationValue: cvvFromSecureField,
-    rememberMe: true
-)
-```
-
-Listen for `.displayCardsReady` to render masked cards from the event payload.
-
-### Saved cards pre-checkout detection
-
-Optional. Merchants who do **not** adopt this API keep the same checkout flow — present `SpreedlyClickToPayButton` or `SpreedlyClickToPayCheckout.present` as today.
-
-Use `ClickToPaySavedCardsDetector` when you want to know whether this device has **Remember-me** saved cards **before** showing contact fields or opening checkout. The detector mounts a hidden MC WebView, runs `init` + `getCards` only, then calls your `onResult` once with `ClickToPaySavedCardsDetectionResult` (`hasSavedCards`, optional `savedCards` labels). It does **not** tokenize, emit checkout flow events, or present the checkout sheet.
-
-**Android name mapping:** iOS `ClickToPaySavedCardsDetector` ↔ Android `ClickToPaySavedCardsProbe`.
-
-```swift
-import SpreedlyClickToPay
-
-// Build from your checkout config, then adapt for the detector:
-let detectorConfig = checkoutConfig.asSavedCardsDetectorConfig()
-
-ClickToPaySavedCardsDetector(
-    config: detectorConfig,
-    detectorKey: deviceDetectorKey, // bump to remount after sign-out
-    onResult: { result in
-        if result.hasSavedCards {
-            // Hide email/phone — shopper is recognized on this device
-            recognizedCardLabels = result.savedCards.compactMap { card in
-                guard let last4 = card.panLastFour else { return nil }
-                let brand = card.cardBrand ?? "Card"
-                return "\(brand) •••• \(last4)"
-            }
-        } else {
-            // Show contact fields for idLookup on present
-        }
-        deviceDetectorKey = -1 // tear down before checkout
-    },
-    onControllerReady: { controller in
-        savedCardsDetectorController = controller
-    }
-)
-.frame(width: 0, height: 0)
-.accessibilityHidden(true)
-```
-
-**Rules:**
-
-1. **One MC flow at a time** — remove or tear down the detector (`deviceDetectorKey = -1` or let the view disappear) **before** `SpreedlyClickToPayCheckout.present` or `SpreedlyClickToPayButton` opens checkout. Both share the process MC host and cookies.
-2. **No customer on detector config** — `asSavedCardsDetectorConfig()` clears `customer` so Remember-me cookies drive `getCards` without spurious `idLookup`.
-3. **Sign out from detector** — `ClickToPaySavedCardsDetectorController.signOut(onComplete:)` clears the MC session without checkout; remount the detector or bump `detectorKey` to re-probe.
-4. **Timeout** — if `getCards` does not complete within 30 seconds, `onResult` receives `hasSavedCards: false`.
-5. **ObjC** — `ClickToPaySavedCardsDetectionResult` and `ClickToPaySavedCardsDetectorController` are `@objcMembers`; embed the SwiftUI detector via `UIHostingController` or use the Example app pattern.
-
-The Example app Click to Pay sandbox demonstrates recognized-device UI (hide contact fields when saved cards exist, **Use a different email** link to sign out and re-probe).
-
-### Headless tokenize
-
-After `.checkoutComplete(checkoutId, metadata)` on a headless `ClickToPayCheckoutController`, pass billing with **required** `firstName` and `lastName`. Address and other fields are optional — only values you set on `ClickToPayTokenizeBilling` are sent.
-
-```swift
-var billing = ClickToPayTokenizeBilling()
-billing.firstName = "Jane"
-billing.lastName = "Doe"
-billing.email = "shopper@example.com"
-// billing.addressLine1 = "..." // optional
-
-controller.tokenize(
-    verificationValue: cvv,
-    billing: billing.toBillingFields(),
-    paymentMetadata: ["order_id": "12345"]
-)
-// Then await subscribeToPaymentResults for the token
-```
-
-Or call `Spreedly.shared().createClickToPayPaymentMethod(clickToPay: metadata, verificationValue: cvv, billing: billing.toBillingFields())`.
-
-### Manual card entry (headless)
-
-When driving a custom UI, `ClickToPayCheckoutController` exposes:
-
-- `showManualCardEntry()` / `dismissManualCardEntry()` — toggle native SPL card form
-- `setPendingVerificationValue(_:)` — stash CVV for the next checkout or tokenize call
-
-### Re-presenting checkout
-
-Calling `present` while a session is active replaces the previous checkout (`cancel(emitCancelled: false)` internally). Check `SpreedlyClickToPayCheckout.isActive` before presenting if you need to guard double-taps.
-
-### `ClickToPayCheckoutViewController` (UIKit / ObjC)
-
-| API | Behavior |
-|-----|----------|
-| `presentWithConfig:from:` | Singleton full-screen sheet — same as `SpreedlyClickToPayCheckout.present`. Set `SpreedlyClickToPayCheckout.delegate` before present for `ClickToPayDelegate` callbacks (iframe `Spreedly.on` parity). |
-| `initWithConfig:` + embed in your hierarchy | Headless WebView host; calls `beginCheckout()` on load. Set `clickToPayDelegate` for flow events. Dismisses on terminal `PaymentResult` (success or failure) from `subscribeToPaymentResults` / `paymentDelegate`. |
-
-The Swift and Objective-C Example apps include Click to Pay sandbox harnesses with event logging.
-
----
-
-## SwiftUI Integration
-
-```swift
-import SpreedlyClickToPay
+import SwiftUI
 import SpreedlyCore
+import SpreedlyClickToPay
 
 struct CheckoutView: View {
     private let config = makeConfig()
@@ -629,7 +432,7 @@ struct CheckoutView: View {
             .onAppear {
                 _ = Spreedly.shared().subscribeToPaymentResults { result in
                     if result.isSuccess, let token = result.token {
-                        // purchase with token
+                        // Send token to your backend
                     }
                 }
             }
@@ -643,38 +446,57 @@ struct CheckoutView: View {
         return ClickToPayCheckoutConfig(
             initConfig: ClickToPayInitConfig(amountCents: 9900),
             srcDpaId: "your-sandbox-or-production-dpaid",
-            customer: ClickToPayCustomer(email: "shopper@example.com"),
             dpaPresentationName: "Your Store",
+            customer: ClickToPayCustomer(email: "shopper@example.com"),
             tokenizeBilling: billing
         )
     }
 }
 ```
 
----
+### UIKit
 
-## UIKit / Swift Integration
+<details>
+<summary><b>Full UIKit implementation</b> — <code>SpreedlyClickToPayButtonViewController</code> as a child view controller</summary>
 
 ```swift
+import UIKit
+import SpreedlyCore
+import SpreedlyClickToPay
+
 var billing = ClickToPayTokenizeBilling()
 billing.firstName = "Jane"
 billing.lastName = "Doe"
+
 let config = ClickToPayCheckoutConfig(
     initConfig: ClickToPayInitConfig(amountCents: 9900),
     srcDpaId: "your-sandbox-or-production-dpaid",
-    customer: ClickToPayCustomer(email: "shopper@example.com"),
     dpaPresentationName: "Your Store",
+    customer: ClickToPayCustomer(email: "shopper@example.com"),
     tokenizeBilling: billing
 )
+
 let buttonVC = SpreedlyClickToPayButtonViewController(checkoutConfig: config)
 addChild(buttonVC)
 stack.addArrangedSubview(buttonVC.view)
 buttonVC.didMove(toParent: self)
 ```
 
----
+For your own button, present the sheet directly:
 
-## Objective-C Integration
+```swift
+SpreedlyClickToPayCheckout.present(config: config, from: self)
+```
+
+Guard double taps with `SpreedlyClickToPayCheckout.isActive`. Presenting while a session is
+active replaces it.
+
+</details>
+
+### Objective-C
+
+<details>
+<summary><b>Full Objective-C implementation</b> — config construction, button view controller, <code>ClickToPayDelegate</code></summary>
 
 ```objc
 #import <SpreedlyClickToPay/SpreedlyClickToPay-Swift.h>
@@ -691,6 +513,7 @@ config.customer = [[ClickToPayCustomer alloc] initWithEmail:@"shopper@example.co
                                               countryCode:nil
                                          mainLookupMethod:ClickToPayMainLookupMethodEmail];
 config.dpaPresentationName = @"Your Store";
+
 ClickToPayTokenizeBilling *billing = [[ClickToPayTokenizeBilling alloc] init];
 billing.firstName = @"Jane";
 billing.lastName = @"Doe";
@@ -703,75 +526,362 @@ SpreedlyClickToPayButtonViewController *buttonVC =
 [buttonVC didMoveToParentViewController:self];
 ```
 
-For advanced sheet-only integration, use `[ClickToPayCheckoutViewController presentWithConfig:config from:self]`. For headless UI, embed `[[ClickToPayCheckoutViewController alloc] initWithConfig:config]` and set `clickToPayDelegate`. See [Objective-C — Click to Pay](objective-c.md#click-to-pay).
+Sheet without the drop-in button:
+
+```objc
+[ClickToPayCheckoutViewController presentWithConfig:config from:self];
+```
+
+Set `SpreedlyClickToPayCheckout.delegate` **before** presenting, then implement
+`clickToPay:didReceiveEvent:userInfo:`.
+
+`ClickToPayCheckoutViewController` has two modes:
+
+| API | Behavior |
+|-----|----------|
+| `presentWithConfig:from:` | Singleton full-screen sheet, same as `SpreedlyClickToPayCheckout.present`. Set `SpreedlyClickToPayCheckout.delegate` before presenting for `ClickToPayDelegate` callbacks |
+| `initWithConfig:` + embed in your hierarchy | Headless WebView host; calls `beginCheckout()` on load. Set `clickToPayDelegate` for flow events. Dismisses on a terminal `PaymentResult` from `subscribeToPaymentResults` / `paymentDelegate` |
+
+</details>
+
+> **iOS only:** the Objective-C surface has no Android or React Native equivalent. React Native
+> consumers use the `checkout-react-native` bridge.
 
 ---
 
-## Differences from Web iframe
+## 7. Handle the result
+
+Three channels, three jobs. Only one of them is the outcome.
+
+| Need | Use | Notes |
+|---|---|---|
+| The token, or the failure | `subscribeToPaymentResults` / `SpreedlyPaymentDelegate` | **Source of truth** |
+| Flow progress | `SpreedlyClickToPayCheckout.events` / `ClickToPayDelegate` | Lookup, OTP, card list, errors |
+| Phase and masked cards | `SpreedlyClickToPayCheckout.state` | A `ClickToPayCheckoutFlowSnapshot` |
+
+| Result | Meaning | What to show the shopper |
+|---|---|---|
+| `PaymentResult.isSuccess` | Tokenized | Dismiss, send `result.token` to your backend |
+| `PaymentResult.isFailure` | Tokenization or checkout failed | `failureDetails.getDescription()` |
+| `.checkoutCancelled` event | Shopper cancelled at the bank confirmation step | Reset your checkout UI. The sheet dismisses itself |
+| `.sessionDeleted` event | Signed out | Return to your product screen |
+
+> **Important:** CVV is never on the event stream, in any case. `.paymentMethodTokenized` carries
+> the token for information only — read the token from `subscribeToPaymentResults`.
+
+<details>
+<summary><b>Flow snapshot and phases</b> — <code>ClickToPayCheckoutFlowSnapshot</code>, <code>ClickToPayFlowState</code></summary>
+
+Subscribe to `SpreedlyClickToPayCheckout.state` for a `ClickToPayCheckoutFlowSnapshot`:
+
+| Snapshot field | Description |
+|----------------|-------------|
+| `checkoutId` | Active checkout session id |
+| `phase` | `ClickToPayFlowState` — see below |
+| `message` | Human-readable status, may match the loader copy |
+| `awaitingExternalOtpChannel` | `true` when the external OTP channel picker should show |
+| `otpValidationChannels` | Available OTP channels |
+| `selectedOtpChannelId` | Currently selected channel |
+| `maskedCards` | Typed saved cards when loaded |
+| `selectedCardId` | Selected `srcDigitalCardId` |
+| `cardsReady` | Saved cards loaded and selectable |
+
+Phases (`ClickToPayFlowState`):
+
+| Phase | Meaning |
+|-------|---------|
+| `idle` | No active checkout |
+| `loadingWebView` / `mcScriptReady` | Loading the Mastercard script and UI kit |
+| `initialized` | Mastercard init complete |
+| `lookupComplete` | Lookup in progress |
+| `otpRequired` | Awaiting OTP |
+| `cardsLoaded` | Saved cards ready |
+| `newUserEnrollment` | New-user card entry |
+| `checkoutInProgress` | Bank confirmation open |
+| `complete` / `tokenizing` | Mastercard `COMPLETE`; Spreedly tokenize in flight |
+| `finished` | Token event emitted after successful tokenize |
+| `failed` | Terminal error — the sheet dismisses; read `subscribeToPaymentResults` for the outcome |
+
+</details>
+
+<details>
+<summary><b>Full event catalog</b> — every <code>ClickToPayEvent</code> case</summary>
+
+Every event carries `checkoutId`, matching Android and React Native. Objective-C receives the same
+payloads as `userInfo` keys — including `channels[]`, `cards[]`, `errors[]` (each with `key`,
+`attribute`, `message`), `correlationId` and `flowId` on `.checkoutComplete`, and `code` as the
+`ClickToPayErrorCode` raw value on `.error`.
+
+| Event | When | Values |
+|---|---|---|
+| `.checkoutStarted` | Session begins | — |
+| `.initialized` | Mastercard init completed | `success`, `availableCardBrands` |
+| `.newUser` | Lookup found no enrolment | — |
+| `.existingUser` | Consumer found, OTP next | — |
+| `.verifiedUser` | Saved cards loaded | — |
+| `.otpInitiated` | OTP started | `maskedValidationChannel`, `channels`, `network`, `rememberMe` |
+| `.otpChannelSelectionRequired` | External picker needed | `channels` |
+| `.otpResponse` | Validate result | `success`, `errorReason?` |
+| `.otpResend` / `.otpNotYou` | Shopper action | — |
+| `.displayCardsReady` | Masked cards ready | `cards: [ClickToPayMaskedCard]` |
+| `.addNewCard` | Add-new-card path | `brands` |
+| `.checkoutCancelled` | Cancelled at bank confirmation | — |
+| `.checkoutDifferentPaymentMethod` | Alternate method chosen | — |
+| `.checkoutError` | Mastercard checkout error | `actionCode` |
+| `.checkoutWindowOpened` / `.checkoutWindowClosed` | Bank confirmation window | — |
+| `.sessionDeleted` | Sign out completed | `deviceRecognized?` |
+| `.checkoutComplete` | Mastercard `COMPLETE` | `metadata: ClickToPayMetadata` |
+| `.paymentMethodTokenized` | Informational | `token` |
+| `.error` | Terminal or validation error | `code: ClickToPayErrorCode`, `message` |
+| `.validationErrors` | Field-level errors | `errors: [ClickToPayFieldError]` |
+
+```swift
+SpreedlyClickToPayCheckout.events
+    .sink { event in
+        switch event {
+        case .initialized(_, let success, let brands): break
+        case .checkoutComplete(_, let metadata): break
+        case .error(_, let code, let message): break
+        default: break
+        }
+    }
+    .store(in: &cancellables)
+```
+
+**Flow phases** on `state`: `idle` → `loadingWebView` → `mcScriptReady` → `initialized` →
+`lookupComplete` → `otpRequired` → `cardsLoaded` or `newUserEnrollment` → `checkoutInProgress` →
+`complete` / `tokenizing` → `finished`, or `failed` at any point.
+
+</details>
+
+---
+
+## 8. Errors and troubleshooting
+
+**Error codes**
+
+| `ClickToPayErrorCode` | Typical cause |
+|---|---|
+| `c2pInit` | Mastercard init or script load failed — check `srcDpaId` and ATS |
+| `c2pLookup` | Invalid identity or lookup failure |
+| `c2pOtp` | OTP initiation or validation failed |
+| `c2pCheckout` | Checkout or bank confirmation failed |
+| `c2pTokenize` | Spreedly tokenization failed |
+| `networkTimeout` | Mastercard script did not load within 15 seconds |
+| `unknown` | Unmapped |
+
+**Problems you hit while integrating**
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Tokenize returns HTTP 422 | Missing names, or Click to Pay not enabled | Set `tokenizeBilling.firstName` and `.lastName`; confirm Click to Pay on your environment key |
+| "First name and last name are required" before any network call | Same cause, caught client-side | Same fix |
+| Mastercard init fails | Bad `srcDpaId`, wrong sandbox flag, or ATS | Check all three — see [Configure your app](#4-configure-your-app) |
+| The identity form keeps appearing | No valid `customer` | Provide an email, or a phone **and** country code |
+| Phone lookup ignored | `countryCode` missing | It is required when using phone without email |
+| OTP appears on every visit | Remember me was not checked, or checkout was not completed | Remember me lives in Mastercard's widget. `otp.rememberMe` only adds a duplicate native toggle |
+| Sheet does not appear (SwiftUI) | No top view controller found | Use `present(config:from:)` with a visible view controller |
+| No delegate callbacks (Objective-C) | Delegate set too late | Set `SpreedlyClickToPayCheckout.delegate` **before** presenting |
+| OTP never shows | Email or phone not enrolled | Use an address enrolled in the Mastercard sandbox |
+| Remember Me missing from the native CVV bar | Not enabled | Set `otp.rememberMe = true`. The Mastercard OTP widget always offers its own |
+| Payment error during tokenize | Inline error on the sheet while processing | Cancel and call `present` again for a full retry |
+| Tokenize hangs after `COMPLETE` | Auto-tokenize timed out after 120 seconds | Check CVV collection and that you subscribed to results |
+| Blank Mastercard area | The web view lost height, usually to the keyboard | Keep it full height during checkout; dismiss the keyboard and retry |
+
+Broader error model: [Error Handling](error-handling.md).
+
+---
+
+<a id="important-notes"></a>
+## 9. Edge cases and cleanup
+
+### Blocked devices
+
+> **Important:** When `blockJailbrokenDevices` is enabled and the device is compromised, the SDK
+> blocks Click to Pay at both button tap and `present`. No sheet appears, `.error` and
+> `.validationErrors` are emitted, and a `PaymentResult.failure` is published. See
+> [Security — Runtime Integrity](security.md#runtime-integrity).
+
+### Returning shoppers and OTP
+
+| What the shopper did in Mastercard's OTP widget | Next checkout |
+|---|---|
+| Checked Remember me **and** completed checkout | Saved cards load, no OTP |
+| Left Remember me unchecked | Lookup runs, OTP required |
+
+You do not configure this. It is a device cookie owned by Mastercard.
+
+<details>
+<summary><b>Detecting saved cards before checkout</b> — optional</summary>
+
+`ClickToPaySavedCardsDetector` mounts a hidden web view, runs init and `getCards` only, and calls
+`onResult` once. It never tokenizes, emits flow events, or presents the sheet. Use it to decide
+whether to show contact fields at all.
+
+```swift
+let detectorConfig = checkoutConfig.asSavedCardsDetectorConfig()
+
+ClickToPaySavedCardsDetector(
+    config: detectorConfig,
+    detectorKey: deviceDetectorKey,   // bump to remount after sign-out
+    onResult: { result in
+        if result.hasSavedCards {
+            // Recognized on this device — hide email and phone
+        }
+        deviceDetectorKey = -1        // tear down before checkout
+    },
+    onControllerReady: { savedCardsDetectorController = $0 }
+)
+```
+
+`onResult` receives a `ClickToPaySavedCardsDetectionResult` (`hasSavedCards`, optional
+`savedCards` labels), and `onControllerReady` hands back a `ClickToPaySavedCardsDetectorController`
+whose `signOut(onComplete:)` clears the Mastercard session without starting checkout.
+
+Operating rules:
+
+- Run **one** Mastercard flow at a time — tear the detector down before presenting checkout.
+- `asSavedCardsDetectorConfig()` clears `customer` and sets `merchantHostedCardList`, so the probe
+  cannot trigger a lookup.
+- Bump `detectorKey` to remount after a sign-out.
+- `getCards` times out after 30 seconds and reports `hasSavedCards: false`.
+- Objective-C: the detector is `@objcMembers`; host it through `UIHostingController`.
+
+Merchants who skip this keep exactly the same flow. Android calls the equivalent
+`ClickToPaySavedCardsProbe`.
+
+</details>
+
+<details>
+<summary><b>Headless and merchant-hosted card list</b> — advanced</summary>
+
+```swift
+let controller = SpreedlyClickToPayCheckout.makeController(config: config)
+// Embed controller.webViewHost() in your hierarchy
+controller.beginCheckout()
+controller.events.sink { event in /* … */ }.store(in: &cancellables)
+```
+
+Prefer `makeController` over constructing `ClickToPayCheckoutController` directly —
+`ClickToPayCheckoutController(config:)` creates an **isolated** flow with its own event bus, so the
+static helpers (`cancel`, `lookup`, OTP and card methods) would not target it.
+
+`controller.lookup` rejects empty email or phone the same way the static `lookup` does — validation
+error events, no Mastercard call. Prefer `controller.typedMaskedCards` or
+`controller.flowSnapshot.maskedCards` over raw dictionaries.
+
+**Headless tokenize.** After `.checkoutComplete(checkoutId, metadata)`, pass billing with the
+required `firstName` and `lastName`:
+
+```swift
+var billing = ClickToPayTokenizeBilling()
+billing.firstName = "Jane"
+billing.lastName = "Doe"
+billing.email = "shopper@example.com"
+// billing.addressLine1 = "..."   // optional
+
+controller.tokenize(
+    verificationValue: cvv,
+    billing: billing.toBillingFields(),
+    paymentMetadata: ["order_id": "12345"]
+)
+// Then await subscribeToPaymentResults for the token
+```
+
+Or call `Spreedly.shared().createClickToPayPaymentMethod(clickToPay: metadata, verificationValue: cvv, billing: billing.toBillingFields())`.
+
+**Manual card entry.** When driving your own UI, the controller also exposes
+`showManualCardEntry()` / `dismissManualCardEntry()` to toggle the native SPL card form, and
+`setPendingVerificationValue(_:)` to stash a CVV for the next checkout or tokenize call. New-card
+checkout goes through `checkoutWithNewCard` with a `ClickToPayNewCardFields` value.
+
+Merchant-hosted card list — set `config.merchantHostedCardList = true`, listen for
+`.displayCardsReady`, then:
+
+```swift
+SpreedlyClickToPayCheckout.selectCard(srcDigitalCardId)
+SpreedlyClickToPayCheckout.checkoutSelectedCard(
+    srcDigitalCardId: srcDigitalCardId,
+    verificationValue: cvvFromSecureField,
+    rememberMe: true
+)
+```
+
+External OTP channel selection:
+
+```swift
+SpreedlyClickToPayCheckout.selectOtpChannel(channelId)
+SpreedlyClickToPayCheckout.initiateOtp()
+SpreedlyClickToPayCheckout.validateOtp("123456")
+```
+
+Prefer `controller.typedMaskedCards` over raw dictionaries.
+
+</details>
+
+### Sign out
+
+The sheet's **Sign out** clears the Mastercard device session, dismisses the sheet, and emits
+`.sessionDeleted`. `SpreedlyClickToPayCheckout.signOut(onComplete:)` clears the session **without**
+dismissing — use it to drop stale Remember-me cards, then call `lookup(customer:)` again.
+
+### Cleanup
+
+`SpreedlyClickToPayCheckout.cancel()` dismisses an active sheet. Hold your `AnyCancellable` for
+the lifetime of the screen. Never log raw CVV, PAN, or full tokens.
+
+---
+
+## 10. API at a glance
+
+| API | Module | Purpose |
+|---|---|---|
+| `SpreedlyClickToPayButton(checkoutConfig:buttonConfig:)` | `SpreedlyClickToPay` | Mastercard button, SwiftUI |
+| `SpreedlyClickToPayButtonViewController(checkoutConfig:)` | `SpreedlyClickToPay` | Mastercard button, UIKit and Objective-C |
+| `SpreedlyClickToPayCheckout.present(config:from:)` | `SpreedlyClickToPay` | Present the sheet from your own button |
+| `SpreedlyClickToPayCheckout.cancel()` / `.isActive` | `SpreedlyClickToPay` | Dismiss, and guard double taps |
+| `SpreedlyClickToPayCheckout.events` / `.state` | `SpreedlyClickToPay` | Progress stream and phase snapshot |
+| `SpreedlyClickToPayCheckout.delegate` | `SpreedlyClickToPay` | Objective-C event channel |
+| `SpreedlyClickToPayCheckout.signOut(onComplete:)` / `.lookup(customer:)` | `SpreedlyClickToPay` | Session control |
+| `SpreedlyClickToPayCheckout.makeController(config:)` | `SpreedlyClickToPay` | Headless controller |
+| `ClickToPayCheckoutController` + `webViewHost()` + `beginCheckout()` | `SpreedlyClickToPay` | Host the WebView in your own UI and start the flow |
+| `SpreedlyClickToPayCheckout.setAutoTokenizeAuthRefresher` | `SpreedlyClickToPay` | Refresh a signed `Spreedly.setup` before auto-tokenize |
+| `SpreedlyClickToPayButton.prepareForPresentation` | `SpreedlyClickToPay` | Run an auth refresh before the sheet opens |
+| `ClickToPayCheckoutController.setRememberMeSelected(_:)` | `SpreedlyClickToPay` | Sync Remember me before a headless checkout |
+| `SpreedlyClickToPayCheckout.checkoutWithNewCard(...)` | `SpreedlyClickToPay` | Headless checkout with SPL-collected card fields |
+| `Spreedly.shared().createClickToPayPaymentMethod(...)` | `SpreedlyCore` | Core tokenize, for advanced flows |
+| `ClickToPaySavedCardsDetectorController.signOut(onComplete:)` | `SpreedlyClickToPay` | Clear the Mastercard session from the detector (`c2pSignOut()` on web) |
+| `ClickToPayCheckoutConfig` | `SpreedlyClickToPay` | The one merchant config object |
+| `ClickToPaySavedCardsDetector` | `SpreedlyClickToPay` | Pre-checkout saved-card probe |
+| `Spreedly.shared().subscribeToPaymentResults { }` | `SpreedlyCore` | Receive the token |
+| `SpreedlyThemeManager.setGlobalTheme(lightTheme:darkTheme:)` | `SpreedlyUI` | Theme the native chrome |
+
+---
+
+## 11. Related documentation
+
+- [Express checkout](express-checkout.md) — plain card entry, the usual companion button
+- [Testing Guide](testing-guide.md) — sandbox setup and the go-live checklist
+- [Theme and styling](theme-and-styling.md) — building the theme you set in step 4
+- [Security](security.md) — runtime integrity and screen prevention
+- [Objective-C](objective-c.md) — selector forms for every API above
+- [Getting Started](getting-started.md) — installation and SDK lifecycle
+
+<details>
+<summary><b>Differences from the web iframe</b> — for merchants porting a web integration</summary>
 
 | Topic | Web iframe | iOS SDK |
 |-------|------------|---------|
 | Merchant button | `<src-button>` + `onclick` → `c2pInit` | `SpreedlyClickToPayButton` |
-| `lib.js` on merchant page | Loaded before click | Loaded in checkout sheet only (`c2p-host.html`) |
-| Presenter | `Spreedly.c2pInit` | Button tap → internal `present` (advanced: call `present` directly) |
+| `lib.js` on the merchant page | Loaded before click | Loaded in the checkout sheet only (`c2p-host.html`) |
+| Presenter | `Spreedly.c2pInit` | Button tap → internal `present`; advanced integrations call `present` directly |
 | Config | `options` object | `ClickToPayCheckoutConfig` |
-| Card-only | Separate integration | Use `CardFormDropIn` or headless card APIs — not inside C2P |
-| Events | `Spreedly.on(event, fn)` | `SpreedlyClickToPayCheckout.events` or `ClickToPayDelegate` (sheet **and** headless VC) |
+| DPA ID | `c2pConfig.srcDpaId` | `srcDpaId` |
+| Widget locale | `dpaLocale` | `locale` |
+| DPA display metadata | `dpaData` | `dpaPresentationName` / `dpaName` |
+| Transaction block | `c2pConfig` | `initConfig` (`ClickToPayInitConfig`) |
+| Card-only | Separate integration | `CardFormDropIn` or headless card APIs — not inside Click to Pay |
+| Events | `Spreedly.on(event, fn)` | `SpreedlyClickToPayCheckout.events` or `ClickToPayDelegate` |
 
----
-
-## Important Notes
-
-- **Tokenize billing** — set `config.tokenizeBilling` with `firstName` and `lastName` before checkout completes. Those names prefill the cardholder fields on the native new-user card form; shoppers can change them before enrollment. The SDK does not fill address defaults; unset optional billing fields are omitted from the tokenize request.
-- **Only tokenize on `COMPLETE`** — other action codes emit events and reset UI.
-- **Amount** — use `ClickToPayInitConfig(amountCents:)`; SDK converts to MC major units.
-- **Lookup** — iframe parity: `getCards` first, then `idLookup` when empty and customer is valid. Phone lookup requires country code.
-- **Card-only checkout** — use [`CardFormDropIn`](getting-started.md), not guest checkout inside C2P.
-- **Do not log** raw CVV, PAN, or full tokens.
-
-### Blocked devices
-
-> **Important:** When `blockJailbrokenDevices` is enabled and the device is compromised, the SDK blocks Click to Pay at button tap and `present`. No sheet is shown; `ClickToPayEvent.error` / `.validationErrors` are emitted and a `PaymentResult.failure` is published on `subscribeToPaymentResults`. See [Security — Runtime Integrity](security.md#runtime-integrity).
-
----
-
-## Returning users and OTP
-
-Returning shoppers skip OTP when Mastercard `getCards()` returns saved cards from a **Remember-me device cookie**. Optionally run [`ClickToPaySavedCardsDetector`](#saved-cards-pre-checkout-detection) on screen load to adapt merchant contact UI before checkout.
-
-| Shopper action (MC WebView OTP) | Next checkout |
-|--------------------------------|---------------|
-| **Remember me checked** + full checkout completed | Saved cards load — **no OTP** |
-| **Remember me unchecked** | `idLookup` runs — **OTP required** |
-
-Merchants do **not** configure Remember-me persistence. `config.otp.rememberMe` only controls an optional duplicate toggle on the native saved-card CVV bar.
-
-`deviceRecognized` on `.sessionDeleted` (after sign-out) is not the same as OTP skip — it reflects MC device recognition at sign-out time.
-
----
-
-## Troubleshooting
-
-| Symptom | Check |
-|---------|-------|
-| MC `init` fails | Valid `srcDpaId`, sandbox vs production, ATS |
-| Tokenize HTTP 422 | C2P enabled on environment key; confirm `firstName` and `lastName` on `tokenizeBilling` |
-| Tokenize fails before network / “First name and last name are required” | Set `tokenizeBilling.firstName` and `.lastName` on `ClickToPayCheckoutConfig` (or pass billing to `createClickToPayPaymentMethod`) |
-| OTP never shows | Email/phone enrolled in sandbox |
-| Identity form keeps showing | Provide valid email, or phone **and** country code on `ClickToPayCustomer` before present, or complete the native Look up step |
-| Phone lookup ignored | `countryCode` is required when using phone without email |
-| OTP every visit despite checking Remember me | Complete a full saved-card checkout after OTP; verify the MC widget was checked. Unchecked Remember me always requires OTP on the next visit. |
-| Remember Me on native CVV bar | Set `otp.rememberMe = true` to show the optional native toggle (MC OTP widget always offers Remember me) |
-| Sheet does not appear (SwiftUI) | Use `present(config:from:)` with a visible view controller, or ensure a key window exists. `present(config:)` without `from:` publishes `PaymentResult.failure` when no top view controller is found. |
-| No delegate callbacks (ObjC/UIKit sheet) | Set `SpreedlyClickToPayCheckout.delegate` before `presentWithConfig:from:` (or use embedded VC with `clickToPayDelegate`) |
-| Payment error during tokenize | Inline error on the sheet during processing; cancel and call `present` again for a full retry. |
-| Tokenize hangs after COMPLETE | Auto-tokenize times out after 120 seconds; check CVV collection and `subscribeToPaymentResults` |
-| Blank DCF / OTP area (MC chrome only) | Ensure the WebView keeps full height during checkout (native card form must not collapse it). Retry after dismissing the keyboard. |
-
----
-
-## Related Documentation
-
-- [Objective-C](objective-c.md)
-- [Getting Started](getting-started.md)
+</details>
 

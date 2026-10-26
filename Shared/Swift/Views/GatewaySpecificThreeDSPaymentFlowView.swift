@@ -466,7 +466,7 @@ struct GatewaySpecificThreeDSPaymentFlowView: View {
                 
                 await MainActor.run {
                     // Show only top 5 cards
-                    savedCards = Array(cards?.prefix(upTo: 6) ?? [])
+                    savedCards = cards ?? []
                     isLoadingCards = false
                 }
             } catch {

@@ -14,11 +14,13 @@ Build fully customized payment forms with secure individual field components.
 6. [Building a Custom Form (SwiftUI)](#building-a-custom-form-swiftui)
 7. [Keyboard Navigation and Focus Management](#keyboard-navigation-and-focus-management)
 8. [Additional Fields (Billing/Shipping)](#additional-fields-billingshipping)
-9. [UIKit Integration](#uikit-integration)
-10. [Save Card Option in Custom Forms](#save-card-option-in-custom-forms)
-11. [Error Handling](#error-handling)
-12. [Headless PAN API quick reference](#headless-pan-api-quick-reference) — SwiftUI, UIKit, Objective-C (iframe parity)
-13. [Related Documentation](#related-documentation)
+9. [Merchant-owned TextFields + hosted card](#merchant-owned-textfields--hosted-card)
+10. [Custom field validators](#custom-field-validators)
+11. [UIKit Integration](#uikit-integration)
+12. [Save Card Option in Custom Forms](#save-card-option-in-custom-forms)
+13. [Error Handling](#error-handling)
+14. [Headless PAN API quick reference](#headless-pan-api-quick-reference) — SwiftUI, UIKit, Objective-C (iframe parity)
+15. [Related Documentation](#related-documentation)
 
 ---
 
@@ -250,6 +252,7 @@ Each `onFieldStateChange` (or ObjC `onFieldStateChanged:`) delivers:
 | `panDisplayFormat` | `CardNumberFormat?` | **Card number only** — pretty / plain / masked at emit time. `nil` on CVC and other fields. ObjC: `panDisplayFormatRawValue`. |
 | `panDisplayPolicyMaskedValue` | `Bool?` | **Card number only** — policy flag from hosted display state (`hostedCardDisplayState.panMasked`) at emit time, not “digits visible”. `nil` on CVC. Swift: use **`panDisplayPolicyMaskedValue`**; ObjC: **`panDisplayPolicyMasked`** (`NSNumber?`). |
 | `iin` | `String?` | **Card number only** — issuer prefix for BIN UX (see below). Not the full PAN. |
+| `errorMessage` | `String?` | Merchant custom-validator message for **non-PCI** fields when that extra rule fails. Always `nil` on card number and CVC. |
 
 **IIN (issuer identification number)** — iframe `inputProperties.iin` parity on **headless** card-number fields:
 
@@ -260,7 +263,8 @@ Each `onFieldStateChange` (or ObjC `onFieldStateChanged:`) delivers:
 
 **Never included:** raw PAN or CVV. Do not log `onChange` ciphertext for card fields.
 
-#### What to read for mask UI {#what-to-read-for-mask-ui}
+<a id="what-to-read-for-mask-ui"></a>
+#### What to read for mask UI
 
 Use **`onFieldStateChange`** snapshots for checkout chrome (lock icons, format labels). Do **not** read `Spreedly.shared().hostedCardDisplayState` inside the same callback — it can lag one frame behind the field.
 
@@ -283,7 +287,7 @@ On **`PAN_MASK_CHANGED`**, trust **`HostedFieldState`** (`isPanMasked`, `panDisp
 | `type` | `FormFieldType` | Field type (e.g., `.cardNumber`, `.firstName`) |
 | `title` | `String?` | Label above the field |
 | `isRequired` | `Bool` | Whether the field is required for validation |
-| `placeholder` | `String?` | Custom placeholder text. **Ignored when `type` is `.cardNumber`** — see [Card number placeholder](#card-number-placeholder-current-behavior). |
+| `placeholder` | `String?` | Custom placeholder text. **Ignored when `type` is `.cardNumber`** — the card number field uses the format-driven display, not a custom placeholder. |
 | `requiredMessage` | `String?` | Overrides the default required-field validation error (e.g. ACH flows use bank-specific copy instead of card defaults). Available on SwiftUI `SPLTextField` and UIKit/ObjC `SPLTextFieldViewController` (`requiredMessage` property). |
 | `theme` | `SpreedlyTheme?` | Light mode theme |
 | `darkTheme` | `SpreedlyTheme?` | Dark mode theme |
@@ -302,13 +306,14 @@ On **`PAN_MASK_CHANGED`**, trust **`HostedFieldState`** (`isPanMasked`, `panDisp
 | `onChange` | `((String) -> Void)?` | Optional per-keystroke value after normalization. Card number and CVV yield an **opaque SDK-encoded string** (not what appears on screen); other fields yield plaintext suitable for UX only. **Never log** this string. |
 | `forceMaskOnLifecycleStop` | `Bool` | Card number only. Default `true` — force visual mask while app is backgrounded (security UX; not iframe `toggleMask`). |
 
-#### PAN/CVV display (iframe and web hosted-field parity)
+<a id="pancvv-display-iframe-and-web-hosted-field-parity"></a>
+#### PAN/CVV display (global hosted display)
 
-**Card number** and **CVC** `SPLTextField` rows always follow **`Spreedly.shared().setNumberFormat(_:)`** and **`Spreedly.shared().toggleMask()`** — there is no per-field observe or mask parameter (same as web `inAppElements` + global format APIs). Mount both fields, then drive display from merchant UI outside the fields.
+**Card number** and **CVC** `SPLTextField` rows always follow **`Spreedly.shared().setNumberFormat(_:)`** and **`Spreedly.shared().toggleMask()`** — there is no per-field observe or mask parameter. Mount both fields, then drive display from merchant UI outside the fields.
 
 **Effective mask** (what the user sees) is: force mask while the app is backgrounded when `forceMaskOnLifecycleStop` is enabled, **or** the current **`hostedCardDisplayState`** from `setNumberFormat` / `toggleMask`. Never puts raw PAN in `HostedFieldState` (use `isPanMasked` on snapshots instead).
 
-**SDK-level (iframe parity)** — on the main thread.
+**SDK-level hosted display** — on the main thread.
 
 #### `setNumberFormat` by language (pick one call per format)
 
@@ -350,11 +355,12 @@ Use `setNumberFormat(type:)` in Swift only when your app still receives iframe f
 [[Spreedly shared] toggleMask];
 ```
 
-Pick **raw value** or **type string**, not both, for the same format change. See [Objective-C guide](objective-c.md#pan-mask-card-number-only).
+Pick **raw value** or **type string**, not both, for the same format change. See the [Objective-C guide](objective-c.md#spltextfieldviewcontroller) for the field component these calls drive.
 
 **Atomic state (Swift):** To set format and mask flags together, use **`SpreedlyUIManager.shared.setHostedCardDisplayState(_:)`** with a **`HostedCardDisplayState`**. **`SpreedlyUIManager.shared.resetHostedCardDisplayState()`** restores defaults (also available from Objective-C on the manager). Reading combined state: **`Spreedly.shared().hostedCardDisplayState`** (or the Combine publisher on **`SpreedlyUIManager.shared`**).
 
-#### `HostedCardDisplayState` — read flags vs mask actions {#hostedcarddisplaystate-read-vs-mask-actions}
+<a id="hostedcarddisplaystate-read-vs-mask-actions"></a>
+#### `HostedCardDisplayState` — read flags vs mask actions
 
 Developers often treat **`cvvDisplayMasked`** or **`panMasked`** as something to **call** to mask or unmask. They are **not APIs** — they are **read-only booleans** on the current display snapshot. The iframe had no `cvvDisplayMasked` name; native SDKs expose it so you can sync merchant UI (toggle label, icon) after the same coupled mask behavior as legacy **`setNumberFormat`** / **`toggleMask`** on number + CVV iframes.
 
@@ -487,6 +493,7 @@ SPLTextField(
     type: .cardNumber,
     title: "Card number",
     isRequired: true,
+    onValidationChange: { _ in },
     trailingIcon: { scheme in
         switch scheme {
         case .visa: Image("MyVisaLogo")
@@ -494,8 +501,7 @@ SPLTextField(
         case .unknown: EmptyView()
         default: Image("MyGenericCard")
         }
-    },
-    onValidationChange: { _ in }
+    }
 )
 ```
 
@@ -514,7 +520,8 @@ SPLTextField(
 | `reset()` / `resetPaymentState()` | — | On ``Spreedly`` — full reset: secure values, field UI, validation, and hosted PAN/CVV display (``reset()`` is an alias) |
 | ``resetPaymentFormPreservingDisplayConfig()`` | — | On ``Spreedly`` — clears fields and validation; **keeps** ``setNumberFormat`` / ``toggleMask`` state |
 
-#### Payment reset (merchant APIs) {#payment-reset-merchant-apis}
+<a id="payment-reset-merchant-apis"></a>
+#### Payment reset (merchant APIs)
 
 Two reset levels — pick the one that matches what you need to clear:
 
@@ -523,7 +530,8 @@ Two reset levels — pick the one that matches what you need to clear:
 | ``resetPaymentFormPreservingDisplayConfig()`` | Cleared | **Kept** |
 | ``resetPaymentState()`` / ``reset()`` | Cleared | Reset to SDK defaults (Pretty, unmasked) |
 
-##### When form reset preserving display config runs {#when-preserving-display-config-reset-runs}
+<a id="when-preserving-display-config-reset-runs"></a>
+##### When form reset preserving display config runs
 
 | Situation | Headless (`SPLTextField`) | Express (`CardFormDropIn`) |
 |-----------|---------------------------|----------------------------|
@@ -575,20 +583,40 @@ Use the `type` parameter to specify the field behavior. The SDK applies validati
 | `.expirationYear` | Expiration year (2 or 4 digit) | `.numberPad` |
 | `.expirationDate` | Combined expiration (MM/YY) | `.numberPad` |
 | `.cvc` | Security code (CVC/CVV) | `.numberPad` |
-| `.addressLine1` | Primary address | `.default` |
-| `.addressLine2` | Secondary address | `.default` |
+| `.addressLine1` | Primary address (legacy single line) | `.default` |
+| `.addressLine2` | Secondary address (legacy) | `.default` |
 | `.city` | City | `.default` |
 | `.state` | State/Province | `.default` |
 | `.zipCode` | Postal/ZIP code | `.default` |
+| `.email` | Email address | `.emailAddress` |
+| `.company` | Company name | `.default` |
+| `.country` | Country | `.default` |
+| `.phoneNumber` | Full phone number | `.phonePad` |
+| `.houseNumberOrName` | House number or building name (street-split) | `.default` |
+| `.street` | Street name (street-split) | `.default` |
+| `.streetLine2` | Street line 2 (street-split) | `.default` |
+| `.phoneNumberCountryCode` | Phone country code | `.phonePad` |
+| `.phoneNumberAreaCode` | Phone area code | `.phonePad` |
+| `.shippingAddress1` … `.shippingPhoneNumber` | Shipping twins of legacy address/phone | same as billing |
+| `.shippingHouseNumberOrName` … `.shippingPhoneNumberAreaCode` | Shipping twins of street-split / phone parts | same as billing |
 | `.routingNumber` | Bank routing number (US/Canada ACH, 9 digits) | `.numberPad` |
 | `.accountNumber` | Bank account number (4–17 digits) | `.numberPad` |
 | `.bankName` | Optional issuing bank name (ACH) | `.default` |
 
-Both patterns are valid: use `.firstName` and `.lastName` for separate fields, or `.fullName` for a single combined name field.
+**Name fields:** You may mount `.firstName`, `.lastName`, and/or `.fullName`. At tokenize, every non-empty name value is sent as-is (`first_name`, `last_name`, and/or `full_name`). The SDK does not drop one shape in favor of another and does not join a lone first or last into `full_name`. Prefer one UI shape so shoppers are not asked twice, unless your backend needs multiple name keys.
 
-> **ACH bank-account fields:** Use `.routingNumber`, `.accountNumber`, and `.bankName` with [ACH bank-account payments](ach-bank-account.md). Routing and account values are stored in `SecureValueContainer`; copy/cut/paste are disabled on those field types (Android parity). Stable **1.4.0** does not include ACH in the production release set — see [CHANGELOG](../CHANGELOG.md) for the current boundary.
+**Pick one address shape for billing (and the same idea for shipping):**
 
-> **Combined expiry field:** Instead of separate `.expirationMonth` and `.expirationYear` fields, you can use `.expirationDate` as a single combined MM/YY field. Use the `yearFormat` property (`.twoDigit` or `.fourDigit`) to control year display. This simplifies the form when a single expiration input is preferred.
+| You want… | Mount these |
+|-----------|-------------|
+| Classic US-style lines | `.addressLine1`, optional `.addressLine2`, `.city`, `.state`, `.zipCode`, `.country` |
+| Street split (house + street) | `.houseNumberOrName`, `.street`, optional `.streetLine2`, plus city/state/ZIP/country as needed |
+
+You may send both legacy and street-split values in `additionalFields` if your backend needs them; the API accepts both. Prefer **one UI shape** so shoppers are not asked twice.
+
+> **ACH bank-account fields:** Use `.routingNumber`, `.accountNumber`, and `.bankName` with [ACH bank-account payments](ach-bank-account.md). Routing and account values are stored in `SecureValueContainer`; copy/cut/paste are disabled on those field types. See [CHANGELOG](../CHANGELOG.md) for the current release boundary.
+
+> **Expiry — pick one shape:** Use either `.expirationDate` (combined MM/YY) **or** `.expirationMonth` + `.expirationYear`. Do **not** mount both shapes on the same form — validation fails until only one remains. Use `yearFormat` (`.twoDigit` or `.fourDigit`) on the combined field when needed.
 
 ---
 
@@ -743,7 +771,8 @@ struct CustomPaymentForm: View {
                      expirationYearValid &&
                      cvcValid &&
                      firstNameValid &&
-                     lastNameValid
+                     lastNameValid &&
+                     SpreedlyUIManager.shared.customValidationErrors.isEmpty
     }
 
     private func getSubmitLabel(for fieldType: FormFieldType) -> SpreedlySubmitLabel {
@@ -893,7 +922,8 @@ Replaces legacy iframe **`validate()`** with a **boolean only** — no per-field
 |--------|----------|
 | **`Spreedly.areAllFieldsValid(fieldTypes:)`** | You know which fields to gate (e.g. `[.cardNumber, .expirationDate, .cvc]`). Replaces iframe **`validate()`** for a typed field list. |
 | **`SpreedlyUIManager.shared.areAllFieldsValid(fieldTypes:)`** | Same boolean check as **`Spreedly.areAllFieldsValid(fieldTypes:)`** if you prefer calling through the UI manager. |
-| **`SpreedlyUIManager.shared.areAllFieldsValid()`** | Every registered field must pass (same check **`createCreditCard`** runs internally). |
+| **`SpreedlyUIManager.shared.areAllFieldsValid()`** | Every registered field must pass. Built-in rules plus the **last recorded** custom-validator result — it does not re-run your validators. |
+| **`Spreedly.shared().runCustomValidationBeforeSubmit(additionalFields:)`** | Run your custom validators now and show their messages. Call on Pay, before **`createCreditCard`**. Returns `true` when all pass. |
 
 Objective-C: **`[Spreedly areAllFieldsValidWithFieldTypeRawValues:]`** with `NSNumber` wrappers of `FormFieldType` raw values, or **`[[SpreedlyUIManager shared] areAllFieldsValid]`** for all registered fields.
 
@@ -907,8 +937,8 @@ This applies to **headless and express**: **`CardFormDropIn`** builds the same `
 
 - **`getRegisteredFieldCount() == 0`** — `areAllFieldsValid()` returns **`true`**. Treat as “fields not mounted yet,” not “form is valid.”
 - **Empty `fieldTypes` list** — returns **`true`** (nothing listed failed).
-- **Main thread** — call before enabling Pay; avoid invoking on every SwiftUI body pass.
-- **Email** — use **`EmailValidator.isValid(_:)`** for optional email gates; it is not part of `areAllFieldsValid`.
+- **Main thread** — prefer calling before enabling Pay from a validation callback or a `@Published` / Combine refresh; the check is cheap (built-in + last recorded custom result, no merchant closures).
+- **Email** — a mounted `SPLTextField(type: .email)` is checked by `areAllFieldsValid` like any other field. For email you collect in your own UI, use **`EmailValidator.isValid(_:)`**.
 
 #### Example
 
@@ -921,7 +951,7 @@ payButton.isEnabled = ready
 
 ### Email validation (optional)
 
-**`EmailValidator.isValid(_:)`** — Email format check before tokenize. Independent of `areAllFieldsValid` and not wired into `SPLTextField` validation.
+**`EmailValidator.isValid(_:)`** — Email format check for email you collect in your own UI, before tokenize. A mounted `SPLTextField(type: .email)` already validates format itself and counts in `areAllFieldsValid`.
 
 ```swift
 if EmailValidator.isValid(emailText) {
@@ -933,11 +963,58 @@ Objective-C: **`[EmailValidator isValid:emailString]`**.
 
 ## Additional Fields (Billing/Shipping)
 
-> **Naming clarification:** The SDK has two distinct concepts:
-> - **`otherFields` / `FormField` array** -- extra UI fields passed to `CardFormDropIn` via its `otherFields:` parameter. These render additional `SPLTextField` components inside the drop-in form. See [express-checkout.md](express-checkout.md).
-> - **`additionalFields` / `AdditionalField` dict** -- extra data (billing, shipping) passed to `createCreditCard(additionalFields:metadata:eligibleForCardUpdater:)` (and related overloads) for tokenization. These are key-value pairs sent with the tokenization request.
+Use this section when you need billing/shipping/email/phone on the token — either as Spreedly UI fields or values you already have in your app.
 
-For billing and shipping data, use `createCreditCard(additionalFields:metadata:eligibleForCardUpdater:)` (and the ObjC overloads) plus the `AdditionalField` enum. Non-sensitive fields can be regular `TextField`s; only card data must use `SPLTextField`.
+### Which API should I use?
+
+| Goal | Use this | How |
+|------|----------|-----|
+| Pre-built Express sheet with extra rows (address, email, …) | `CardFormDropIn(otherFields:)` | Pass `FormField(id:title:type:isRequired:)` — see [express-checkout.md](express-checkout.md#additional-fields) |
+| Custom layout; shopper types into Spreedly-managed fields | `SPLTextField(type: …)` | Mount billing/shipping `FormFieldType`s; values tokenize automatically (hosted-wins) |
+| Your own `TextField`s / no Spreedly UI for address | `createCreditCard(additionalFields:)` | Pass `[AdditionalField: String]` (or ObjC dictionary of wire keys) |
+| Mix: some fields on screen, some from your app | Mounted `SPLTextField` **plus** `additionalFields` | Mounted fields win; only pass keys for **unmounted** fields (see [merge rules](#what-gets-tokenized-merge-rules)) |
+
+> **Naming:** `otherFields` = Express UI rows. `additionalFields` = tokenize payload dict. Different APIs — do not confuse them.
+
+**Card number and CVC must always use `SPLTextField`.** Billing, shipping, email, and company can be Spreedly fields **or** your own inputs + `additionalFields`.
+
+### Quick start — tokenize with billing data (no Spreedly address UI)
+
+```swift
+let processingResult = Spreedly.shared().createCreditCard(
+    additionalFields: [
+        .firstName: "John",
+        .lastName: "Doe",
+        .addressLine1: "123 Main St",
+        .city: "Anytown",
+        .state: "CA",
+        .zipCode: "12345",
+        .country: "US",
+        .email: "john.doe@example.com",
+        .phoneNumber: "+1234567890"
+    ],
+    metadata: ["orderId": "12345"]
+)
+```
+
+### Quick start — street-split address (optional)
+
+Use these instead of (or in addition to) `.addressLine1` / `.addressLine2` when your integration needs house + street keys:
+
+```swift
+additionalFields: [
+    .houseNumberOrName: "12A",
+    .street: "Main Street",
+    .streetLine2: "Suite 4",
+    .city: "Anytown",
+    .zipCode: "12345",
+    .country: "US",
+    .phoneNumberCountryCode: "1",
+    .phoneNumberAreaCode: "415"
+]
+```
+
+Shipping twins use the same pattern with `.shipping…` cases (for example `.shippingHouseNumberOrName`, `.shippingStreet`).
 
 ### Account Updater (tokenize)
 
@@ -1009,7 +1086,7 @@ let processingResult = Spreedly.shared().createCreditCard(
 
 A few things to know:
 
-- **Native Swift values are encoded for you.** `Date` becomes an ISO-8601 string (identical to what the Web SDK sends), `URL` becomes its absolute string, `UUID` becomes its lowercase UUID string (Foundation's `UUID.uuidString` is uppercase; the wire form matches JS), and string- or number-backed enums become their raw value. Optionals are unwrapped, and a `nil` becomes JSON `null`. This mirrors `JSON.stringify` exactly.
+- **Native Swift values are encoded for you.** `Date` becomes an ISO-8601 string, `URL` becomes its absolute string, `UUID` becomes its lowercase UUID string (Foundation's `UUID.uuidString` is uppercase; the wire form matches the canonical lowercase form), and string- or number-backed enums become their raw value. Optionals are unwrapped, and a `nil` becomes JSON `null`.
 - **Numbers stay numbers.** Send `5000`, not `"5000"`. Spreedly currently accepts a bare digit string for `max_amount` and converts it, but that leniency is not part of the contract — it does not extend to `"5000.0"` or a locale-formatted `"5,000"`, and the SDK will not stringify numbers for you.
 - **Non-finite numbers become `null`.** `Double.nan` and `Double.infinity` encode to JSON `null`, matching `JSON.stringify(NaN) === "null"`.
 - **A value with no JSON representation fails tokenization.** `Data` and arbitrary class instances have no canonical encoding, so a mandate containing one throws an error naming the offending key path (e.g. `"mandate.raw_mandate.receipt"`) rather than being silently dropped or sending a partial mandate.
@@ -1024,43 +1101,206 @@ If you build a **`CreditCardRequest`** (or **`BasePaymentMethodRequest`**) yours
 
 Constructing one of these request types directly is now a throwing call (`try CreditCardRequest(...)` / `try BasePaymentMethodRequest(...)`), because a `mandate:` value with no JSON representation is caught at construction time and surfaces as a thrown error naming the offending key rather than a silently omitted key.
 
-### AdditionalField Enum
+### AdditionalField catalog (what to pass in `additionalFields`)
 
-**Billing fields:**
+Use the Swift enum (autocomplete). Objective-C dictionaries use the **dict key** in the rightmost column (same as `AdditionalField.rawValue` / `.fieldName`).
 
-| Field | Description |
-|-------|-------------|
-| `.firstName` | First name |
-| `.lastName` | Last name |
-| `.fullName` | Full name |
-| `.addressLine1` | Primary address |
-| `.addressLine2` | Secondary address |
-| `.city` | City |
-| `.state` | State/Province |
-| `.zipCode` | Postal/ZIP code |
-| `.country` | Country code |
-| `.phoneNumber` | Phone number |
-| `.email` | Email address |
+> **Two key styles:** Tokenize dict keys are mostly camelCase for names (`firstName`) and mixed for address (`address1`, `zip`, `phone_number`). Custom validators use a separate allowlist — often snake_case (`first_name`, `zip`). See [Custom field validators](#custom-field-validators).
 
-**Shipping fields:**
+**Billing**
 
-| Field | Description |
-|-------|-------------|
-| `.shippingAddress1` | Shipping address line 1 |
-| `.shippingAddress2` | Shipping address line 2 |
-| `.shippingCity` | Shipping city |
-| `.shippingState` | Shipping state/province |
-| `.shippingZip` | Shipping postal/ZIP code |
-| `.shippingCountry` | Shipping country code |
-| `.shippingPhoneNumber` | Shipping phone number |
+| Swift `AdditionalField` | Use when | Dict key (`additionalFields`) |
+|-------------------------|----------|-------------------------------|
+| `.firstName` / `.lastName` | Separate name parts | `firstName` / `lastName` |
+| `.fullName` | Single name string | `full_name` |
+| `.addressLine1` / `.addressLine2` | Legacy address lines | `address1` / `address2` |
+| `.city` / `.state` / `.zipCode` / `.country` | Locality | `city` / `state` / `zip` / `country` |
+| `.email` / `.company` / `.phoneNumber` | Contact | `email` / `company` / `phone_number` |
+| `.houseNumberOrName` / `.street` / `.streetLine2` | Street-split address | `house_number_or_name` / `street` / `street_line2` |
+| `.phoneNumberCountryCode` / `.phoneNumberAreaCode` | Split phone | `phone_number_country_code` / `phone_number_area_code` |
 
-### Field Fallback Logic
+**Shipping** — same ideas with `.shippingAddress1`, `.shippingZip`, `.shippingHouseNumberOrName`, `.shippingPhoneNumberAreaCode`, and so on (dict keys are `shipping_*`, e.g. `shipping_address1`, `shipping_house_number_or_name`).
 
-1. **SDK fields first** – If a value exists in the SDK's secure fields, that value is used.
-2. **Additional fields fallback** – If the SDK field is empty, the value from `additionalFields` is used.
-3. **Empty string default** – If neither has a value, an empty string is used.
+### Built-in length limits (cannot be relaxed by custom validators)
 
-### Validation: invalidAdditionalFields
+| Fields | Max characters |
+|--------|----------------|
+| Full / first / last name | 350 |
+| Email | 254 |
+| Country / shipping country | 100 |
+| ZIP, phone, phone country/area (+ shipping twins) | 15 |
+| Company, address lines, city, state, street-split (+ shipping twins) | 500 |
+
+### What gets tokenized (merge rules)
+
+At Pay / `createCreditCard`, the SDK merges on-screen Spreedly fields with your `additionalFields` dict:
+
+| Situation | What happens | What you should do |
+|-----------|--------------|--------------------|
+| Shopper typed into a mounted `SPLTextField` | **Hosted-wins** — that value is used; a conflicting key in `additionalFields` is ignored | Do not also pass the same key in `additionalFields` |
+| Field is **not** mounted; key is in `additionalFields` (even `""`) | That dict value is used | Pass only keys you intend to send |
+| Field is not mounted; key **omitted** from `additionalFields` | Form / secure-container value is kept if present | Omit the key to keep UI values |
+| Clear a value from code while a secure value exists | Pass `""` (or whitespace) for that key | Use blank string; do not omit the key |
+
+**Blank `additionalFields` values:** Empty or whitespace-only entries are accepted for every `AdditionalField` key (required vs optional is your UI’s job). The headless map path does **not** honor `allowBlankName` — that flag still applies to **hosted** name `SPLTextField` / Express only. When filled, built-in checks are: char limits (Swift `String.count` / grapheme clusters), combined first+last ≤ 350 (evaluated when the map is validated at tokenize — not on single-field live validate), and email format — not ZIP/address/name min format on the headless map. Mounted card `SPLTextField` / Express name fields accept any non-blank value including non-Latin scripts; **hosted ACH** name fields still require 2 characters (headless bank `additionalFields` do not). Address line 1 has no 5-character minimum. Hosted ZIP does not enforce US 5-digit or international format (char limit still applies); use `addValidation` for format rules. For richer demo-style format rules on merchant-owned TextFields, validate in your UI or use `addValidation` — see [Merchant-owned TextFields + hosted card](#merchant-owned-textfields--hosted-card).
+
+**Safe path:** Prefer one source of truth — either mount the field **or** pass it in `additionalFields`, not both.
+
+---
+
+## Merchant-owned TextFields + hosted card
+
+Use this pattern when **catalogue data** (name, address, city, state, ZIP, …) lives in **your** SwiftUI `TextField` / UIKit `UITextField`, while **card number, expiry, and CVC** stay on Spreedly `SPLTextField` (PCI).
+
+### What the SDK does vs what you do
+
+| Concern | Your app | Spreedly SDK |
+|---------|----------|--------------|
+| Layout / Enable / Required for catalogue fields | Your toggles and UI | Not involved |
+| Format rules (US ZIP shape, name min-2, address min-5, …) | Your validators **or** `addValidation` | Headless path: **char limits + combined name ≤ 350 + email** only |
+| Card / expiry / CVC | Mount `SPLTextField` | Secure storage + built-in card rules |
+| Tokenize | Build `[AdditionalField: String]` from your TextFields | `createCreditCard(additionalFields:)` |
+
+> **Important:** Sample-app copy such as “Name must be at least 2 characters” or “Address must be at least 5 characters” is **demo-only**. Demo name/city checks do **not** restrict charset (non-Latin OK). The SDK does not enforce those demo mins on headless `additionalFields` or on hosted **card** name / address / ZIP. Copy the **pattern**, not the demo mins, unless your product wants the same UX.
+
+### Steps (Swift)
+
+1. Mount **only** CHD fields with `SPLTextField` (e.g. `.cardNumber`, `.expirationMonth`, `.expirationYear`, `.cvc`).
+2. Collect catalogue strings in your own `@State` / view model.
+3. On Pay, validate locally (required + any format you need).
+4. Gate Pay with hosted readiness (`areAllFieldsValid` / your `onValidationChange` flags) **and** an empty custom-validator error map if you use `addValidation`.
+5. Call:
+
+```swift
+let map: [AdditionalField: String] = [
+    .fullName: fullName,       // only include keys you collected
+    .addressLine1: address,
+    .city: city,
+    .state: state,
+    .zipCode: zip
+]
+_ = Spreedly.shared().createCreditCard(additionalFields: map, metadata: nil)
+```
+
+Omit disabled fields from the map (or omit the key). Do **not** also mount `SPLTextField` for the same catalogue keys unless you intend hosted-wins.
+
+### Steps (Objective-C)
+
+Same split: `SPLTextFieldViewController` for card/expiry/CVC; `UITextField` for catalogue; pass an `NSDictionary` of wire keys (`full_name`, `address1`, `city`, `state`, `zip`) into `createCreditCardObjCWithAdditionalFields:…`.
+
+### Sample app (copyable reference)
+
+| Platform | Screen | Helper (demo validation copy only) |
+|----------|--------|--------------------------------------|
+| Swift | **Custom Merchant TextFields** → `CustomMerchantTextFieldsDemoView.swift` | `MerchantCatalogueFieldValidation.swift` |
+| Objective-C | Same title → `CustomMerchantTextFieldsDemoViewController` | `MerchantCatalogueFieldValidation.h` / `.m` |
+
+Related demos: **Checkout with Additional Fields** (catalogue via Spreedly fields + Enable/Required), **Custom Form** (mostly `SPLTextField` including name/ZIP).
+
+### Optional: SDK custom validators instead of local-only checks
+
+If you want Spreedly to show field chrome / block tokenize for ZIP or state format, register `addValidation(field:)` and call `runCustomValidationBeforeSubmit(additionalFields:)` on Pay — see [Custom field validators](#custom-field-validators). The sample **Checkout with Additional Fields** screen shows that path; **Custom Merchant TextFields** shows pure merchant-owned UI validation.
+
+## Custom field validators
+
+> **Available since 1.7.0.**
+
+Add **your own** check on top of Spreedly’s built-in headless rules (char limits, combined name length, email format). Use this for format rules the headless path does not ship — for example “US ZIP (`12345` or `12345-6789`) only when country is US”, or “state required for US/CA”. Hosted `SPLTextField` / Express still apply their own required and field format rules.
+
+### Steps (Swift)
+
+1. Register once after SDK setup (app launch or before showing the form).
+2. Use `CustomValidatableFieldName` for autocomplete (29 allowlisted cases).
+3. In the validator, read cross-field values with enum keys (`fields[.country]`), not string literals.
+4. Return `.valid` or `.invalid("message for the shopper")`.
+5. Call `removeValidation(field:)` when you no longer need the rule.
+
+```swift
+// 1) Register — runs on blur (when enabled) and again on Pay / tokenize
+Spreedly.shared().addValidation(field: .zipCode) { value, fields in
+    // Cross-field: only enforce US ZIP when country is US
+    if fields[.country] != "US" { return .valid }
+    let ok = value.range(of: #"^\d{5}(-\d{4})?$"#, options: .regularExpression) != nil
+    return ok ? .valid : .invalid("Enter a valid US ZIP code")
+}
+
+// 2) Later — remove
+Spreedly.shared().removeValidation(field: .zipCode)
+```
+
+### What you can validate
+
+| Allowed (`CustomValidatableFieldName`) | Not allowed (ignored + warning) |
+|----------------------------------------|----------------------------------|
+| First/last/full name, email, company | Card number (PAN), CVC |
+| Billing + shipping address, ZIP, country, phone | Expiry month/year/date |
+| Street-split and phone-part keys (29 total) | ACH routing/account, unknown keys |
+
+Prefer the enum in Swift. Objective-C uses wire-key strings (or `SpreedlyCustomValidatableField` constants for `fields`) — see [objective-c.md](objective-c.md#custom-field-validators) (full table of 29 keys).
+
+#### Full allowlist (29) — Swift enum ↔ wire key
+
+| Swift (`CustomValidatableFieldName`) | Wire key (ObjC `addValidationForField:`) |
+|--------------------------------------|------------------------------------------|
+| `.firstName` | `first_name` |
+| `.lastName` | `last_name` |
+| `.fullName` | `full_name` |
+| `.email` | `email` |
+| `.company` | `company` |
+| `.addressLine1` | `address1` |
+| `.addressLine2` | `address2` |
+| `.city` | `city` |
+| `.state` | `state` |
+| `.zipCode` | `zip` |
+| `.country` | `country` |
+| `.phoneNumber` | `phone_number` |
+| `.houseNumberOrName` | `house_number_or_name` |
+| `.street` | `street` |
+| `.streetLine2` | `street_line2` |
+| `.phoneNumberCountryCode` | `phone_number_country_code` |
+| `.phoneNumberAreaCode` | `phone_number_area_code` |
+| `.shippingAddressLine1` | `shipping_address1` |
+| `.shippingAddressLine2` | `shipping_address2` |
+| `.shippingCity` | `shipping_city` |
+| `.shippingState` | `shipping_state` |
+| `.shippingZipCode` | `shipping_zip` |
+| `.shippingCountry` | `shipping_country` |
+| `.shippingPhoneNumber` | `shipping_phone_number` |
+| `.shippingHouseNumberOrName` | `shipping_house_number_or_name` |
+| `.shippingStreet` | `shipping_street` |
+| `.shippingStreetLine2` | `shipping_street_line2` |
+| `.shippingPhoneNumberCountryCode` | `shipping_phone_number_country_code` |
+| `.shippingPhoneNumberAreaCode` | `shipping_phone_number_area_code` |
+
+### Behavior merchants should expect
+
+| Topic | Behavior |
+|-------|----------|
+| Built-in rules | Always run first; your validator **cannot** raise length / charset limits |
+| When it runs | Blur (Express, or headless when blur is enabled), `runCustomValidationBeforeSubmit(additionalFields:)`, and `createCreditCard` — **not** `areAllFieldsValid` (that reads the last recorded result), not every keystroke, and **not** `createBankAccount` (ACH) |
+| Express Pay button | Always tappable (except while processing); invalid Pay shows field errors and does **not** tokenize |
+| Headless Pay button | Gate with local `onValidationChange` flags **and** ensure `SpreedlyUIManager.shared.customValidationErrors` is empty (or sync those flags when `$customValidationErrors` changes). `onValidationChange` stays `false` while custom error chrome is visible on that field. Objective-C: use `[SpreedlyUIManager shared].customValidationErrorCount == 0` |
+| Fail-closed | Thrown Swift validator, ObjC `nil`, malformed return, or oversized `fields` snapshot → fail with generic `"{label} is invalid"` |
+| Merchant message | Non-empty `.invalid("…")` shows under the field and on tokenize failure; blank/nil → generic label |
+| Clear on edit | After a custom failure, editing the field clears that custom error; the rule re-runs on next blur or Pay |
+| `fields` argument | Other non-PCI values at validation time (after hosted-wins). Never includes PAN or CVC |
+
+### Enable blur on headless `SPLTextField`
+
+Express drop-in enables blur evaluation by default. For custom forms:
+
+```swift
+SPLTextField(type: .zipCode, title: "ZIP", isRequired: true)
+    .enablingCustomValidationOnBlur()
+```
+
+Objective-C: set `evaluatesCustomValidationOnBlur = YES` on `SPLTextFieldViewController`.
+
+### Demo in the sample app
+
+**Checkout with Additional Fields** — toggle Enable/Required per catalogue field; sample ZIP/state validators via `addValidation`. **Custom Form** — full name (+ ZIP/state) with blur, hosted-wins, and expiry-shape toggles. **Custom Merchant TextFields** — merchant-owned TextFields + hosted card (full walkthrough: [Merchant-owned TextFields + hosted card](#merchant-owned-textfields--hosted-card)).
+
+### Reading validation failures
 
 When validation fails, check `invalidAdditionalFields` on `PaymentProcessingResult`:
 
@@ -1316,15 +1556,15 @@ SPLTextField(
     title: "Card number",
     isRequired: true,
     enableAutofill: true,
-    trailingIcon: { scheme in AnyView(MyVisaIcon(scheme)) },
+    onValidationChange: { valid in payButton.isEnabled = valid },
     onFieldStateChange: { state in /* scheme, digit count, valid — no raw PAN */ },
     onInputLength: { count in print(count) },
-    onValidationChange: { valid in payButton.isEnabled = valid }
+    trailingIcon: { scheme in AnyView(MyVisaIcon(scheme)) }
 )
 
 SPLTextField(type: .cvc, title: "CVC", isRequired: true)
 
-// Merchant UI outside fields (iframe / web parity)
+// Merchant UI outside fields (global hosted display)
 Spreedly.shared().setNumberFormat(.pretty)
 Spreedly.shared().toggleMask()
 ```
@@ -1473,7 +1713,8 @@ Spreedly.shared().resetPaymentFormPreservingDisplayConfig()
 Spreedly.shared().resetPaymentState()
 ```
 
-**Display formats** {#display-formats}
+<a id="display-formats"></a>
+**Display formats**
 
 > **iframe `prettyFormat` vs iOS `.pretty`**
 >

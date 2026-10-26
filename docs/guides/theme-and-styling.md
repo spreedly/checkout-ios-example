@@ -101,12 +101,12 @@ let lightTheme = SpreedlyThemeManager.createCustomTheme(
     colors: SpreedlyColors(
         primary: Color(hex: "#007AFF"),
         background: Color(hex: "#F5F5F5"),
+        surface: Color.white,
         text: Color(hex: "#1A1A1A"),
         textSecondary: Color(hex: "#666666"),
-        error: Color(hex: "#FF3B30"),
-        surface: Color.white,
         border: Color(hex: "#E0E0E0"),
         borderFocused: Color(hex: "#007AFF"),
+        error: Color(hex: "#FF3B30"),
         placeholder: Color(hex: "#999999")
     )
 )
@@ -115,12 +115,12 @@ let darkTheme = SpreedlyThemeManager.createCustomTheme(
     colors: SpreedlyColors(
         primary: Color(hex: "#0A84FF"),
         background: Color(hex: "#1C1C1E"),
+        surface: Color(hex: "#2C2C2E"),
         text: Color.white,
         textSecondary: Color(hex: "#8E8E93"),
-        error: Color(hex: "#FF453A"),
-        surface: Color(hex: "#2C2C2E"),
         border: Color(hex: "#38383A"),
         borderFocused: Color(hex: "#0A84FF"),
+        error: Color(hex: "#FF453A"),
         placeholder: Color(hex: "#636366")
     )
 )
@@ -206,9 +206,9 @@ SPLTextField(
 > Direct parameters take precedence over the environment modifier. If both are set, the direct `theme`/`darkTheme` values win.
 
 
-### Toggle switches (iOS 14+)
+### Toggle switches
 
-For custom payment UI that includes `Toggle` controls, use `.spreedlyThemedSwitchToggle(tint:)` so the switch matches `SpreedlyColors.primary` on iOS 14 (`accentColor`) and iOS 15+ (`SwitchToggleStyle`):
+For custom payment UI that includes `Toggle` controls, use `.spreedlyThemedSwitchToggle(tint:)` so the switch matches `SpreedlyColors.primary`:
 
 ```swift
 Toggle("Remember me", isOn: $rememberMe)
@@ -264,12 +264,12 @@ let theme = SpreedlyThemeManager.createCustomTheme(
     colors: SpreedlyColors(
         primary: Color.blue,
         background: Color.white,
+        surface: Color.white,
         text: Color.black,
         textSecondary: Color.gray,
-        error: Color.red,
-        surface: Color.white,
         border: Color(hex: "#E0E0E0"),
         borderFocused: Color.blue,
+        error: Color.red,
         placeholder: Color(hex: "#999999")
     ),
     typography: SpreedlyTypography(
@@ -582,12 +582,12 @@ struct ThemedCheckoutView: View {
         colors: SpreedlyColors(
             primary: Color(hex: "#6200EE"),
             background: Color(hex: "#FAFAFA"),
+            surface: Color.white,
             text: Color(hex: "#212121"),
             textSecondary: Color(hex: "#757575"),
-            error: Color(hex: "#B00020"),
-            surface: Color.white,
             border: Color(hex: "#E0E0E0"),
             borderFocused: Color(hex: "#6200EE"),
+            error: Color(hex: "#B00020"),
             placeholder: Color(hex: "#9E9E9E")
         )
     )
@@ -596,12 +596,12 @@ struct ThemedCheckoutView: View {
         colors: SpreedlyColors(
             primary: Color(hex: "#BB86FC"),
             background: Color(hex: "#121212"),
+            surface: Color(hex: "#1E1E1E"),
             text: Color(hex: "#E0E0E0"),
             textSecondary: Color(hex: "#A0A0A0"),
-            error: Color(hex: "#CF6679"),
-            surface: Color(hex: "#1E1E1E"),
             border: Color(hex: "#333333"),
             borderFocused: Color(hex: "#BB86FC"),
+            error: Color(hex: "#CF6679"),
             placeholder: Color(hex: "#666666")
         )
     )

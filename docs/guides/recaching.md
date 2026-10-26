@@ -793,8 +793,6 @@ Reset validation parameters in `onDisappear` to restore defaults when the recach
 
 ---
 
-## Related Documentation
-
 ## Core API (Advanced)
 
 If you need programmatic recaching without the built-in UI, use the Core API directly:
@@ -826,3 +824,5 @@ You must collect the CVV via `SecureValueContainer` before calling this method. 
 | [error-handling.md](error-handling.md) | Error types, handling patterns, troubleshooting |
 | [theme-and-styling.md](theme-and-styling.md) | Theming and customization |
 | [security.md](security.md) | Security best practices |
+
+## Related Documentation

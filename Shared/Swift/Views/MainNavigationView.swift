@@ -80,6 +80,19 @@ struct MainNavigationView: View {
                                 .accessibilityLabel(AccessibilityLabels.Navigation.customFormLink)
                                 .accessibilityHint(AccessibilityHints.Navigation.customFormLink)
                                 .accessibilityAddTraits(.isButton)
+
+                                NavigationLink(destination: CustomMerchantTextFieldsDemoView()) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Custom Merchant TextFields")
+                                            .font(headerFont)
+                                            .foregroundColor(textColor)
+                                        Text("Your own TextFields for catalogue data + SPLTextField for card / expiry / CVC")
+                                            .font(subheadingFont)
+                                            .foregroundColor(textColor)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .accessibilityAddTraits(.isButton)
                                 
                                 NavigationLink(destination: CustomThemeFormView()) {
                                     VStack(alignment: .leading, spacing: 4) {

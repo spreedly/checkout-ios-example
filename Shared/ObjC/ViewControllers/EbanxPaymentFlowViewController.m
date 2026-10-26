@@ -90,7 +90,11 @@ typedef NS_ENUM(NSInteger, EbanxStage) {
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
-    [self cleanupPaymentDelegate];
+    // Presenting Safari can fire viewWillDisappear. Clearing the delegate here
+    // drops the checkout result and leaves the UI stuck on checkout.
+    if (self.isMovingFromParentViewController || self.isBeingDismissed) {
+        [self cleanupPaymentDelegate];
+    }
 }
 
 - (void)dealloc {
