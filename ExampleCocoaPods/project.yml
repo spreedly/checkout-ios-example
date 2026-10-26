@@ -2,7 +2,7 @@ name: MerchantExamplePods
 options:
   bundleIdPrefix: com.example.spreedly-merchant.pods
   deploymentTarget:
-    iOS: "14.0"
+    iOS: "16.0"
   xcodeVersion: "16.1"
 
 settings:
