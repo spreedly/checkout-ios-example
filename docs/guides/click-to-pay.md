@@ -9,7 +9,7 @@ through Spreedly.
 | **Use something else when** | Plain card entry → [Express checkout](express-checkout.md). Click to Pay is not a card form — a common pattern is two buttons side by side |
 | **You build** | 2 things: a checkout screen · a backend charge call |
 | **Modules** | `SpreedlyCore` + `SpreedlySecurity` + `SpreedlyUI` + `SpreedlyClickToPay` |
-| **Requires** | SDK 1.6.0+ · iOS 16.0+ from 1.7.0 (iOS 14.0+ on 1.6.x) · Xcode 26.0+ |
+| **Requires** | SDK 1.6.0+ · iOS 16.0+ from 1.7.0 (iOS 14.0+ on 1.6.x) · Xcode 27.0+ |
 | **Integration time** | ~20 minutes |
 | **UI** | Spreedly sheet wrapping Mastercard widgets — SwiftUI · UIKit · Objective-C |
 
@@ -88,6 +88,7 @@ status copy in custom chrome.
 | Category | You need | Where to get it |
 |---|---|---|
 | Spreedly | Click to Pay enabled on your environment key | Contact Spreedly Support |
+| Spreedly | Secure tokenization enabled on your environment (required) | [Getting started — Enable Secure Tokenization](getting-started.md#enable-secure-tokenization) |
 | Credentials | A sandbox or production `srcDpaId` (DPAID) | Contact Spreedly Support — there is no self-serve path |
 | Your app | Mastercard SRC hosts allowed by App Transport Security | Your `Info.plist` — see [Configure your app](#4-configure-your-app) |
 | Your app | A shopper first and last name available at checkout | Required at tokenize time. See [step 2](#step-2--build-the-config--your-app) |
@@ -101,7 +102,8 @@ status copy in custom chrome.
 
 | SDK version | iOS | Xcode | Notes |
 |---|---|---|---|
-| 1.7.0+ | **16.0+** | 26.0+ | — |
+| 1.8.0+ | **16.0+** | 27.0+ | — |
+| 1.7.x | **16.0+** | 26.0+ | — |
 | 1.6.x | 14.0+ | 26.0+ | Click to Pay since 1.6.0. Last line that supports iOS 14 and 15 — see [Migrating to iOS 16](migration/v1-to-v2.md) |
 | 1.5.x and earlier | — | — | **No Click to Pay module.** Upgrade to 1.6.0+ |
 
@@ -123,7 +125,7 @@ at launch and `Spreedly.setup(config:)` with a signed bundle from your server.
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.7.0")  // use the latest release tag
+    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.8.0")  // use the latest release tag
 ],
 targets: [
     .target(
@@ -141,10 +143,10 @@ targets: [
 **CocoaPods**
 
 ```ruby
-pod 'SpreedlyCore',       '~> 1.7'
-pod 'SpreedlySecurity',   '~> 1.7'
-pod 'SpreedlyUI',         '~> 1.7'
-pod 'SpreedlyClickToPay', '~> 1.7'
+pod 'SpreedlyCore',       :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlySecurity',   :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlyUI',         :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlyClickToPay', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
 ```
 
 No `post_install` block is needed — unlike [Stripe APM](stripe-apm.md).

@@ -17,8 +17,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (instancetype)initWithConfig:(ServerConfig *)config;
 
-/// Fetches all payment methods
-/// @param completion Completion block with response or error
+/// The saved payment methods kept on the device, read on a background queue.
+/// @param completion Called on a background queue with the response or an error; dispatch to main for UI work.
 - (void)fetchPaymentMethodsWithCompletion:(void (^)(FetchPaymentMethodsResponse * _Nullable response, NSError * _Nullable error))completion;
 
 @end

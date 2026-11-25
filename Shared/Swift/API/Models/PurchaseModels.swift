@@ -65,7 +65,7 @@ public struct OffsitePurchaseRequest: Codable {
     public let amount: Double
     public let currencyCode: String
     public let paymentMethodToken: String
-    public let redirectUrl: String
+    public let redirectUrl: String?
     public let callbackUrl: String
     public let channel: String
 
@@ -84,7 +84,7 @@ public struct OffsitePurchaseRequest: Codable {
         amount: Decimal,
         currencyCode: String,
         paymentMethodToken: String,
-        redirectUrl: String,
+        redirectUrl: String?,
         callbackUrl: String,
         channel: String = "app"
     ) {
@@ -113,7 +113,7 @@ public struct HerokuCreatePurchaseTransaction: Codable {
     public let paymentMethodToken: String?
     public let amount: Double
     public let currencyCode: String
-    public let redirectUrl: String
+    public let redirectUrl: String?
     public let callbackUrl: String
     public let channel: String
     /// Stripe only: payment_method with payment_method_type "stripe_apm" and apm_types; omitted for EBANX.
@@ -136,7 +136,7 @@ public struct HerokuCreatePurchaseTransaction: Codable {
         paymentMethodToken: String? = nil,
         amount: Decimal,
         currencyCode: String,
-        redirectUrl: String,
+        redirectUrl: String?,
         callbackUrl: String,
         channel: String = "app",
         paymentMethod: StripeAPMPaymentMethod? = nil,
@@ -157,7 +157,7 @@ public struct HerokuCreatePurchaseTransaction: Codable {
         try container.encodeIfPresent(paymentMethodToken, forKey: .paymentMethodToken)
         try container.encode(amount, forKey: .amount)
         try container.encode(currencyCode, forKey: .currencyCode)
-        try container.encode(redirectUrl, forKey: .redirectUrl)
+        try container.encodeIfPresent(redirectUrl, forKey: .redirectUrl)
         try container.encode(callbackUrl, forKey: .callbackUrl)
         try container.encode(channel, forKey: .channel)
         try container.encodeIfPresent(paymentMethod, forKey: .paymentMethod)
@@ -209,7 +209,7 @@ public struct HerokuBraintreeCreatePurchaseRequest: Codable {
 public struct HerokuBraintreeCreatePurchaseTransaction: Codable {
     public let amount: Double
     public let currencyCode: String
-    public let redirectUrl: String
+    public let redirectUrl: String?
     public let callbackUrl: String
     public let channel: String
     public let paymentMethod: BraintreeOffsitePaymentMethod
@@ -228,7 +228,7 @@ public struct HerokuBraintreeCreatePurchaseTransaction: Codable {
     public init(
         amount: Decimal,
         currencyCode: String,
-        redirectUrl: String,
+        redirectUrl: String?,
         callbackUrl: String,
         channel: String = "app",
         paymentMethodType: String,
@@ -533,7 +533,7 @@ public struct SpreedlyPurchaseTransaction: Codable {
     public let currencyCode: String
     public let paymentMethodToken: String
     public let ip: String
-    public let redirectUrl: String
+    public let redirectUrl: String?
     public let channel: String
     public let callbackUrl: String
     public let scaProviderKey: String?
@@ -556,7 +556,7 @@ public struct SpreedlyPurchaseTransaction: Codable {
         currencyCode: String,
         paymentMethodToken: String,
         ip: String,
-        redirectUrl: String,
+        redirectUrl: String?,
         channel: String = "app",
         callbackUrl: String,
         scaProviderKey: String? = nil

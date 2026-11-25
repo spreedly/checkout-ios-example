@@ -11,6 +11,7 @@
 #import <objc/runtime.h>
 #import "SpreedlyConfigManager.h"
 #import "RetainPaymentMethodAPIClient.h"
+#import "SignatureServerClient.h" // SPLExampleSampleAppOwnerMetadata
 #import "RetainPaymentMethodModels.h"
 #import "ThemeHelper.h"
 #import "DemoCustomValidationRecipes.h"
@@ -669,6 +670,7 @@
         }
     }];
 
+    dropInVC.metadata = SPLExampleSampleAppOwnerMetadata();
     // CardFormDropInViewController applies screen prevention internally.
     [self presentViewController:dropInVC animated:YES completion:nil];
 }
@@ -1025,6 +1027,7 @@
             
             // Handle card retention preference (save card for future payments)
             if (result.shouldRetain && result.token) {
+                // The card joins the saved list only once the retain succeeds.
                 [self retainPaymentMethodWithToken:result.token];
             }
             

@@ -914,7 +914,9 @@ struct CustomFormView: View {
             let apiClient = SpreedlyConfigManager.shared.createRetainPaymentMethodAPIClient()
             _ = try await apiClient.retainPaymentMethod(token: token)
         } catch {
-            logError(tag: "SpreedlyExample", message: "Retain payment method failed: \(error.localizedDescription)", error: error)
+            // Fixed text only: the error can carry backend response text, and the token is in the request URL.
+            let reason = (error as? RetainPaymentMethodAPIError)?.logSummary ?? "unexpected error"
+            logError(tag: "SpreedlyExample", message: "Retain payment method failed (\(reason))")
         }
     }
     
@@ -1429,7 +1431,7 @@ struct CustomFormView: View {
     }
 
     // Step 11: handleSubmit — the core payment flow for the custom form approach
-    // 1. Generate HMAC signature (required by Spreedly API)
+    // 1. Generate the request signature (required by Spreedly API)
     // 2. Call createCreditCard() — SPLTextField already stored card data securely in SecureValueContainer
     // 3. createCreditCard() returns immediately with processing status (sync validation result)
     // 4. If processing started, the actual API result arrives via the subscribeToPaymentResults subscription
@@ -1471,7 +1473,7 @@ struct CustomFormView: View {
                 // createCreditCard reads card data from SecureValueContainer (populated by SPLTextField)
                 let processingResult = Spreedly.shared().createCreditCard(
                     additionalFields: additionalFields,
-                    metadata: [:],
+                    metadata: SampleAppOwner.metadata,
                     eligibleForCardUpdater: eligibleForCardUpdater ? true : nil
                 )
                 

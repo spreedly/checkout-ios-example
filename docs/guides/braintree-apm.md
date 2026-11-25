@@ -13,7 +13,7 @@ Accept PayPal and Venmo through the native Braintree SDK.
 | **Use something else when** | European bank redirects → [Stripe APM](stripe-apm.md) · Pix, Boleto, OXXO, NuPay → [EBANX APM](ebanx-apm.md) · Safari-based PayPal → [Offsite payments](offsite-payments.md) |
 | **You build** | 3 things: a purchase endpoint · a checkout screen · a confirm call |
 | **Modules** | `SpreedlyCore` + `SpreedlySecurity` + `SpreedlyUI` + `SpreedlyBraintree` |
-| **Requires** | SDK 1.7.0+ · iOS 16.0+ (iOS 14.0+ on 1.6.x) · Xcode 26.0+ |
+| **Requires** | SDK 1.7.0+ · iOS 16.0+ (iOS 14.0+ on 1.6.x) · Xcode 27.0+ |
 | **Integration time** | ~15 minutes |
 | **UI** | Partner-hosted PayPal / Venmo flows — SwiftUI · UIKit · Objective-C |
 
@@ -83,7 +83,8 @@ without Universal Links.
 
 | SDK version | iOS | Xcode | Notes |
 |---|---|---|---|
-| 1.7.0+ | **16.0+** | 26.0+ | Braintree iOS v7.x resolved transitively |
+| 1.8.0+ | **16.0+** | 27.0+ | Braintree iOS v7.x resolved transitively |
+| 1.7.x | **16.0+** | 26.0+ | Braintree iOS v7.x resolved transitively |
 | 1.6.x | 14.0+ | 26.0+ | Last line that supports iOS 14 and 15 — see [Migrating to iOS 16](migration/v1-to-v2.md) |
 
 Assumed done: [Getting Started](getting-started.md) — installation plus `Spreedly.initializeSDK()`
@@ -106,17 +107,17 @@ a separate Braintree dependency.
 **Swift Package Manager**
 
 ```swift
-.package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.7.0")  // use the latest release tag
+.package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.8.0")  // use the latest release tag
 // Link SpreedlyCore, SpreedlySecurity, SpreedlyUI, SpreedlyBraintree to your app target.
 ```
 
 **CocoaPods**
 
 ```ruby
-pod 'SpreedlyCore',      '~> 1.7'
-pod 'SpreedlySecurity',  '~> 1.7'
-pod 'SpreedlyUI',        '~> 1.7'
-pod 'SpreedlyBraintree', '~> 1.7'
+pod 'SpreedlyCore',      :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlySecurity',  :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlyUI',        :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlyBraintree', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
 ```
 
 No `post_install` block is needed — unlike [Stripe APM](stripe-apm.md).

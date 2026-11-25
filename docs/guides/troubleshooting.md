@@ -41,18 +41,15 @@ Common integration issues and their solutions, organised by symptom.
 **Fix:**
 1. **File > Packages > Reset Package Caches**
 2. **File > Packages > Resolve Package Versions**
-3. If using a private repo, verify your GitHub token has read access
 
 ### CocoaPods: Pod not found
 
-**Cause:** The podspec source is not configured or the repo is private.
+**Cause:** The Podfile uses a version-only line such as `pod 'SpreedlyCore', '~> 1.8'`. New versions are not on the CocoaPods Trunk registry, so CocoaPods can't find them.
 
-**Fix for private repos:**
+**Fix:** Point each pod at a `checkout-ios-package` release tag. No token is needed.
 ```ruby
-pod 'SpreedlyCore', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git'
+pod 'SpreedlyCore', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
 ```
-
-Replace `{GitToken}` with a GitHub personal access token that has read access.
 
 ### CocoaPods: Custom xcconfig values missing after pod install
 
@@ -131,6 +128,17 @@ Spreedly.setup(config: SpreedlyConfig(
 **Cause:** `setup(config:)` was not called with a fresh nonce/signature for this session (or only `initializeSDK()` was called).
 
 **Fix:** Fetch signature parameters from your backend **before** each checkout, then `setup(config:)` until `isInitialized` is `true`. See [SDK lifecycle](getting-started.md#sdk-lifecycle).
+
+### Authentication errors after enabling secure tokenization
+
+**Cause:** Secure tokenization is on for the environment, so every Create payment method call needs valid auth. Calls fail when the `certificateToken`, `nonce`, `signature` or `timestamp` in `SpreedlyConfig` are missing, expired, or not valid for that environment. The failure typically surfaces as an authentication error, for example `SpreedlyApiError.unauthorized`.
+
+**Fix:**
+1. Fetch fresh signature parameters from your backend before each checkout, then call `setup(config:)`.
+2. Confirm the environment key and signing credentials belong to the same environment where you enabled the setting.
+3. For direct API calls from your server, use HTTP basic auth.
+
+To check or change the setting, see [Enable Secure Tokenization](getting-started.md#enable-secure-tokenization). It is per environment, so verify staging and production separately.
 
 ### Do I need `destroy()` or `Spreedly.destroy()`?
 

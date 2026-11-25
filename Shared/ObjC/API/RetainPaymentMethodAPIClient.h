@@ -16,6 +16,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (instancetype)initWithConfig:(ServerConfig *)config;
 
+/// Uses `session` for requests instead of one built from `config`, so tests can answer them.
+- (instancetype)initWithConfig:(ServerConfig *)config session:(NSURLSession *)session NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)init NS_UNAVAILABLE;
+
 /// Retains a payment method
 /// @param token The payment method token to retain
 /// @param completion Completion block with response or error

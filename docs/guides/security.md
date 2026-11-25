@@ -102,6 +102,7 @@ When the SDK is blocked, **all operations fail gracefully** — no card data UI 
 - **Recaching UI** (`SpreedlyCVVRecachingView`) does not render and emits a failure result
 - **3DS challenges** (`DoChallengeIfNeeded`) do not render and emit a 3DS failure result
 - **APM flows** (Stripe `present()`, Braintree `present()`) reject immediately with a `PaymentResult.failure`
+- **Apple Pay** (`SpreedlyApplePay`) hides its buttons, opens no sheet and sends nothing to Spreedly
 - **Offsite payments** (`SpreedlyOffsiteCheckout.present(transactionToken:)`) reject immediately
 - **Network calls** — blocked at the SDK network layer so no request leaves the device
 - **3DS integrations** (Forter, Gateway-Specific) check the blocked state and emit failure results
@@ -120,6 +121,7 @@ Merchants observing `paymentResultPublisher` or the `SpreedlyPaymentDelegate` wi
 | Braintree `present()` | UIKit | Returns immediately, publishes `PaymentResult.failure` |
 | Stripe `present()` | UIKit | Returns immediately, publishes `PaymentResult.failure` |
 | Offsite `SpreedlyOffsiteCheckout.present(transactionToken:)` | Safari | Returns immediately, publishes `PaymentResult.failure` |
+| Apple Pay buttons (`SpreedlyApplePayButton`, `SpreedlyApplePayButtonView`, `SpreedlyApplePayWallet` in the drop-in) | Inline / drop-in row | Hidden, with the Set Up button and the drop-in divider; no Apple Pay sheet opens and nothing is sent. A tap that started before the block publishes `PaymentResult.failure`. See [Apple Pay — Blocked devices](apple-pay.md#blocked-devices) |
 | `createCreditCard()` / network | N/A | Request fails immediately — no data leaves the device |
 | 3DS (Global / Gateway-Specific) | N/A | Emits `ThreeDSChallengeResult.failure`, no UI shown |
 
@@ -356,6 +358,8 @@ Signature parameters (`nonce`, `signature`, `certificateToken`, `timestamp`) are
 - Generated fresh before each payment session
 - Never stored or reused across sessions
 
+> **Required:** These parameters are only enforced once you [enable secure tokenization](getting-started.md#enable-secure-tokenization) for your Spreedly environment. Until then, tokenization requests are not authenticated.
+
 Call `Spreedly.setup(config:)` with valid signature parameters before any tokenization, payment form presentation, or 3DS challenge flow.
 
 **Example: Fetch signature before presenting the payment form**
@@ -401,7 +405,7 @@ import Security
 
 ### Payment Method Tokens
 
-Payment method tokens returned by Spreedly are non-sensitive and can be stored for future use (for example, to charge a saved card). Store them in Keychain if you persist them locally, or pass them to your backend for server-side storage.
+Payment method tokens returned by Spreedly don't contain the card number or security code, so you can keep them for future use (for example, to charge a saved card). They still need protecting, because your backend can charge a saved card with its token. Send them to your backend for server-side storage, or, if you must store them on the device, keep them in the Keychain or encrypted with a key held in the Keychain.
 
 ---
 
@@ -511,7 +515,7 @@ The Spreedly SDK does not control logging from third-party SDKs it depends on (B
 
 - **Braintree**: Refer to [Braintree iOS SDK documentation](https://developer.paypal.com/braintree/docs/start/hello-client/ios/v5) for logging configuration.
 - **Stripe**: Refer to [Stripe iOS SDK documentation](https://docs.stripe.com/payments/accept-a-payment?platform=ios) for controlling log output.
-- **Datadog**: The Spreedly SDK initializes Datadog via a build-time injected client token. Spreedly sanitizes all messages before sending. If you also use Datadog directly in your app, ensure your own logs do not contain PCI data.
+- **Datadog**: The Spreedly SDK initializes Datadog via a build-time injected client token, so telemetry is on by default; see [Telemetry and opting out](getting-started.md#telemetry-and-opting-out) to reduce or turn it off. Spreedly sanitizes all messages before sending. If you also use Datadog directly in your app, ensure your own logs do not contain PCI data.
 
 ### Error Message Sanitization
 

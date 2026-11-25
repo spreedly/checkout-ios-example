@@ -52,6 +52,7 @@ For EBANX providers (Pix, Boleto, OXXO, NuPay), see [ebanx-apm.md](ebanx-apm.md)
 Before integrating offsite payments:
 
 - Complete [getting-started.md](getting-started.md) - installation, `Spreedly.setup(config:)`, and credential management
+- [Enable secure tokenization](getting-started.md#enable-secure-tokenization) on your Spreedly environment (required)
 - Ensure `Spreedly.initializeSDK()` is called at app launch (e.g., in your `App.init()` or `AppDelegate`)
 - Register a custom URL scheme in `Info.plist` (see [Custom URL Scheme Setup](#custom-url-scheme-setup))
 

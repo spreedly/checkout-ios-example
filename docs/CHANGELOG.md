@@ -5,6 +5,33 @@ All notable changes to the Spreedly iOS SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-11-25
+
+### Added
+
+- **React Native version telemetry**: New optional `SpreedlyConfig.rnVersion` and `SpreedlyConfig.rnSdkVersion`. When `sdkPlatform` is `.reactNative`, telemetry also reports the host app's React Native version and the Spreedly React Native package version, so React Native issues can be grouped by version. Native iOS telemetry is unchanged.
+- **Drop-in metadata**: Pass `metadata` to `CardFormDropIn` or set `CardFormDropInViewController.metadata` to attach your own key-value pairs to the payment method created when the form is submitted. The existing `CardFormDropIn` initializer is unchanged, so current integrations need no code changes.
+- **Apple Pay**: Optional `SpreedlyApplePay` module (Swift Package Manager only) with the official Apple Pay button and sheet (`SpreedlyApplePayButton` for SwiftUI, `SpreedlyApplePayButtonView` for UIKit / Objective-C). Your server charges the token through a required `processPayment` step before the sheet shows success, and a required `signedAuth` returns fresh signed auth for every attempt, including retries in the sheet. Supports subscriptions (`ApplePayOrder(recurringPaymentRequest:)`, `PaymentResult.isApplePayMerchantToken`), saved billing and shipping contacts, and field errors on decline (`ApplePayPaymentDecision.declined(message:errors:)`). See [guides/apple-pay.md](guides/apple-pay.md).
+- **Apple Pay in the card drop-in**: `CardFormDropIn(walletButtons:)` and `CardFormDropInViewController.walletButtons` (requires `SpreedlyApplePay`, Swift Package Manager only) show Apple Pay above the card fields, hidden when Apple Pay is unavailable. Only one payment runs at a time across drop-ins and Apple Pay buttons.
+- **Apple Pay testing on a Spreedly Test gateway**: `ApplePayConfiguration.testCardNumber` lets Test gateway purchases succeed; allowed only in Xcode, ad-hoc and TestFlight installs.
+
+### Changed
+
+- **Xcode 27.0+ required**: Published XCFrameworks and API baselines are built with **Xcode 27.1**. Merchants must use Xcode 27.0 or newer; Xcode 26.x will fail to import the binary modules (`failed to build module`).
+- **CocoaPods installs from release tags**: New versions are no longer published to the CocoaPods Trunk registry, so `pod 'SpreedlyCore', '~> 1.8'` won't find them. Point each pod at a `checkout-ios-package` release tag (`:git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => 'X.Y.Z'`), or switch to Swift Package Manager (recommended).
+- **Rejected signed auth reports Spreedly's reason**: when Spreedly rejects signed auth (for example a nonce that was already used), `failureDetails.message` and `validationErrors` now carry Spreedly's reason and error key instead of a generic "unauthorized", and the card form shows it as a general error.
+- **Telemetry disclosure**: The guides now state that the published frameworks send operational telemetry to Datadog by default, list what is sent, and show how to reduce or turn it off with `Spreedly.configureLogging(.production)` or `.disabled`, including from Objective-C.
+
+### Fixed
+
+- **Privacy manifest reaches your app**: Spreedly's privacy manifest did not reach your app through Swift Package Manager or CocoaPods, so the SDK's required-reason API usage and data types were missing from your app's privacy report. Each framework now ships its own `PrivacyInfo.xcprivacy`, covering its own usage plus the Datadog, Stripe and Braintree code compiled into it. See the [privacy guide](guides/privacy.md).
+- **Apps without Forter3DS**: An app that doesn't include the Forter3DS framework no longer crashes at launch on a device with "Library not loaded: Forter3DS". When such an app starts a 3DS Global challenge, `DoChallengeIfNeeded` publishes a failed `ThreeDSChallengeResult` instead of only showing the "3DS unavailable" screen, so your payment flow gets an error to handle. The challenge is never skipped or reported as a success.
+- **Recache cancel**: Cancel and swipe-down on the CVV recache sheet now deliver `PaymentResult.canceled()` on `subscribeToRecacheResults` and `recacheDelegate`. A recache already in flight still finishes as success or failure.
+
+### Security
+
+- **Apple Pay keeps Spreedly's error text out of logs and telemetry**: when Spreedly rejects an Apple Pay payment, the SDK logs the error code (for example `client_error_422`) and telemetry records Spreedly's error keys, not the error text, which can echo what the shopper entered. The full text is still in `failureDetails`.
+
 ## [1.7.0] - 2026-10-16
 
 > [!WARNING]

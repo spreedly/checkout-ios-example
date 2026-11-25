@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 @class RetainPaymentMethodAPIClient;
 @class FetchPaymentMethodsAPIClient;
 @class PurchaseAPIClient;
+@class SpreedlyConfig;
 
 @interface SpreedlyConfigManager : NSObject
 
@@ -24,6 +25,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)generateSignatureWithCompletion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 
+/// Fresh signed auth from the demo backend, without applying it. Signed auth works for one request
+/// only, so Apple Pay asks for a new one on every payment attempt.
+- (void)fetchSignedAuthWithCompletion:(void (^)(SpreedlyConfig * _Nullable config, NSError * _Nullable error))completion;
+
 - (RetainPaymentMethodAPIClient *)createRetainPaymentMethodAPIClient;
 
 - (FetchPaymentMethodsAPIClient *)createFetchPaymentMethodsAPIClient;
@@ -32,6 +37,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Stripe publishable key for PaymentSheet (Stripe APM flow).
 @property (nonatomic, copy, readonly) NSString *stripePublishableKey;
+
+/// Merchant ID from Info.plist (`SpreedlyApplePayMerchantId` / `SPREEDLY_APPLE_PAY_MERCHANT_ID`).
+@property (nonatomic, copy, readonly) NSString *applePayMerchantId;
+
+/// `nil` when configured; otherwise a message describing the fix (empty or placeholder ID).
+@property (nonatomic, copy, readonly, nullable) NSString *applePayMerchantIdConfigurationError;
 
 @end
 

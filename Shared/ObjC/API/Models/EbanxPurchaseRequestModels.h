@@ -13,7 +13,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign, readonly) double amount;
 @property (nonatomic, copy, readonly) NSString *currencyCode;
 @property (nonatomic, copy, readonly) NSString *paymentMethodToken;
-@property (nonatomic, copy, readonly) NSString *redirectUrl;
+/// `nil` leaves `redirect_url` out of the request.
+@property (nonatomic, copy, readonly, nullable) NSString *redirectUrl;
 @property (nonatomic, copy, readonly) NSString *callbackUrl;
 @property (nonatomic, copy, readonly) NSString *channel;
 @property (nonatomic, copy, readonly, nullable) NSString *document;
@@ -21,7 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithAmount:(NSDecimalNumber *)amount
                  currencyCode:(NSString *)currencyCode
            paymentMethodToken:(NSString *)paymentMethodToken
-                  redirectUrl:(NSString *)redirectUrl
+                  redirectUrl:(nullable NSString *)redirectUrl
                  callbackUrl:(NSString *)callbackUrl
                      channel:(NSString *)channel
                     document:(nullable NSString *)document;

@@ -67,11 +67,12 @@ When you present `DoChallengeIfNeeded`, the SDK manages two internal phases auto
 Same as global 3DS, plus:
 
 1. Complete [getting-started.md](getting-started.md) (installation, basic setup).
-2. Ensure `Spreedly.initializeSDK()` is called at app launch (e.g., in your `App.init()` or `AppDelegate`).
-3. Call `Spreedly.setup(config:)` with environment key and signature parameters before any 3DS calls.
-4. A gateway that requires gateway-specific 3DS (e.g. Worldpay).
-5. **No `Info.plist` URL scheme, redirect URL, or `onOpenURL` handler needed for 3DS.** The SDK uses `ASWebAuthenticationSession`, which stays in-app. Polling detects the terminal state and dismisses the session automatically.
-6. When creating the purchase/authorize on your backend, include these parameters:
+2. [Enable secure tokenization](getting-started.md#enable-secure-tokenization) on your Spreedly environment (required).
+3. Ensure `Spreedly.initializeSDK()` is called at app launch (e.g., in your `App.init()` or `AppDelegate`).
+4. Call `Spreedly.setup(config:)` with environment key and signature parameters before any 3DS calls.
+5. A gateway that requires gateway-specific 3DS (e.g. Worldpay).
+6. **No `Info.plist` URL scheme, redirect URL, or `onOpenURL` handler needed for 3DS.** The SDK uses `ASWebAuthenticationSession`, which stays in-app. Polling detects the terminal state and dismisses the session automatically.
+7. When creating the purchase/authorize on your backend, include these parameters:
 
 | Parameter | Value | Purpose |
 |-----------|-------|---------|

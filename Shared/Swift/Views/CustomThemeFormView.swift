@@ -136,7 +136,9 @@ struct CustomThemeFormView: View {
             let apiClient = SpreedlyConfigManager.shared.createRetainPaymentMethodAPIClient()
             _ = try await apiClient.retainPaymentMethod(token: token)
         } catch {
-            logError(tag: "SpreedlyExample", message: "Retain payment method failed: \(error.localizedDescription)", error: error)
+            // Fixed text only: the error can carry backend response text, and the token is in the request URL.
+            let reason = (error as? RetainPaymentMethodAPIError)?.logSummary ?? "unexpected error"
+            logError(tag: "SpreedlyExample", message: "Retain payment method failed (\(reason))")
         }
     }
     
@@ -246,7 +248,7 @@ struct CustomThemeFormView: View {
                 
                 let processingResult = Spreedly.shared().createCreditCard(
                     additionalFields: additionalFields,
-                    metadata: [:]
+                    metadata: SampleAppOwner.metadata
                 )
                 
                 // Handle immediate processing result

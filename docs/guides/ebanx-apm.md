@@ -47,6 +47,7 @@ EBANX payments (Pix, Boleto Bancario, OXXO, NuPay) use the same offsite flow as 
 Before integrating EBANX payments:
 
 - Complete [getting-started.md](getting-started.md) — installation, `Spreedly.setup(config:)`, and credential management
+- [Enable secure tokenization](getting-started.md#enable-secure-tokenization) on your Spreedly environment (required)
 - Ensure `Spreedly.initializeSDK()` is called at app launch (e.g., in your `App.init()` or `AppDelegate`)
 - Register a custom URL scheme in `Info.plist` (see [Custom URL Scheme Setup](offsite-payments.md#custom-url-scheme-setup) in the Offsite Payment Guide)
 - Understand the offsite payment flow (see [offsite-payments.md](offsite-payments.md))

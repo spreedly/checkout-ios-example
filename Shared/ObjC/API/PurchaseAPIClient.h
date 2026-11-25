@@ -9,6 +9,10 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// `userInfo` keys on a purchase error: the HTTP status (NSNumber) and the server's message (NSString).
+FOUNDATION_EXPORT NSString * const PurchaseAPIStatusCodeKey;
+FOUNDATION_EXPORT NSString * const PurchaseAPIServerMessageKey;
+
 @class ServerConfig;
 @class PurchaseResponse;
 
@@ -16,6 +20,11 @@ NS_ASSUME_NONNULL_BEGIN
 @interface PurchaseAPIClient : NSObject
 
 - (instancetype)initWithConfig:(ServerConfig *)config;
+
+/// Uses `session` for requests instead of one built from `config`, so tests can answer them.
+- (instancetype)initWithConfig:(ServerConfig *)config session:(NSURLSession *)session NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)init NS_UNAVAILABLE;
 
 /// Performs a purchase transaction
 /// @param paymentMethodToken Token of the payment method to use
@@ -41,12 +50,20 @@ NS_ASSUME_NONNULL_BEGIN
                           currencyCode:(NSString *)currencyCode
                             completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion;
 
+/// Performs a purchase without Spreedly 3DS (POST {baseURL}/simple-purchase). Use it for payment methods the
+/// wallet already authenticated, such as Apple Pay: Spreedly 3DS accepts credit cards only.
+/// @param amount Purchase amount in minor units (e.g. cents)
+- (void)simplePurchaseWithPaymentMethodToken:(NSString *)paymentMethodToken
+                                       amount:(NSDecimalNumber *)amount
+                                 currencyCode:(NSString *)currencyCode
+                                   completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion;
+
 /// Performs an offsite purchase via merchant backend (POST {baseURL}/offsite-purchase). Gateway: "sprel" or "paypal".
 - (void)offsitePurchaseWithGateway:(NSString *)gateway
              paymentMethodToken:(NSString *)paymentMethodToken
                          amount:(NSDecimalNumber *)amount
                   currencyCode:(NSString *)currencyCode
-                   redirectUrl:(NSString *)redirectUrl
+                   redirectUrl:(nullable NSString *)redirectUrl
                   callbackUrl:(NSString *)callbackUrl
                     completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion;
 
@@ -54,7 +71,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)ebanxPurchaseWithPaymentMethodToken:(NSString *)paymentMethodToken
                                      amount:(NSDecimalNumber *)amount
                               currencyCode:(NSString *)currencyCode
-                               redirectUrl:(NSString *)redirectUrl
+                               redirectUrl:(nullable NSString *)redirectUrl
                               callbackUrl:(NSString *)callbackUrl
                                   document:(nullable NSString *)document
                                 completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion;
@@ -62,7 +79,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// Stripe APM pending purchase (POST {baseURL}/create-purchase). Gateway: "stripe", payment_method stripe_apm + apm_types.
 - (void)stripeAPMPendingPurchaseWithAmount:(NSDecimalNumber *)amount
                              currencyCode:(NSString *)currencyCode
-                              redirectUrl:(NSString *)redirectUrl
+                              redirectUrl:(nullable NSString *)redirectUrl
                              callbackUrl:(NSString *)callbackUrl
                                 apmTypes:(NSArray<NSString *> *)apmTypes
                            radarSessionId:(nullable NSString *)radarSessionId
@@ -71,7 +88,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// Braintree purchase (POST {baseURL}/create-purchase, gateway "braintree").
 - (void)braintreePurchaseWithAmount:(NSDecimalNumber *)amount
                       currencyCode:(NSString *)currencyCode
-                       redirectUrl:(NSString *)redirectUrl
+                       redirectUrl:(nullable NSString *)redirectUrl
                       callbackUrl:(NSString *)callbackUrl
                  paymentMethodType:(NSString *)paymentMethodType
                         completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion;

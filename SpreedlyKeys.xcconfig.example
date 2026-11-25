@@ -22,3 +22,7 @@ SPREEDLY_BASE_URL = https:/$()/your-server.example.com/api/v1
 SPREEDLY_API_KEY =
 STRIPE_PUBLISHABLE_KEY = your_stripe_publishable_key_here
 SPREEDLY_C2P_SANDBOX_SRC_DPA_ID = your_sandbox_src_dpa_id_here
+
+// Real Apple Pay Merchant ID from developer.apple.com (Identifiers → Merchant IDs).
+// Must match the Apple Pay capability on the Example app target. Placeholders will not return a payment token.
+SPREEDLY_APPLE_PAY_MERCHANT_ID = merchant.com.your.example

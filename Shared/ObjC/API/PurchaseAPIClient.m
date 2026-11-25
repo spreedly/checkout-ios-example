@@ -34,17 +34,19 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
     return nil;
 }
 
+NSString * const PurchaseAPIStatusCodeKey = @"PurchaseAPIStatusCode";
+NSString * const PurchaseAPIServerMessageKey = @"PurchaseAPIServerMessage";
+
 @implementation PurchaseAPIClient
 
 - (instancetype)initWithConfig:(ServerConfig *)config {
+    return [self initWithConfig:config session:SPLExampleSharedBackendSession(config.timeoutInterval)];
+}
+
+- (instancetype)initWithConfig:(ServerConfig *)config session:(NSURLSession *)session {
     if (self = [super init]) {
         _config = config;
-        
-        NSURLSessionConfiguration *sessionConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
-        sessionConfig.timeoutIntervalForRequest = config.timeoutInterval;
-        sessionConfig.timeoutIntervalForResource = config.timeoutInterval;
-        
-        _session = [NSURLSession sessionWithConfiguration:sessionConfig];
+        _session = session;
     }
     return self;
 }
@@ -54,8 +56,23 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
                           currencyCode:(NSString *)currencyCode
                   useGatewaySpecific3DS:(BOOL)useGatewaySpecific3DS
                             completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion {
+    [self purchaseAtPath:@"purchase"
+      paymentMethodToken:paymentMethodToken
+                  amount:amount
+            currencyCode:currencyCode
+   useGatewaySpecific3DS:useGatewaySpecific3DS
+              completion:completion];
+}
+
+/// POSTs a purchase to {baseURL}/{path}; shared by /purchase and /simple-purchase.
+- (void)purchaseAtPath:(NSString *)path
+    paymentMethodToken:(NSString *)paymentMethodToken
+                amount:(NSDecimalNumber *)amount
+          currencyCode:(NSString *)currencyCode
+ useGatewaySpecific3DS:(BOOL)useGatewaySpecific3DS
+            completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion {
     NSString *baseURLString = [self.config.baseURL hasSuffix:@"/"] ? [self.config.baseURL substringToIndex:self.config.baseURL.length - 1] : self.config.baseURL;
-    NSString *urlString = [NSString stringWithFormat:@"%@/purchase", baseURLString];
+    NSString *urlString = [NSString stringWithFormat:@"%@/%@", baseURLString, path];
     NSURL *url = [NSURL URLWithString:urlString];
     
     if (!url) {
@@ -77,6 +94,7 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
     if (self.config.apiKey.length > 0) {
         [urlRequest setValue:[NSString stringWithFormat:@"Bearer %@", self.config.apiKey] forHTTPHeaderField:@"Authorization"];
     }
+    SPLExampleApplyBackendBasicAuth(urlRequest);
     
     NSDictionary *requestBody = nil;
     if (useGatewaySpecific3DS) {
@@ -135,7 +153,9 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
                 NSError *serverError = [NSError errorWithDomain:@"PurchaseAPIError"
                                                           code:4
                                                       userInfo:@{
-                                                          NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Purchase API error (%ld): %@", (long)httpResponse.statusCode, errorMessage]
+                                                          NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Purchase API error (%ld): %@", (long)httpResponse.statusCode, errorMessage],
+                                                          PurchaseAPIStatusCodeKey: @(httpResponse.statusCode),
+                                                          PurchaseAPIServerMessageKey: errorMessage
                                                       }];
                 completion(nil, serverError);
             }
@@ -189,6 +209,7 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
     if (self.config.apiKey.length > 0) {
         [urlRequest setValue:[NSString stringWithFormat:@"Bearer %@", self.config.apiKey] forHTTPHeaderField:@"Authorization"];
     }
+    SPLExampleApplyBackendBasicAuth(urlRequest);
     
     NSURLSessionDataTask *task = [self.session dataTaskWithRequest:urlRequest completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
         if (error) {
@@ -248,13 +269,26 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
                               completion:completion];
 }
 
+- (void)simplePurchaseWithPaymentMethodToken:(NSString *)paymentMethodToken
+                                       amount:(NSDecimalNumber *)amount
+                                 currencyCode:(NSString *)currencyCode
+                                   completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion {
+    [self purchaseAtPath:@"simple-purchase"
+      paymentMethodToken:paymentMethodToken
+                  amount:amount
+            currencyCode:currencyCode
+   useGatewaySpecific3DS:NO
+              completion:completion];
+}
+
 - (void)offsitePurchaseWithGateway:(NSString *)gateway
              paymentMethodToken:(NSString *)paymentMethodToken
                          amount:(NSDecimalNumber *)amount
                   currencyCode:(NSString *)currencyCode
-                   redirectUrl:(NSString *)redirectUrl
+                   redirectUrl:(nullable NSString *)redirectUrl
                   callbackUrl:(NSString *)callbackUrl
                     completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion {
+    redirectUrl = SPLExampleBackendRedirectURL(redirectUrl);
     NSString *baseURLString = [self.config.baseURL hasSuffix:@"/"] ? [self.config.baseURL substringToIndex:self.config.baseURL.length - 1] : self.config.baseURL;
     NSString *urlString = [NSString stringWithFormat:@"%@/offsite-purchase", baseURLString];
     NSURL *url = [NSURL URLWithString:urlString];
@@ -277,6 +311,7 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
     if (self.config.apiKey.length > 0) {
         [urlRequest setValue:[NSString stringWithFormat:@"Bearer %@", self.config.apiKey] forHTTPHeaderField:@"Authorization"];
     }
+    SPLExampleApplyBackendBasicAuth(urlRequest);
 
     OffsitePurchaseRequest *request = [[OffsitePurchaseRequest alloc] initWithGateway:gateway ?: @""
                                                                                               amount:amount
@@ -352,10 +387,11 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
 - (void)ebanxPurchaseWithPaymentMethodToken:(NSString *)paymentMethodToken
                                      amount:(NSDecimalNumber *)amount
                               currencyCode:(NSString *)currencyCode
-                               redirectUrl:(NSString *)redirectUrl
+                               redirectUrl:(nullable NSString *)redirectUrl
                               callbackUrl:(NSString *)callbackUrl
                                   document:(NSString *)document
                                 completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion {
+    redirectUrl = SPLExampleBackendRedirectURL(redirectUrl);
     NSString *baseURLString = [self.config.baseURL hasSuffix:@"/"] ? [self.config.baseURL substringToIndex:self.config.baseURL.length - 1] : self.config.baseURL;
     NSString *urlString = [NSString stringWithFormat:@"%@/create-purchase", baseURLString];
     NSURL *url = [NSURL URLWithString:urlString];
@@ -378,6 +414,7 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
     if (self.config.apiKey.length > 0) {
         [urlRequest setValue:[NSString stringWithFormat:@"Bearer %@", self.config.apiKey] forHTTPHeaderField:@"Authorization"];
     }
+    SPLExampleApplyBackendBasicAuth(urlRequest);
 
     EbanxPurchaseTransaction *transaction = [[EbanxPurchaseTransaction alloc] initWithAmount:amount
                                                                                currencyCode:currencyCode
@@ -454,11 +491,12 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
 
 - (void)stripeAPMPendingPurchaseWithAmount:(NSDecimalNumber *)amount
                              currencyCode:(NSString *)currencyCode
-                              redirectUrl:(NSString *)redirectUrl
+                              redirectUrl:(nullable NSString *)redirectUrl
                              callbackUrl:(NSString *)callbackUrl
                                 apmTypes:(NSArray<NSString *> *)apmTypes
                            radarSessionId:(nullable NSString *)radarSessionId
                               completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion {
+    redirectUrl = SPLExampleBackendRedirectURL(redirectUrl);
     NSString *baseURLString = [self.config.baseURL hasSuffix:@"/"] ? [self.config.baseURL substringToIndex:self.config.baseURL.length - 1] : self.config.baseURL;
     NSString *urlString = [NSString stringWithFormat:@"%@/create-purchase", baseURLString];
     NSURL *url = [NSURL URLWithString:urlString];
@@ -478,6 +516,7 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
     if (self.config.apiKey.length > 0) {
         [urlRequest setValue:[NSString stringWithFormat:@"Bearer %@", self.config.apiKey] forHTTPHeaderField:@"Authorization"];
     }
+    SPLExampleApplyBackendBasicAuth(urlRequest);
 
     NSDictionary *paymentMethod = @{
         @"payment_method_type": @"stripe_apm",
@@ -486,11 +525,14 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
     NSMutableDictionary *transaction = [@{
         @"amount": @([amount doubleValue]),
         @"currency_code": currencyCode ?: @"",
-        @"redirect_url": redirectUrl ?: @"",
         @"callback_url": callbackUrl ?: @"",
         @"channel": @"app",
         @"payment_method": paymentMethod
     } mutableCopy];
+    // No redirect means the backend picks its own return page, so the key is left out rather than sent empty.
+    if (redirectUrl) {
+        transaction[@"redirect_url"] = redirectUrl;
+    }
     if (radarSessionId.length > 0) {
         transaction[@"gateway_specific_fields"] = @{
             @"stripe_payment_intents": @{ @"radar_session_id": radarSessionId }
@@ -543,10 +585,11 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
 
 - (void)braintreePurchaseWithAmount:(NSDecimalNumber *)amount
                       currencyCode:(NSString *)currencyCode
-                       redirectUrl:(NSString *)redirectUrl
+                       redirectUrl:(nullable NSString *)redirectUrl
                       callbackUrl:(NSString *)callbackUrl
                  paymentMethodType:(NSString *)paymentMethodType
                         completion:(void (^)(PurchaseResponse * _Nullable response, NSError * _Nullable error))completion {
+    redirectUrl = SPLExampleBackendRedirectURL(redirectUrl);
     NSString *baseURLString = [self.config.baseURL hasSuffix:@"/"] ? [self.config.baseURL substringToIndex:self.config.baseURL.length - 1] : self.config.baseURL;
     NSString *urlString = [NSString stringWithFormat:@"%@/create-purchase", baseURLString];
     NSURL *url = [NSURL URLWithString:urlString];
@@ -566,11 +609,11 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
     if (self.config.apiKey.length > 0) {
         [urlRequest setValue:[NSString stringWithFormat:@"Bearer %@", self.config.apiKey] forHTTPHeaderField:@"Authorization"];
     }
+    SPLExampleApplyBackendBasicAuth(urlRequest);
 
     NSMutableDictionary *transaction = [@{
         @"amount": @([amount doubleValue]),
         @"currency_code": currencyCode ?: @"USD",
-        @"redirect_url": redirectUrl ?: @"",
         @"callback_url": callbackUrl ?: @"",
         @"channel": @"app",
         @"payment_method": @{
@@ -578,6 +621,10 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
             @"offsite_sync": @YES
         }
     } mutableCopy];
+    // No redirect means the backend picks its own return page, so the key is left out rather than sent empty.
+    if (redirectUrl) {
+        transaction[@"redirect_url"] = redirectUrl;
+    }
 
     NSDictionary *braintreeGSF = BraintreeGatewaySpecificFieldsForPaymentMethodType(paymentMethodType);
     if (braintreeGSF != nil) {
@@ -658,6 +705,7 @@ static NSDictionary * _Nullable BraintreeGatewaySpecificFieldsForPaymentMethodTy
     if (self.config.apiKey.length > 0) {
         [urlRequest setValue:[NSString stringWithFormat:@"Bearer %@", self.config.apiKey] forHTTPHeaderField:@"Authorization"];
     }
+    SPLExampleApplyBackendBasicAuth(urlRequest);
 
     NSMutableDictionary *requestBody = [NSMutableDictionary dictionaryWithDictionary:@{
         @"state": state ?: @"Successful",

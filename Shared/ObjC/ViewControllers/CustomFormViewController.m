@@ -12,6 +12,7 @@
 #import "SpreedlyConfigManager.h"
 #import "RetainPaymentMethodAPIClient.h"
 #import "RetainPaymentMethodModels.h"
+#import "SignatureServerClient.h" // SPLExampleSampleAppOwnerMetadata
 #import "ThemeHelper.h"
 #import "DemoCustomValidationRecipes.h"
 #import "AdditionalFieldCataloguePanel.h"
@@ -1317,7 +1318,7 @@
         }
         
         // Create metadata
-        NSDictionary *metadata = @{};
+        NSDictionary *metadata = SPLExampleSampleAppOwnerMetadata();
         
         // Call Spreedly createCreditCard (synchronous, returns PaymentProcessingResult)
         Spreedly *spreedly = [Spreedly shared];
