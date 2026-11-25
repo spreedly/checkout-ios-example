@@ -9,7 +9,7 @@ for your backend to attach to a Spreedly purchase or authorization.
 | **Use something else when** | You need the APM payment sheet → [Stripe APM](stripe-apm.md). Radar is an optional addition, not an alternative |
 | **You build** | 2 things: a call to create the session · a backend that attaches the id |
 | **Modules** | `SpreedlyCore` + `SpreedlySecurity` + `SpreedlyUI` + `SpreedlyStripeRadar` |
-| **Requires** | SDK 1.5.0+ · iOS 16.0+ from 1.7.0 (iOS 14.0+ on 1.6.x) · Xcode 26.0+ |
+| **Requires** | SDK 1.5.0+ · iOS 16.0+ from 1.7.0 (iOS 14.0+ on 1.6.x) · Xcode 27.0+ |
 | **Integration time** | ~10 minutes |
 | **UI** | None — headless. Swift and Objective-C |
 
@@ -99,7 +99,7 @@ Add **SpreedlyStripeRadar** when you need Radar session IDs. You may also add **
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/spreedly/checkout-ios-package.git", from: "1.7.0"),
+    .package(url: "https://github.com/spreedly/checkout-ios-package.git", from: "1.8.0"),
     .package(url: "https://github.com/stripe/stripe-ios-spm.git", from: "25.11.0"),
 ],
 targets: [
@@ -119,18 +119,19 @@ targets: [
 ### CocoaPods
 
 ```ruby
-pod 'SpreedlyCore', '~> 1.7'
-pod 'SpreedlySecurity', '~> 1.7'
-pod 'SpreedlyUI', '~> 1.7'
-pod 'SpreedlyStripeRadar', '~> 1.7'
-# pod 'SpreedlyStripeAPM', '~> 1.7'  # if you use Payment Sheet APM
+pod 'SpreedlyCore', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlySecurity', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlyUI', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlyStripeRadar', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+# pod 'SpreedlyStripeAPM', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'  # if you use Payment Sheet APM
 ```
 
 ### Compatibility
 
 | SDK version | iOS | Xcode | Notes |
 |---|---|---|---|
-| 1.7.0+ | **16.0+** | 26.0+ | — |
+| 1.8.0+ | **16.0+** | 27.0+ | — |
+| 1.7.x | **16.0+** | 26.0+ | — |
 | 1.6.x | 14.0+ | 26.0+ | Stripe Radar since 1.5.0. Last line that supports iOS 14 and 15 — see [Migrating to iOS 16](migration/v1-to-v2.md) |
 | 1.4.x and earlier | — | — | **No Stripe Radar module.** Upgrade to 1.5.0+ |
 
@@ -176,7 +177,7 @@ Xcode **File → Add Package Dependencies** often defaults to the newest Stripe 
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/spreedly/checkout-ios-package.git", from: "1.7.0"),
+    .package(url: "https://github.com/spreedly/checkout-ios-package.git", from: "1.8.0"),
     .package(url: "https://github.com/stripe/stripe-ios-spm.git", from: "25.11.0"),
 ],
 targets: [

@@ -8,19 +8,20 @@ Set up the Spreedly iOS SDK in your project in under 15 minutes.
 
 1. [Prerequisites](#prerequisites)
 2. [Required Credentials](#required-credentials)
-3. [Installation](#installation) — includes *one version for all modules*
-4. [Optional Dependencies](#optional-dependencies)
-5. [Required Info.plist Entries](#required-infoplist-entries)
-6. [Required App Setup](#required-app-setup)
-7. [Basic Setup](#basic-setup)
-8. [SDK lifecycle](#sdk-lifecycle)
-9. [Module Dependency Table](#module-dependency-table)
-10. [Testing and Sandbox](#testing-and-sandbox)
-11. [Payment Methods at a Glance](#payment-methods-at-a-glance)
-12. [Choosing Your Integration Path](#choosing-your-integration-path)
-13. [Conditional Imports for Optional Modules](#conditional-imports-for-optional-modules)
-14. [Next Steps](#next-steps)
-15. [Related Documentation](#related-documentation)
+3. [Enable Secure Tokenization (Required)](#enable-secure-tokenization)
+4. [Installation](#installation) — includes *one version for all modules*
+5. [Optional Dependencies](#optional-dependencies)
+6. [Required Info.plist Entries](#required-infoplist-entries)
+7. [Required App Setup](#required-app-setup)
+8. [Basic Setup](#basic-setup)
+9. [SDK lifecycle](#sdk-lifecycle)
+10. [Module Dependency Table](#module-dependency-table)
+11. [Testing and Sandbox](#testing-and-sandbox)
+12. [Payment Methods at a Glance](#payment-methods-at-a-glance)
+13. [Choosing Your Integration Path](#choosing-your-integration-path)
+14. [Conditional Imports for Optional Modules](#conditional-imports-for-optional-modules)
+15. [Next Steps](#next-steps)
+16. [Related Documentation](#related-documentation)
 
 ---
 
@@ -30,10 +31,11 @@ Before integrating the Spreedly iOS SDK, ensure you have:
 
 - **iOS 16.0+** deployment target from **1.7.0**. Apps that still support iOS 14 or 15 stay on
   **1.6.x** — see [Upgrade to the iOS 16 minimum](migration/v1-to-v2.md)
-- **Xcode 26.0+** minimum, **26.5** recommended
+- **Xcode 27.0+** minimum, **27.1** recommended
 - **Swift 6.0+** for Swift projects
 - **Spreedly Account** with API credentials
 - **Valid Environment Key** from the Spreedly dashboard
+- **Secure tokenization enabled** on every Spreedly environment you integrate — see [Enable Secure Tokenization](#enable-secure-tokenization)
 
 ---
 
@@ -66,11 +68,41 @@ struct ExampleCredentials {
 
 ---
 
+<a id="enable-secure-tokenization"></a>
+## Enable Secure Tokenization (Required)
+
+Generating the auth details above is not enough on its own. Until you turn on **secure tokenization** for your Spreedly environment, Spreedly does not enforce the signature check, so tokenization requests are not authenticated.
+
+> **Required:** Enable secure tokenization in every environment you integrate. This applies to all SDK versions.
+
+**Before you save the setting**, confirm your integration already sends valid auth details (`certificateToken`, `nonce`, `signature`, `timestamp`) with every request. Once the setting is on, requests without valid auth fail.
+
+**To enable it:**
+
+1. Sign in to [app.spreedly.com](https://app.spreedly.com) and open **Environment settings** for the environment you are integrating.
+2. Under **Security → Enhanced Security**, check **Enable secure tokenization**, then click **Save changes**.
+3. Recommended: set **Payment method submission** to **iFrame or Spreedly Express** so payment methods cannot be created through the direct API. Before you choose this, confirm nothing in your integration creates payment methods through the direct API (for example from your own server), because this option blocks that path.
+
+**The setting is per environment.** Repeat the steps for each environment, for example staging and production. Turning it on in one does not change the other.
+
+**What changes once it is on:** every Create payment method call in that environment needs authentication.
+
+| Call | How it authenticates |
+|------|----------------------|
+| Requests made through the SDK | The `certificateToken`, `nonce`, `signature` and `timestamp` in `SpreedlyConfig`, fetched fresh from your backend |
+| Direct API calls from your server | HTTP basic auth |
+
+**Deprecation:** Non-secure tokenization was deprecated on **October 31, 2026**, with end of life on **December 31, 2028**. See [Securing iFrame or Checkout SDK](https://developer.spreedly.com/docs/securing-iframe) for the full details.
+
+If payments return an authentication error after you enable the setting, see [Troubleshooting](troubleshooting.md#authentication-errors-after-enabling-secure-tokenization).
+
+---
+
 ## Installation
 
 ### Use one package version for all Spreedly modules
 
-Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyStripeRadar**, **SpreedlyBraintree**, **SpreedlyClickToPay**) are released together under **one** version. Use the **same** resolved version for every Spreedly product in your app — always pick the [latest release tag](https://github.com/spreedly/checkout-ios-package/releases) (the snippets below use **1.7.0** as an example).
+Distribution is **[checkout-ios-package](https://github.com/spreedly/checkout-ios-package)** (SwiftPM or CocoaPods). **SpreedlyCore**, **SpreedlySecurity**, **SpreedlyUI**, and optional modules (**SpreedlyStripeAPM**, **SpreedlyStripeRadar**, **SpreedlyBraintree**, **SpreedlyClickToPay**, **SpreedlyApplePay**) are released together under **one** version. **SpreedlyApplePay** is available through Swift Package Manager only. Use the **same** resolved version for every Spreedly product in your app — always pick the [latest release tag](https://github.com/spreedly/checkout-ios-package/releases) (the snippets below use **1.8.0** as an example).
 
 ### Option 1: Swift Package Manager (Recommended)
 
@@ -87,6 +119,7 @@ SPM distribution is from a separate repository: `https://github.com/spreedly/che
    - **SpreedlyStripeRadar** (optional, for Stripe Radar device data)
    - **SpreedlyBraintree** (optional, for Braintree PayPal/Venmo)
    - **SpreedlyClickToPay** (optional, for Mastercard Click to Pay — **1.6.0+**)
+   - **SpreedlyApplePay** (optional, for Apple Pay)
    - **Forter3DS** (optional, for 3DS Global) — add separately from `https://bitbucket.org/forter-mobile/forter-ios.git`; not part of the Spreedly package
 
 **Add via Package.swift:**
@@ -94,7 +127,7 @@ SPM distribution is from a separate repository: `https://github.com/spreedly/che
 ```swift
 dependencies: [
     // Example minimum version — Xcode resolves to the latest compatible release, or pin an exact tag.
-    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.7.0"),
+    .package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.8.0"),
     // Optional: add when using 3DS Global (Forter) — separate repo:
     // .package(url: "https://bitbucket.org/forter-mobile/forter-ios.git", exact: "2.1.0")
 ],
@@ -109,6 +142,7 @@ targets: [
             // .product(name: "SpreedlyStripeRadar", package: "checkout-ios-package"), // 1.5.0+
             // .product(name: "SpreedlyBraintree", package: "checkout-ios-package"),
             // .product(name: "SpreedlyClickToPay", package: "checkout-ios-package"), // 1.6.0+
+            // .product(name: "SpreedlyApplePay", package: "checkout-ios-package"),
             // Optional: add when using 3DS Global (Forter):
             // .product(name: "Forter3DS", package: "forter-ios")
         ]
@@ -120,7 +154,9 @@ targets: [
 
 ### Option 2: CocoaPods
 
-**Option A (Recommended):** Install from the remote package using a version or Git reference. This is the standard approach for production and matches how most teams consume SDKs.
+**Option A (Recommended):** Install from a release tag of the remote package. This is the standard approach for production and matches how most teams consume SDKs.
+
+> **CocoaPods Trunk:** New versions are not published to the CocoaPods Trunk registry, so version-only lines like `pod 'SpreedlyCore', '~> 1.8'` won't find them. Install from a `checkout-ios-package` release tag as shown below, or use Swift Package Manager (recommended).
 
 Add to your `Podfile`. Source is `https://github.com/spreedly/checkout-ios-package`:
 
@@ -128,37 +164,18 @@ Add to your `Podfile`. Source is `https://github.com/spreedly/checkout-ios-packa
 target 'YourApp' do
   use_frameworks!
 
-  pod 'SpreedlyCore', '~> 1.7'
-  pod 'SpreedlySecurity', '~> 1.7'
-  pod 'SpreedlyUI', '~> 1.7'
+  # Example tags — replace with a release from checkout-ios-package.
+  pod 'SpreedlyCore',      :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+  pod 'SpreedlySecurity',  :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+  pod 'SpreedlyUI',        :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
   # Add these only if needed:
-  # pod 'SpreedlyStripeAPM', '~> 1.7'
-  # pod 'SpreedlyStripeRadar', '~> 1.7'  # 1.5.0+
-  # pod 'SpreedlyBraintree', '~> 1.7'
-  # pod 'SpreedlyClickToPay', '~> 1.7'  # 1.6.0+
+  # pod 'SpreedlyStripeAPM', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+  # pod 'SpreedlyStripeRadar', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'  # 1.5.0+
+  # pod 'SpreedlyBraintree', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+  # pod 'SpreedlyClickToPay', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'  # 1.6.0+
 end
 ```
 Then run `pod install`.
-
-**Private repository access:** If the SDK is distributed via a private GitHub repository, use the `:git` option with a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) instead of version specifiers (still Option A—remote install):
-
-```ruby
-target 'YourApp' do
-  use_frameworks!
-
-  # Example tags — replace with a release from checkout-ios-package.
-  pod 'SpreedlyCore',      :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
-  pod 'SpreedlySecurity',  :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
-  pod 'SpreedlyUI',        :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
-  # Add these only if needed:
-  # pod 'SpreedlyStripeAPM', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
-  # pod 'SpreedlyStripeRadar', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
-  # pod 'SpreedlyBraintree', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
-  # pod 'SpreedlyClickToPay', :git => 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git', :tag => '1.7.0'
-end
-```
-
-Replace `{GitToken}` with your GitHub personal access token that has read access to the repository. Then run `pod install`.
 
 #### Stripe APM: CocoaPods `post_install` (Required)
 
@@ -166,13 +183,13 @@ If you use **SpreedlyStripeAPM** with CocoaPods, you **must** add a `post_instal
 
 **SPM users do not need this step** — when you add `SpreedlyStripeAPM` via SPM, `StripePaymentSheet` is resolved as a transitive dependency automatically and bundles already use the correct names.
 
-**Full Podfile example (private repo with Stripe APM):**
+**Full Podfile example (with Stripe APM):**
 
 ```ruby
 platform :ios, '16.0'   # 1.7.0+ requires iOS 16; apps on iOS 14/15 stay on 1.6.x
 
-PACKAGE_REPO = 'https://{GitToken}@github.com/spreedly/checkout-ios-package.git'
-PACKAGE_TAG  = '1.7.0'  # example — use a checkout-ios-package release tag
+PACKAGE_REPO = 'https://github.com/spreedly/checkout-ios-package.git'
+PACKAGE_TAG  = '1.8.0'  # example — use a checkout-ios-package release tag
 
 target 'YourApp' do
   use_frameworks!
@@ -286,6 +303,7 @@ Add these only when you need the corresponding features:
 | Stripe on app target (Radar / own Stripe APIs) | StripePayments (via `stripe-ios-spm`) | `https://github.com/stripe/stripe-ios-spm.git` | **`from: "25.11.0"`** (25.x only — do **not** use Stripe **26.x**) |
 | Braintree (PayPal/Venmo) | SpreedlyBraintree | `https://github.com/spreedly/checkout-ios-package` | Same Spreedly SDK version as Core (e.g. 1.6.0+) |
 | Click to Pay (Mastercard SRC) | SpreedlyClickToPay | `https://github.com/spreedly/checkout-ios-package` | Same Spreedly SDK version as Core (**1.6.0+**) |
+| Apple Pay | SpreedlyApplePay | `https://github.com/spreedly/checkout-ios-package` | Same Spreedly SDK version as Core |
 
 **Forter3DS (3DS Global):** Required for Global 3DS. Add Forter3DS directly from Forter's Bitbucket repository. **Do not use** `pod 'SpreedlyForter3DS'` — use the Forter Bitbucket URL below. A dedicated `SpreedlyForter3DS` module is planned for a future release but is not yet available for standard CocoaPods usage.
 
@@ -304,6 +322,8 @@ Without Forter3DS linked (and embedded) for Global 3DS, challenge UI falls back 
 **SpreedlyStripeRadar (Stripe Radar):** Optional headless module — returns a `radar_session_id` for Stripe Payment Intents fraud signals. **Availability:** Included from package **1.5.0+** (`SpreedlyStripeRadar` XCFramework). **1.4.1** does not include Radar. **App target:** also link **`StripePayments`** from [stripe-ios-spm](https://github.com/stripe/stripe-ios-spm) using **`from: "25.11.0"`** (stay on **25.x** — do not accept Xcode’s Stripe **26.x** “latest”). See [Stripe Radar — Stripe version](stripe-radar.md#stripe-version-required). Radar does not use Payment Sheet — `NSCameraUsageDescription` is not required for Radar-only integrations.
 
 **SpreedlyClickToPay (Click to Pay):** Optional Mastercard SRC checkout module. **Availability:** Included from package **1.6.0+**. Requires Core, Security, and UI at the same version. See [Click to Pay](click-to-pay.md).
+
+**SpreedlyApplePay (Apple Pay):** Optional PassKit button and sheet. Requires Core, Security, and UI at the same version. See [Apple Pay](apple-pay.md).
 
 **SpreedlyBraintree (Braintree PayPal/Venmo):** Add `SpreedlyBraintree` from `checkout-ios-package` — no extra Braintree dependencies needed. Both SPM and CocoaPods resolve the required Braintree modules (Core, PayPal, Venmo, DataCollector) transitively. If Braintree is not linked, `SpreedlyBraintreeCheckout.present(config:)` publishes a failure gracefully (no crash).
 
@@ -528,9 +548,11 @@ Call `Spreedly.setup(config:)` with all required parameters before any payment r
 | `forterSiteId` | Yes (for 3DS) | Your Forter site ID. Required if your integration uses 3D Secure. Pass `nil` if you do not use 3DS. |
 | `certificateToken` | Yes | Certificate token fetched from your backend |
 | `nonce` | Yes | Unique nonce for request signing, fetched from your backend |
-| `signature` | Yes | HMAC signature, fetched from your backend |
+| `signature` | Yes | RSA-SHA256 signature, created on your backend with your certificate's private key |
 | `timestamp` | Yes | Timestamp of signature generation, fetched from your backend |
 | `sdkPlatform` | No | Identifies the integration surface in telemetry and the `source` field on payment method creation requests. Defaults to `.ios` for native apps. Set to `.reactNative` if calling from a React Native bridge. Uses the `SdkPlatform` enum. |
+| `rnVersion` | No | Property, not an initializer parameter. React Native version of the host app (e.g. `"0.76.5"`), sent to telemetry as `rn_version` only when `sdkPlatform` is `.reactNative`. Set by the React Native bridge; native iOS apps leave it `nil`. |
+| `rnSdkVersion` | No | Property, not an initializer parameter. Spreedly React Native package version (e.g. `"1.3.0"`), sent to telemetry as `rn_sdk_version` only when `sdkPlatform` is `.reactNative`. Set by the React Native bridge; native iOS apps leave it `nil`. |
 | `blockJailbrokenDevices` | No | When `true`, SDK blocks all operations on jailbroken or compromised devices. Defaults to `false`. Check `Spreedly.initializationError` after setup, or `Spreedly.isDeviceTrusted` at any time. Also available as `Spreedly.blockJailbrokenDevices` static property for `initializeSDK()` usage. See [Security — Runtime Integrity](security.md#runtime-integrity). |
 
 > **Migration note (breaking change):** `sdkPlatform` was previously a `String?` parameter. It is now a type-safe `SdkPlatform` enum. If you were passing `sdkPlatform: "react_native"`, change to `sdkPlatform: .reactNative`. Native iOS apps that omitted the parameter are unaffected — the default changed from `nil` to `.ios`, which produces the same behavior. In Objective-C, use `SdkPlatformIos` or `SdkPlatformReactNative`.
@@ -608,7 +630,29 @@ The SDK stays alive for your whole app session (`Spreedly.shared()`). You **star
 | **User opens checkout** | Fetch signature params from your backend, then `Spreedly.setup(config:)` with `environmentKey`, `nonce`, `signature`, `certificateToken`, `timestamp` (and `forterSiteId` if you use 3DS) |
 | **User leaves checkout** | See [Headless](#headless-custom-form-spltextfield) or [Express](#express-checkout-cardformdropin) below |
 | **New payment session** (new nonce) | Call `setup(config:)` again with the new values — no destroy step |
+| **A payment failed** and the customer will try again | Get new signed auth from your server and call `setup(config:)` before they submit again ([why](#refreshing-signed-auth)) |
 | **Device blocked** (jailbreak, etc.) | Check `Spreedly.isDeviceTrusted` and `Spreedly.initializationError`; show fallback UI |
+
+<a id="refreshing-signed-auth"></a>
+### Refreshing signed auth
+
+Each set of signed auth works for **one request** to Spreedly. Once a request has reached Spreedly, even one that failed, its nonce is used: another request with the same auth fails, and `failureDetails` carries Spreedly's reason (`errors.replayed_tokenization_nonce` in `validationErrors`). After a failed payment, get new auth from your backend and pass it to `setup(config:)` before the customer submits again. The open card form uses it on the next tap.
+
+```swift
+cancellable = Spreedly.shared().subscribeToPaymentResults { result in
+    guard result.isFailure else { return }
+    Task {
+        // fetchSignedConfigFromYourBackend() returns a SpreedlyConfig with fresh nonce/signature.
+        if let config = try? await fetchSignedConfigFromYourBackend() {
+            Spreedly.setup(config: config)
+        }
+    }
+}
+```
+
+Apple Pay asks for its own fresh auth on every attempt (`signedAuth`), so it never uses up the auth your card form holds. See [Apple Pay — Signed auth for each attempt](apple-pay.md#retry-auth).
+
+Don't turn off Enhanced Security to avoid this: it is Spreedly's protection against card testing.
 
 ### Headless custom form (`SPLTextField`)
 
@@ -737,7 +781,7 @@ Objective-C: `[[Spreedly shared] reset]` in `viewWillDisappear:`, remove child f
 If you are integrating the iOS SDK through a React Native bridge, you **must** pass `sdkPlatform: .reactNative` so the SDK correctly identifies the integration surface in telemetry and in the `source` field on all payment method creation requests:
 
 ```swift
-Spreedly.setup(config: SpreedlyConfig(
+let config = SpreedlyConfig(
     environmentKey: environmentKey,
     forterSiteId: forterSiteId,
     certificateToken: params.certificateToken,
@@ -745,16 +789,23 @@ Spreedly.setup(config: SpreedlyConfig(
     signature: params.signature,
     timestamp: params.timestamp,
     sdkPlatform: .reactNative
-))
+)
+config.rnVersion = "0.76.5"     // React Native version of the host app
+config.rnSdkVersion = "1.3.0"   // Spreedly React Native package version
+Spreedly.setup(config: config)
 ```
 
 In Objective-C:
 
 ```objc
 config.sdkPlatform = SdkPlatformReactNative;
+config.rnVersion = @"0.76.5";
+config.rnSdkVersion = @"1.3.0";
 ```
 
-Without this, all telemetry and API requests will be tagged as `"checkout-ios"` instead of `"checkout-react-native"`, making it impossible to distinguish native iOS events from React Native events in Datadog.
+Without `sdkPlatform`, all telemetry and API requests will be tagged as `"checkout-ios"` instead of `"checkout-react-native"`, making it impossible to distinguish native iOS events from React Native events in Datadog.
+
+`rnVersion` and `rnSdkVersion` are optional. When set, telemetry also carries `rn_version` and `rn_sdk_version`, so React Native issues can be grouped by React Native version and package version. They are ignored unless `sdkPlatform` is `.reactNative`, and values that are not short version strings (letters, digits, `.`, `-`, `+`, `_`, up to 32 characters) are dropped.
 
 ### Enable Jailbreak Blocking (Optional)
 
@@ -864,15 +915,44 @@ Spreedly.setLogger(nil)
 
 **Objective-C:**
 
-> **Note:** The logging configuration APIs (`configureLogging`, `setLogLevel`, `setDatadogLogLevel`) are Swift-only. `LogLevel` is not `@objc`-exposed. From Objective-C, use the delegate-based `SpreedlyLogger` protocol to receive log output, or configure logging from your Swift bridging layer.
+The presets work from Objective-C through `configureLogging:`:
 
 ```objc
-// Logging configuration is Swift-only. From Objective-C, implement logging
-// in a Swift bridging file that calls Spreedly.setLogger() and Spreedly.setLogLevel().
-// Your custom logger class must conform to the SpreedlyLogger protocol in Swift.
+[Spreedly configureLogging:SpreedlyLoggerConfiguration.production];
 ```
 
+> **Note:** `setLogLevel`, `setDatadogLogLevel` and custom loggers (`SpreedlyLogger`) are Swift-only, because `LogLevel` and the `SpreedlyLogger` protocol are not `@objc`-exposed. To use them from an Objective-C app, call them from a Swift file in your app.
+
 **React Native:** Set `sdkPlatform` to `.reactNative` in `SpreedlyConfig` so telemetry events and payment method `source` fields are tagged correctly. All logging APIs above work the same from the native bridge.
+
+#### Telemetry and opting out
+
+The published `SpreedlyCore` framework sends operational telemetry to Datadog **by default**, so Spreedly can monitor SDK health and failures. You do not need to configure anything for it to run.
+
+**What is sent:** SDK version, platform (`iOS`) and integration surface (`sdk_platform`), OS version, a coarse region (continent, from the device locale), a random session ID created on each launch, and your environment key. Events and log lines add flow outcomes, error types, durations, payment method types and, for the pre-built forms, field focus and blur. Log text is sanitized before it is sent. Card numbers, CVV, expiry dates, payment method tokens and shopper personal data are never sent. See [Privacy](privacy.md) for the App Store privacy details.
+
+**Reduce or turn it off** with the logging presets:
+
+| Call | Telemetry sent to Datadog |
+|------|---------------------------|
+| Default (no call) | All events, and logs at debug level and up |
+| `Spreedly.configureLogging(.production)` | Warnings and errors only |
+| `Spreedly.configureLogging(.disabled)` | None |
+
+Call it **before** `Spreedly.initializeSDK()` or `Spreedly.setup(config:)`. Both send an initialization event, so a later call stops everything after that point but not that first event.
+
+```swift
+// AppDelegate: turn off SDK telemetry before initializing
+Spreedly.configureLogging(.disabled)
+Spreedly.initializeSDK()
+```
+
+```objc
+[Spreedly configureLogging:SpreedlyLoggerConfiguration.disabled];
+[Spreedly initializeSDK];
+```
+
+`.disabled` also turns off console logging. To turn off only telemetry and keep console output, use `Spreedly.setDatadogLogLevel(.none)` (Swift). A custom logger set with `Spreedly.setLogger(_:)` is not affected by either call.
 
 See [Security — Logging Security](security.md#logging-security) for production recommendations and PCI compliance details.
 
@@ -970,13 +1050,9 @@ let ms = FlowDurationTracker.shared.elapsedMs(key: "my_flow") // milliseconds as
 - `elapsedMs(key:)` returns elapsed milliseconds and removes the mark; returns `-1` if no mark exists
 - Marks older than 30 minutes are automatically pruned to prevent memory leaks from abandoned flows
 
-#### Datadog Requirement
-
-Telemetry events only flow to Datadog when `DatadogConfig.clientToken` is non-empty. In CI this is injected automatically. For local development, set it manually or telemetry calls will be silently discarded. See the [Datadog logging behavior](#logging--observability-optional) note above.
-
 #### Platform Filtering
 
-Every telemetry event includes a `sdk_platform` global attribute, set via `SpreedlyConfig.sdkPlatform` at init time. Native iOS apps default to `.ios` — no action needed. The React Native bridge passes `.reactNative` so events are distinguishable in Datadog:
+Every telemetry event includes a `sdk_platform` global attribute, set via `SpreedlyConfig.sdkPlatform` at init time. Native iOS apps default to `.ios` — no action needed. The React Native bridge passes `.reactNative` so its events can be told apart from native iOS events:
 
 ```swift
 SpreedlyConfig(
@@ -985,15 +1061,9 @@ SpreedlyConfig(
 )
 ```
 
-**Datadog queries:**
-
-| Filter | Shows |
-|--------|-------|
-| `@sdk_platform:checkout-ios` | Native iOS events only |
-| `@sdk_platform:checkout-react-native` | Events from the React Native bridge |
-| `@sdk_platform:*` | All events regardless of surface |
-
 The attribute resets to `.ios` (value `"checkout-ios"`) on each `Spreedly.setup()` call unless overridden.
+
+React Native events also carry `rn_version` and `rn_sdk_version` when the bridge sets `SpreedlyConfig.rnVersion` and `SpreedlyConfig.rnSdkVersion`. Native iOS events never include them.
 
 ### Objective-C Setup
 
@@ -1082,6 +1152,7 @@ Call this before presenting any payment form or initiating any payment operation
 | SpreedlyStripeRadar | Stripe Radar device data (`radar_session_id`; headless, no UI) |
 | SpreedlyBraintree | PayPal/Venmo via Braintree |
 | SpreedlyClickToPay | Mastercard SRC Click to Pay checkout (**1.6.0+**) |
+| SpreedlyApplePay | Apple Pay button, sheet, and drop-in wallet |
 
 > **SpreedlyAnalytics** is an internal module used by SpreedlyCore for logging and Datadog integration. You do not need to import or interact with it directly.
 
@@ -1106,7 +1177,7 @@ Some modules have third-party code compiled into their frameworks. SPM and Cocoa
 
 | Library | Version | Compiled into | License |
 |---------|---------|---------------|---------|
-| Datadog (DatadogCore, DatadogLogs) | 3.7.0 | `SpreedlyCore` | Apache-2.0 |
+| Datadog (DatadogCore, DatadogLogs) | 3.18.0 | `SpreedlyCore` | Apache-2.0 |
 | Stripe (StripeCore, StripePayments; `SpreedlyStripeAPM` also StripePaymentSheet and its UI modules) | 25.17.0 | `SpreedlyStripeAPM`, `SpreedlyStripeRadar` | MIT |
 | Braintree (BraintreeCore, BraintreePayPal, BraintreeVenmo, BraintreeDataCollector, PPRiskMagnes) | 7.4.0 | `SpreedlyBraintree` | MIT |
 
@@ -1114,7 +1185,7 @@ Some modules have third-party code compiled into their frameworks. SPM and Cocoa
 
 **Version conflicts:** Because these libraries are compiled in, SPM and CocoaPods do not resolve them and will not report a version conflict with a copy your app adds. For **merchant-added** Forter and Stripe pins, see [Optional Dependencies](#optional-dependencies) (Forter **exact 2.1.0**; Stripe app package **25.x** only).
 
-**Opting out:** Datadog telemetry is active only when `DatadogConfig.clientToken` is non-empty. In local builds the client token defaults to `""`, so no data flows to Datadog unless explicitly configured.
+**Datadog telemetry:** The bundled Datadog library sends operational telemetry by default. To reduce or turn it off, see [Telemetry and opting out](#telemetry-and-opting-out).
 
 ---
 
@@ -1146,7 +1217,7 @@ Use your **test environment key** (from the Spreedly dashboard) during developme
 - **Test mode**: Use your test environment key. Transactions appear in the Spreedly test dashboard. No real charges.
 - **Production mode**: Use your production environment key. Real charges are processed.
 
-Switch between environments by changing the `environmentKey` in `SpreedlyConfig`. No code changes are required beyond the key.
+Switch between environments by changing the `environmentKey` in `SpreedlyConfig`. No code changes are required beyond the key. [Secure tokenization](#enable-secure-tokenization) is a per-environment setting, so enable it in the production environment as well as in test.
 
 ### Verifying Your Integration
 
@@ -1168,6 +1239,7 @@ Switch between environments by changing the `environmentKey` in `SpreedlyConfig`
 | **Offsite** | PayPal, Sprel | `SpreedlyUI` (offsite) | Yes | Safari | Token |
 | **ACH (Bank Account)** | US ABA + Canadian routing | `SpreedlyCore` + `SpreedlyUI` | Yes | `BankAccountFormDropIn` (drop-in) or custom | Token |
 | **Click to Pay** | Mastercard SRC wallet | `SpreedlyClickToPay` | Yes | Native sheet / button (**1.6.0+**) | Token |
+| **Apple Pay** | Apple Wallet cards | `SpreedlyApplePay` + `SpreedlyCore`, `SpreedlySecurity`, `SpreedlyUI` | Yes | Apple Pay sheet / button | Token |
 | **Gateway-Specific 3DS** | Card (e.g. Worldpay) | `SpreedlyCore` | N/A | Safari (challenge) | Transaction result |
 
 ### Backend Requirements Quick Reference
@@ -1201,6 +1273,7 @@ See each gateway's integration guide for full backend request examples and SDK c
 | iDEAL, Bancontact, EPS, SEPA via Stripe | [Stripe APM](stripe-apm.md) |
 | Stripe Radar device data (optional fraud signal) | [Stripe Radar](stripe-radar.md) |
 | Mastercard Click to Pay (**1.6.0+**) | [Click to Pay](click-to-pay.md) |
+| Apple Pay | [Apple Pay](apple-pay.md) |
 | Pix, Boleto, OXXO, NuPay via EBANX | [EBANX APM](ebanx-apm.md) |
 | CVV re-entry for saved cards | [Recaching](recaching.md) |
 | Objective-C integration | [Objective-C](objective-c.md) |
@@ -1229,9 +1302,13 @@ import SpreedlyStripeRadar
 #if canImport(SpreedlyClickToPay)
 import SpreedlyClickToPay
 #endif
+
+#if canImport(SpreedlyApplePay)
+import SpreedlyApplePay
+#endif
 ```
 
-This pattern is recommended for any optional dependency (SpreedlyBraintree, SpreedlyStripeAPM, SpreedlyStripeRadar, SpreedlyClickToPay, Forter3DS). The Spreedly example app links SpreedlyStripeRadar directly and imports it without `canImport` because the module is always present in the sample target.
+This pattern is recommended for any optional dependency (SpreedlyBraintree, SpreedlyStripeAPM, SpreedlyStripeRadar, SpreedlyClickToPay, SpreedlyApplePay, Forter3DS). The Spreedly example app links SpreedlyStripeRadar directly and imports it without `canImport` because the module is always present in the sample target.
 
 ---
 
@@ -1265,13 +1342,15 @@ Use this before shipping to production users. Details live in the linked guides 
 | Item | What to verify | Reference |
 |------|----------------|-----------|
 | SPM / CocoaPods access | GitHub PAT with `read:packages` for `checkout-ios-package`, or CocoaPods token configured | [Installation](#installation) above |
-| Backend signing | Your server mints **new** signed init params (environment key, HMAC signature, timestamp) per session / flow | [Basic Setup](#basic-setup) above |
+| Secure tokenization | Enabled in your **production** environment (and in every other environment you use) | [Enable Secure Tokenization](#enable-secure-tokenization) above |
+| Backend signing | Your server mints **new** signed init params (environment key, RSA-SHA256 signature, timestamp) per session / flow | [Basic Setup](#basic-setup) above |
 | Errors and UX | Handle all `PaymentProcessingResult` / `PaymentResult` states; show user-friendly messages | [Error Handling](error-handling.md) |
 | Security | Prefer drop-ins (`CardFormDropIn` / ACH / CVV — built-in screen prevention); apply `.screenPrevention()` on custom payment screens | [Security](security.md) |
 | Privacy and telemetry | Understand Datadog logging and data handling; disclose in your privacy policy | [Privacy](privacy.md) |
 | Minimum iOS version | Your deployment target is at least **iOS 16.0** for 1.7.0+ (**iOS 14.0** if you stay on 1.6.x) | [Upgrade to the iOS 16 minimum](migration/v1-to-v2.md) |
 | 3DS setup (if applicable) | Forter3DS SDK added via SPM/CocoaPods; `#if canImport(Forter3DS)` pattern used | [3DS Global](3ds-global.md), [Conditional Imports](#conditional-imports-for-optional-modules) |
 | ObjC compatibility (if applicable) | ObjC delegates and view controllers tested if your app uses Objective-C | [Objective-C](objective-c.md) |
+| Apple Pay (if applicable) | Merchant ID in the `com.apple.developer.in-app-payments` entitlement, processing certificate uploaded to Spreedly, `processPayment` charges on your server, `testCardNumber` unset | [Apple Pay — Before going live](apple-pay.md#before-going-live) |
 
 ---
 
@@ -1291,6 +1370,7 @@ Use this before shipping to production users. Details live in the linked guides 
 | [custom-payment-forms.md](custom-payment-forms.md) | Building custom payment forms with SPLTextField |
 | [ach-bank-account.md](ach-bank-account.md) | ACH (US/Canada) bank-account tokenization |
 | [click-to-pay.md](click-to-pay.md) | Mastercard SRC Click to Pay (**1.6.0+**) |
+| [apple-pay.md](apple-pay.md) | Apple Pay button, sheet, and tokenization |
 | [migration/from-legacy.md](migration/from-legacy.md) | iframe-ui to native hosted fields (state, mask, validation) |
 | [3ds-global.md](3ds-global.md) | 3DS Global (Forter) authentication flow |
 | [offsite-payments.md](offsite-payments.md) | Offsite payments (PayPal, Sprel) via Safari |

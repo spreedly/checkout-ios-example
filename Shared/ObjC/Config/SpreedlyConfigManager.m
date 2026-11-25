@@ -28,6 +28,7 @@
 @property (nonatomic, strong) NSString *serverURL;
 @property (nonatomic, strong) NSString *paymentMethodsBaseURL;
 @property (nonatomic, strong) NSString *apiKey;
+@property (nonatomic, copy, readwrite) NSString *applePayMerchantId;
 
 @end
 
@@ -50,8 +51,14 @@ static SpreedlyConfigManager *_shared = nil;
         self.serverURL            = [SpreedlyConfigManager infoPlistValueForKey:@"SpreedlyServerURL"];
         self.paymentMethodsBaseURL = [SpreedlyConfigManager infoPlistValueForKey:@"SpreedlyBaseURL"];
         self.apiKey               = [SpreedlyConfigManager infoPlistValueForKey:@"SpreedlyApiKey"];
-        
+        self.applePayMerchantId   = [SpreedlyConfigManager infoPlistValueForKey:@"SpreedlyApplePayMerchantId"];
+
         [Spreedly initializeSDK];
+
+        NSString *applePayError = self.applePayMerchantIdConfigurationError;
+        if (applePayError.length > 0) {
+            NSLog(@"[SpreedlyExample] Apple Pay config: %@", applePayError);
+        }
     }
     return self;
 }
@@ -70,42 +77,41 @@ static SpreedlyConfigManager *_shared = nil;
     // [SpreedlyThemeManagerObjC setGlobalThemeWithConfig:globalTheme];
 }
 
-- (void)generateSignatureWithCompletion:(void (^)(BOOL success, NSError * _Nullable error))completion {
-    // Create server security config
+- (void)fetchSignedAuthWithCompletion:(void (^)(SpreedlyConfig * _Nullable config, NSError * _Nullable error))completion {
     ServerSecurityConfig *config = [[ServerSecurityConfig alloc] initWithServerURL:self.serverURL
                                                                              apiKey:self.apiKey.length > 0 ? self.apiKey : nil
                                                                      environmentKey:self.environmentKey];
-    
-    // Setup server-based security
+
     [SignatureSecurityService setupServerBasedSecurityWithConfig:config completion:^(SecuritySetupResult * _Nullable result) {
-        if (!result.success) {
-            if (completion) {
-                completion(NO, result.error);
-            }
+        if (!result.success || !result.signatureParams) {
+            NSError *error = result.error ?: [NSError errorWithDomain:@"SpreedlyConfigManager"
+                                                                 code:0
+                                                             userInfo:@{NSLocalizedDescriptionKey: @"Failed to generate signature parameters"}];
+            completion(nil, error);
             return;
         }
-        
-        if (!result.signatureParams) {
-            NSError *signatureError = [NSError errorWithDomain:@"SpreedlyConfigManager"
-                                                          code:0
-                                                      userInfo:@{NSLocalizedDescriptionKey: @"Failed to generate signature parameters"}];
-            if (completion) {
-                completion(NO, signatureError);
-            }
-            return;
-        }
-        
         // Signature parameters generated (values not logged for security)
-        // Setup Spreedly with config including forterSiteId
         SpreedlyConfig *spreedlyConfig = [[SpreedlyConfig alloc] initWithEnvironmentKey:self.environmentKey];
         spreedlyConfig.forterSiteId = self.forterSiteId;
         spreedlyConfig.certificateToken = result.signatureParams.certificateToken;
         spreedlyConfig.nonce = result.signatureParams.nonce;
         spreedlyConfig.signature = result.signatureParams.signature;
         spreedlyConfig.timestamp = [NSString stringWithFormat:@"%ld", (long)result.signatureParams.timestamp];
-        
+        completion(spreedlyConfig, nil);
+    }];
+}
+
+- (void)generateSignatureWithCompletion:(void (^)(BOOL success, NSError * _Nullable error))completion {
+    [self fetchSignedAuthWithCompletion:^(SpreedlyConfig * _Nullable spreedlyConfig, NSError * _Nullable error) {
+        if (!spreedlyConfig) {
+            if (completion) {
+                completion(NO, error);
+            }
+            return;
+        }
+
         [Spreedly setupWithConfig:spreedlyConfig];
-        
+
         if (Spreedly.initializationError != nil) {
             NSError *blockError = [NSError errorWithDomain:@"SpreedlyConfigManager"
                                                       code:1
@@ -116,7 +122,7 @@ static SpreedlyConfigManager *_shared = nil;
             }
             return;
         }
-        
+
         if (completion) {
             completion(YES, nil);
         }
@@ -148,4 +154,22 @@ static SpreedlyConfigManager *_shared = nil;
     return [SpreedlyConfigManager infoPlistValueForKey:@"StripePublishableKey"];
 }
 
-@end 
+- (nullable NSString *)applePayMerchantIdConfigurationError {
+    NSString *trimmed = [self.applePayMerchantId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) {
+        return @"Apple Pay Merchant ID is empty. Set SPREEDLY_APPLE_PAY_MERCHANT_ID in SpreedlyKeys.xcconfig to your real Merchant ID from Apple Developer, enable Apple Pay on the app target with the same ID, then rebuild.";
+    }
+    // Template-only values from SpreedlyKeys.xcconfig.example. Real IDs may contain "example".
+    NSSet<NSString *> *templates = [NSSet setWithArray:@[
+        @"merchant.com.your.example",
+        @"merchant.com.example"
+    ]];
+    if ([templates containsObject:trimmed.lowercaseString]) {
+        return [NSString stringWithFormat:
+                @"Apple Pay Merchant ID is still the template value (%@). Set SPREEDLY_APPLE_PAY_MERCHANT_ID in SpreedlyKeys.xcconfig to the Merchant ID you created in Apple Developer (must match the Apple Pay entitlement), then rebuild.",
+                trimmed];
+    }
+    return nil;
+}
+
+@end

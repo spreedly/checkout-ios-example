@@ -228,6 +228,9 @@ struct CVVRecachingView: View {
                     if result.isSuccess {
                         errorMessage = nil
                         showCVVRecachingView = false
+                    } else if result.isCanceled {
+                        errorMessage = nil
+                        showCVVRecachingView = false
                     } else if result.isFailure {
                         // Failure: handle error (common causes: invalid CVV, network error, expired token)
                         if let failureDetails = result.failureDetails {

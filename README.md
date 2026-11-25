@@ -6,13 +6,13 @@ Demonstrates integrating the [Spreedly iOS SDK](https://github.com/spreedly/chec
 
 Each variant contains a **SwiftUI (Swift)** target and a **UIKit (Objective-C)** target, showing both language integration paths.
 
-**SDK Version:** 1.7.0
+**SDK Version:** 1.8.0
 
 ## Prerequisites
 
 | Requirement       | Version        |
 |-------------------|----------------|
-| **Xcode**         | 26.0+  |
+| **Xcode**         | 27.0+  |
 | **iOS Deployment**| 16.0+    |
 | **Swift**         | 6.0+  |
 | **XcodeGen**      | 2.40+ (to regenerate `.xcodeproj`) |
@@ -29,6 +29,7 @@ Each variant contains a **SwiftUI (Swift)** target and a **UIKit (Objective-C)**
   | **SpreedlyStripeRadar** | `SpreedlyStripeRadar` | SpreedlyStripeRadar framework |
   | **SpreedlyBraintree** | `SpreedlyBraintree` | SpreedlyBraintree framework |
   | **SpreedlyClickToPay** | `SpreedlyClickToPay` | SpreedlyClickToPay framework |
+  | **SpreedlyApplePay** | `SpreedlyApplePay` | SpreedlyApplePay framework |
 
 ## Credential Setup
 
@@ -41,6 +42,8 @@ Each variant contains a **SwiftUI (Swift)** target and a **UIKit (Objective-C)**
 2. Open `SpreedlyKeys.xcconfig` and fill in your Spreedly environment key, server URL, and other credentials. This file is **git-ignored** and will not be committed.
 
 3. Both variants read these values from `Info.plist` at runtime via `$(VARIABLE_NAME)` substitution.
+
+4. **Enable secure tokenization (required).** In [app.spreedly.com](https://app.spreedly.com), open **Environment settings** for the environment whose key you used above. Under **Security → Enhanced Security**, check **Enable secure tokenization**, then click **Save changes**. The setting is per environment, so repeat it for each one you use. Make sure the app is sending valid auth details first. See [Enable Secure Tokenization](docs/guides/getting-started.md#enable-secure-tokenization) for the full steps and the deprecation dates.
 
 > **Security note:** Values injected via xcconfig end up in the compiled `Info.plist` inside the app binary. This is acceptable for a demo, but production apps should fetch sensitive credentials from a secure backend rather than embedding them in the client. If you accidentally commit or share real keys, rotate them immediately.
 

@@ -20,7 +20,8 @@ Build fully customized payment forms with secure individual field components.
 12. [Save Card Option in Custom Forms](#save-card-option-in-custom-forms)
 13. [Error Handling](#error-handling)
 14. [Headless PAN API quick reference](#headless-pan-api-quick-reference) — SwiftUI, UIKit, Objective-C (iframe parity)
-15. [Related Documentation](#related-documentation)
+15. [Apple Pay next to hosted fields](#apple-pay-next-to-hosted-fields)
+16. [Related Documentation](#related-documentation)
 
 ---
 
@@ -132,6 +133,7 @@ Full API list: [docs index — public API inventory](../README.md#hosted-fields-
 Complete [getting-started.md](getting-started.md) before using custom fields. You must:
 
 - Add SpreedlyCore, SpreedlySecurity, and SpreedlyUI to your project
+- [Enable secure tokenization](getting-started.md#enable-secure-tokenization) on your Spreedly environment (required)
 - Ensure `Spreedly.initializeSDK()` is called at app launch (e.g., in your `App.init()` or `AppDelegate`)
 - Call `Spreedly.setup(config:)` with signature parameters from your backend before any tokenization
 - Fetch signature parameters fresh for each payment session
@@ -1884,8 +1886,34 @@ Values live in **`SecureValueContainer`**. Tokenize with **`createCreditCard`**,
 
 ---
 
+---
+
+## Apple Pay next to hosted fields
+
+Place **`SpreedlyApplePayButton`** (SwiftUI) or **`SpreedlyApplePayButtonView`** (UIKit / Objective-C) on the same screen as your `SPLTextField`s. Add the optional `SpreedlyApplePay` module (`import SpreedlyApplePay`). This is the button-only path — not `CardFormDropIn(walletButtons:)`. The shopper can pay with Apple Pay or type a card. Both results arrive on `subscribeToPaymentResults` / `paymentDelegate`.
+
+```swift
+SpreedlyApplePayButton(
+    configuration: applePayConfig,
+    order: ApplePayOrder(label: "Your Store", amount: NSDecimalNumber(string: "19.99")),
+    signedAuth: { try await yourServer.freshSpreedlyAuth() },   // fresh auth for every attempt
+    processPayment: { authorization in
+        try await yourServer.charge(token: authorization.paymentMethodToken)
+            ? .approved : .declined(message: "Your card was declined.")
+    }
+)
+.frame(height: 48)
+
+// Then your SPLTextField rows (name, card number, CVC, expiry) and PAY button.
+```
+
+Apple Pay merchant ID, capability, and payment processing certificate still apply. See [apple-pay.md](apple-pay.md).
+
+---
+
 ## Related Documentation
 
 - [express-checkout.md](express-checkout.md) – Pre-built payment form with `CardFormDropIn`
+- [apple-pay.md](apple-pay.md) – Standalone Apple Pay button next to hosted fields
 - [theme-and-styling.md](theme-and-styling.md) – Theming and customization
 - [objective-c.md](objective-c.md) – Objective-C integration with delegates and wrappers

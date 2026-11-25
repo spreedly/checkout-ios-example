@@ -1791,6 +1791,12 @@ typedef NS_ENUM(NSInteger, ThemeOption) {
             if (self.presentedViewController) {
                 [self.presentedViewController dismissViewControllerAnimated:YES completion:nil];
             }
+        } else if (result.isCanceled) {
+            self.errorMessage = nil;
+            self.paymentResult = nil;
+            if (self.presentedViewController) {
+                [self.presentedViewController dismissViewControllerAnimated:YES completion:nil];
+            }
         } else if (result.isFailure) {
             // MARK: - Recaching Failure
             // Handle error (common causes: invalid CVV, network error, expired token)

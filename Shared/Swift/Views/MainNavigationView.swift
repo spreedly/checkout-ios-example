@@ -13,7 +13,10 @@ struct MainNavigationView: View {
     @Environment(\.colorScheme) private var colorScheme
     
     public var body: some View {
-        NavigationView {
+        // NavigationStack keeps the pushed screens when iOS snapshots the app on its way to the
+        // background (it renders it again, e.g. in the other appearance). NavigationView dropped
+        // back to the parent screen then, losing an open checkout.
+        NavigationStack {
             ZStack {
                 // Background color for the entire view - adaptive for dark mode
                 backgroundColor
@@ -269,6 +272,24 @@ struct MainNavigationView: View {
                                 .accessibilityLabel(AccessibilityLabels.Navigation.bankAccountCustomFormLink)
                                 .accessibilityHint(AccessibilityHints.Navigation.bankAccountCustomFormLink)
                                 .accessibilityAddTraits(.isButton)
+
+                                #if canImport(SpreedlyApplePay)
+                                NavigationLink(destination: ApplePayHubView()) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Apple Pay")
+                                            .font(headerFont)
+                                            .foregroundColor(textColor)
+                                        Text("One-time and recurring checkout, button design and configuration")
+                                            .font(subheadingFont)
+                                            .foregroundColor(textColor)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .accessibilityIdentifier("navigation_apple_pay_link")
+                                .accessibilityLabel("Apple Pay")
+                                .accessibilityHint("Navigate to Apple Pay examples")
+                                .accessibilityAddTraits(.isButton)
+                                #endif
                             }
                             
                             Section(header: Text("About")) {

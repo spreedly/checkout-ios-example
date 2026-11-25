@@ -268,6 +268,7 @@ struct CheckoutWithAdditionalFieldsView: View {
                 otherFields: selectedOtherFields,
                 yearFormat: yearFormat,
                 displayConfig: CardFormDropInDisplayConfig(enableAutofill: enableAutofill),
+                metadata: SampleAppOwner.metadata,
                 onProcessingResult: { processingResult in
                     if processingResult.isProcessing {
                         isLoading = true
@@ -289,6 +290,7 @@ struct CheckoutWithAdditionalFieldsView: View {
                     errorMessage = nil
                     showForm = false
                     if result.shouldRetain, let paymentMethodToken = result.token {
+                        // The card joins the saved list only once the retain succeeds.
                         Task {
                             await retainPaymentMethod(token: paymentMethodToken)
                         }
@@ -350,7 +352,9 @@ struct CheckoutWithAdditionalFieldsView: View {
             let apiClient = SpreedlyConfigManager.shared.createRetainPaymentMethodAPIClient()
             _ = try await apiClient.retainPaymentMethod(token: token)
         } catch {
-            logError(tag: "SpreedlyExample", message: "Retain payment method failed: \(error.localizedDescription)", error: error)
+            // Fixed text only: the error can carry backend response text, and the token is in the request URL.
+            let reason = (error as? RetainPaymentMethodAPIError)?.logSummary ?? "unexpected error"
+            logError(tag: "SpreedlyExample", message: "Retain payment method failed (\(reason))")
         }
     }
 

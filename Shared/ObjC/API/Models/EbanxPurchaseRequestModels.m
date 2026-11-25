@@ -10,7 +10,7 @@
 - (instancetype)initWithAmount:(NSDecimalNumber *)amount
                   currencyCode:(NSString *)currencyCode
             paymentMethodToken:(NSString *)paymentMethodToken
-                   redirectUrl:(NSString *)redirectUrl
+                   redirectUrl:(nullable NSString *)redirectUrl
                    callbackUrl:(NSString *)callbackUrl
                        channel:(NSString *)channel
                       document:(nullable NSString *)document {
@@ -31,10 +31,13 @@
         @"amount": @(self.amount),
         @"currency_code": self.currencyCode ?: @"",
         @"payment_method_token": self.paymentMethodToken ?: @"",
-        @"redirect_url": self.redirectUrl ?: @"",
         @"callback_url": self.callbackUrl ?: @"",
         @"channel": self.channel ?: @"app"
     }];
+    // No redirect means the backend picks its own return page, so the key is left out rather than sent empty.
+    if (self.redirectUrl) {
+        body[@"redirect_url"] = self.redirectUrl;
+    }
 
     if (self.document.length > 0) {
         body[@"gateway_specific_fields"] = @{

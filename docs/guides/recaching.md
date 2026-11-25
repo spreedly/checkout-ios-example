@@ -44,6 +44,7 @@ CVV never passes through your application code. The SDK handles all sensitive da
 Before integrating CVV recaching:
 
 - Complete the setup steps in [getting-started.md](getting-started.md)
+- [Enable secure tokenization](getting-started.md#enable-secure-tokenization) on your Spreedly environment (required)
 - Ensure `Spreedly.initializeSDK()` is called at app launch (e.g., in your `App.init()` or `AppDelegate`)
 - Call `Spreedly.setup(config:)` with `environmentKey`, `forterSiteId`, and signature parameters before presenting the recaching UI
 - Fetch signature parameters from your backend before each payment session
@@ -98,6 +99,8 @@ struct CheckoutView: View {
                 if result.isSuccess {
                     showCVVRecaching = false
                     // Use result.token for payment processing
+                } else if result.isCanceled {
+                    showCVVRecaching = false
                 } else if result.isFailure {
                     showCVVRecaching = false
                     // Handle failure
@@ -179,7 +182,7 @@ The final `PaymentResult` delivered via `subscribeToRecacheResults` (Swift) or `
 
 | Property | Type | Description |
 |---|---|---|
-| `isSuccess` / `isFailure` / `isCanceled` | `Bool` | Outcome flags |
+| `isSuccess` / `isFailure` / `isCanceled` | `Bool` | Outcome flags. `isCanceled` is Cancel or swipe-down before Confirm. A recache already in flight still ends as success or failure. |
 | `token` | `String?` | Payment method token on success — use this for the next purchase |
 | `paymentMethodUpdatedAt` | `String?` | ISO-8601 `updated_at` timestamp from the recached payment method. Non-nil on success; useful for tracking which CVV-cache cycle the token is on. |
 | `failureDetails` | `FailedDetails?` | Error info on failure |
@@ -197,12 +200,12 @@ If you're coming from the Spreedly web iframe, here's how the recache lifecycle 
 
 | Web iframe event | iOS equivalent | When it fires |
 |---|---|---|
-| `iframe.recacheReady()` | **Superseded** — `SpreedlyCVVRecachingView` / `CVVRecachingViewController` mounts the CVV field; **Confirm stays disabled until CVV is valid** | No iOS `recacheReady` callback. Disabled submit until valid matches the merchant outcome of iframe readiness + safe submit. Use **`subscribeToRecacheResults`** / **`recacheDelegate`** for **recache API completion** only. |
+| `iframe.recacheReady()` | **Superseded** — `SpreedlyCVVRecachingView` / `CVVRecachingViewController` mounts the CVV field; **Confirm stays disabled until CVV is valid** | No iOS `recacheReady` callback. Disabled submit until valid matches the merchant outcome of iframe readiness + safe submit. Use **`subscribeToRecacheResults`** / **`recacheDelegate`** for recache completion, including Cancel and swipe-down (`isCanceled`). |
 | `iframe.recache(...)` (merchant call) | User taps submit after CVV is valid, **or** call `Spreedly.shared().recachePaymentMethod(...)` from headless UI when your validation passes | Sends the CVV to Spreedly. |
 | `transaction.succeeded` from iframe wrapper | `PaymentResult.isSuccess == true` via `subscribeToRecacheResults` (Swift) or `recacheDelegate` (ObjC) | Server has accepted the recache; the same `token` now has a fresh CVV cache window. |
 | `transaction.failed` from iframe wrapper | `PaymentResult.isFailure == true` with populated `failureDetails` | Validation or network error. Not delivered on the tokenization payment stream. |
 
-The iOS drop-in does not expose `recacheReady()`. That iframe event is **superseded** by the recache UI (field tappable on appear) plus **submit disabled until CVV validates** — you do not need a separate readiness callback. For headless integrations, call `recachePaymentMethod(...)` when your validation passes; listen on **`subscribeToRecacheResults`** / **`recacheDelegate`** for success or failure.
+The iOS drop-in does not expose `recacheReady()`. That iframe event is **superseded** by the recache UI (field tappable on appear) plus **submit disabled until CVV validates** — you do not need a separate readiness callback. For headless integrations, call `recachePaymentMethod(...)` when your validation passes; listen on **`subscribeToRecacheResults`** / **`recacheDelegate`** for success, failure, or cancel.
 
 ### Tokenization and recache on one checkout screen
 
@@ -211,7 +214,7 @@ Subscribe to **both** result channels when the same screen offers new-card token
 | User action | Listen on |
 |-------------|-----------|
 | New card / drop-in / `createCreditCard` | `subscribeToPaymentResults` (Swift) or `paymentDelegate` (ObjC) |
-| Saved card + CVV recache (success / validation / API failure) | `subscribeToRecacheResults` (Swift) or `recacheDelegate` (ObjC) |
+| Saved card + CVV recache (success, failure, or cancel) | `subscribeToRecacheResults` (Swift) or `recacheDelegate` (ObjC) |
 | Recache UI blocked (`blockJailbrokenDevices` + compromised device) | **`subscribeToPaymentResults`** / `paymentDelegate` — **not** the recache channel |
 
 Successful recache outcomes are **not** delivered on the payment channel — you do not need to filter `paymentResultPublisher` for normal recache results. **Exception:** when recache UI auto-dismisses on a blocked device, `SecurityManager` publishes `PaymentResult.failure` on **`paymentResultPublisher`** (same as card drop-in). Screens that only subscribe to `subscribeToRecacheResults` will miss that failure — subscribe to **both** channels on combined checkout screens, or check **`Spreedly.isDeviceTrusted`** before presenting recache UI.
@@ -222,7 +225,7 @@ Successful recache outcomes are **not** delivered on the payment channel — you
 
 Before presenting the CVV recaching UI, you need a list of saved payment methods. The SDK does **not** provide a built-in API for fetching saved cards -- merchants must maintain their own saved card list from their backend.
 
-- The example app uses `FetchPaymentMethodsAPIClient` to retrieve saved payment methods from a sample backend.
+- The example apps keep the cards they retained on the device and read that list through `FetchPaymentMethodsAPIClient`. In your app, load saved payment methods from your own backend.
 - `SavedCardInfo` requires `lastFourDigits` and `cardType` (e.g., `"Visa"`, `"Mastercard"`). `cardBrand` is optional.
 - Map your backend response to `SavedCardInfo` instances before passing them to `RecacheConfig`.
 - **Filter to credit cards only:** Recaching applies to saved cards with CVV. Filter your payment methods by `paymentMethodType == "credit_card"` before displaying the list. Non-credit-card payment methods (e.g., bank accounts, APM tokens) do not support CVV recaching.
@@ -251,6 +254,8 @@ let config = RecacheConfig(cardInfo: cardInfo)
         if result.isSuccess {
             showCVVRecaching = false
             // Use result.token for your payment processing
+        } else if result.isCanceled {
+            showCVVRecaching = false
         } else if result.isFailure {
             if let _ = result.failureDetails {
                 // Show failure to the user (e.g. failureDetails.getDescription())
@@ -261,7 +266,7 @@ let config = RecacheConfig(cardInfo: cardInfo)
 }
 ```
 
-3. **Handle success and failure:** Check `result.isSuccess` and `result.isFailure` from `PaymentResult`. On success, use `result.token` for payment processing.
+3. **Handle success, cancel, and failure:** Check `result.isSuccess`, `result.isCanceled`, and `result.isFailure`. On success, use `result.token`. `isCanceled` means the shopper tapped Cancel or swiped the sheet down before Confirm — dismiss the sheet and do not show an error. A recache already in flight still ends as success or failure.
 
 4. **Cancel subscription on disappear:** Prevent memory leaks by cancelling the subscription when the view disappears.
 
@@ -357,6 +362,8 @@ struct SavedCardsView: View {
                 paymentResult = result
                 if result.isSuccess {
                     selectedCard = nil
+                } else if result.isCanceled {
+                    selectedCard = nil
                 } else if result.isFailure {
                     if let _ = result.failureDetails {
                         // Show failure to the user
@@ -442,7 +449,7 @@ In UIKit Swift, set `Spreedly.shared().recacheDelegate = self` and implement `Sp
 
 ### Objective-C
 
-Use `CVVRecachingViewController` with alloc/init and the same parameters. Implement **`SpreedlyRecacheDelegate`** (`recacheDidComplete:`) for recache success and failure. Optionally also conform to `SpreedlyPaymentDelegate` to handle the blocked-device case (when `blockJailbrokenDevices` is enabled and the device is compromised, the failure publishes on the payment channel, not the recache channel).
+Use `CVVRecachingViewController` with alloc/init and the same parameters. Implement **`SpreedlyRecacheDelegate`** (`recacheDidComplete:`) for recache success, cancel, and failure. Optionally also conform to `SpreedlyPaymentDelegate` to handle the blocked-device case (when `blockJailbrokenDevices` is enabled and the device is compromised, the failure publishes on the payment channel, not the recache channel).
 
 > **Note:** The example app uses `CVVRecachingDemoViewController` for this flow. The simplified `SavedCardsViewController` shown below demonstrates the same integration pattern.
 
@@ -461,7 +468,7 @@ Use `CVVRecachingViewController` with alloc/init and the same parameters. Implem
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    // Recache success/failure flows through recacheDidComplete:
+    // Recache success, cancel, and failure flow through recacheDidComplete:
     [[Spreedly shared] setRecacheDelegate:self];
     // Optional — only needed if you want to catch blocked-device failures here.
     [[Spreedly shared] setPaymentDelegate:self];
@@ -515,6 +522,10 @@ Use `CVVRecachingViewController` with alloc/init and the same parameters. Implem
 - (void)recacheDidComplete:(PaymentResult *)result {
     if (result.isSuccess) {
         NSLog(@"CVV recaching successful — use result.token for the next purchase.");
+        if (self.presentedViewController) {
+            [self.presentedViewController dismissViewControllerAnimated:YES completion:nil];
+        }
+    } else if (result.isCanceled) {
         if (self.presentedViewController) {
             [self.presentedViewController dismissViewControllerAnimated:YES completion:nil];
         }
@@ -664,7 +675,7 @@ Handle network and API errors in the payment result subscription:
 ```swift
 Spreedly.shared().subscribeToRecacheResults { result in
     if result.isCanceled {
-        // User dismissed the recache UI before submitting — usually no error to show.
+        // Shopper tapped Cancel or swiped the sheet down before Confirm. No error to show.
         return
     }
     if result.isFailure, let failureDetails = result.failureDetails {

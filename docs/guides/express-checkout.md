@@ -12,12 +12,14 @@ Add a complete, pre-built payment form to your app in under 15 minutes.
 2. [Prerequisites](#prerequisites)
 3. [Quick Start](#quick-start)
 4. [Step-by-Step Integration](#step-by-step-integration)
-5. [Callback System](#callback-system)
-6. [Advanced Configuration](#advanced-configuration)
-7. [Save Card for Future Payments](#save-card-for-future-payments)
-8. [Error Handling](#error-handling)
-9. [Troubleshooting](#troubleshooting)
-10. [Related Documentation](#related-documentation)
+5. [Core field titles and placeholders](#core-field-titles-and-placeholders)
+6. [Custom metadata](#custom-metadata)
+7. [Callback System](#callback-system)
+8. [Advanced Configuration](#advanced-configuration)
+9. [Save Card for Future Payments](#save-card-for-future-payments)
+10. [Error Handling](#error-handling)
+11. [Troubleshooting](#troubleshooting)
+12. [Related Documentation](#related-documentation)
 
 ---
 
@@ -56,9 +58,10 @@ Choose Express Checkout when you need:
 Before integrating Express Checkout:
 
 1. Complete [getting-started.md](getting-started.md) (installation, basic setup).
-2. Ensure `Spreedly.initializeSDK()` is called at app launch (e.g., in your `App.init()` or `AppDelegate`).
-3. Call `Spreedly.setup(config:)` with `environmentKey`, `forterSiteId`, and signature parameters (nonce, signature, certificateToken, timestamp) **before** presenting the form. Without valid credentials, tokenization will fail.
-4. Enable the Pay button or present the sheet only when **`Spreedly.isInitialized`** is `true` after **`setup(config:)`** with signed credentials from your server. See [SDK lifecycle](getting-started.md#isinitialized--when-to-use-it).
+2. [Enable secure tokenization](getting-started.md#enable-secure-tokenization) on your Spreedly environment (required).
+3. Ensure `Spreedly.initializeSDK()` is called at app launch (e.g., in your `App.init()` or `AppDelegate`).
+4. Call `Spreedly.setup(config:)` with `environmentKey`, `forterSiteId`, and signature parameters (nonce, signature, certificateToken, timestamp) **before** presenting the form. Without valid credentials, tokenization will fail.
+5. Enable the Pay button or present the sheet only when **`Spreedly.isInitialized`** is `true` after **`setup(config:)`** with signed credentials from your server. See [SDK lifecycle](getting-started.md#isinitialized--when-to-use-it).
 
 ### Blocked Devices
 
@@ -417,6 +420,37 @@ Express drop-in shows the **default card scheme label** on the PAN row. Custom b
 
 ---
 
+## Custom metadata
+
+Attach your own key-value pairs to the payment method that `CardFormDropIn` creates with the **`metadata`** parameter (on a second initializer; leave it out to use the original one). When the form is submitted, the SDK sends them in the tokenization request as `payment_method.metadata`, and also copies them into the nested `payment_method.credit_card.metadata`. The nested copy leaves out `eligible_for_card_updater`, which the SDK reserves for the Account Updater setting; that setting has its own typed `eligibleForCardUpdater` parameter on `createCreditCard` (see [Custom payment forms](custom-payment-forms.md)). Never put cardholder data in metadata.
+
+The SDK sets one key of its own, `card_type`, to `unknown`. If your metadata uses the same key, your value is sent instead of the SDK's.
+
+```swift
+CardFormDropIn(
+    metadata: ["order_id": "1234", "source": "checkout-sheet"],
+    onProcessingResult: { result in
+        // ...
+    }
+)
+```
+
+Objective-C: set `metadata` on `CardFormDropInViewController` before presenting it. Keys and values must both be strings (`NSString`); the property is typed as a string-to-string dictionary.
+
+```objc
+CardFormDropInViewController *dropInVC = [[CardFormDropInViewController alloc]
+    initWithOtherFields:@[]
+    yearFormat:YearFormatFourDigit
+    nameDisplayMode:DropInNameDisplayModeSeparateFields
+    onProcessingResult:^(PaymentProcessingResult *result) {
+        // Show loading or validation errors as in the Objective-C example above
+    }];
+dropInVC.metadata = @{ @"order_id": @"1234", @"source": @"checkout-sheet" };
+[self presentViewController:dropInVC animated:YES completion:nil];
+```
+
+---
+
 ## Callback System
 
 Express checkout exposes **`onProcessingResult`** on the drop-in plus **`subscribeToPaymentResults`** / **`paymentDelegate`** for the final token.
@@ -692,6 +726,23 @@ CardFormDropIn(
     }
 )
 ```
+
+### Apple Pay in the Drop-In
+
+Add the optional `SpreedlyApplePay` module, then show Apple Pay above the card fields with an "or pay with card" divider:
+
+```swift
+import SpreedlyApplePay
+import SpreedlyUI
+CardFormDropIn(
+    walletButtons: [applePayWallet],
+    onProcessingResult: { _ in }
+)
+```
+
+Objective-C / UIKit: set `dropInVC.walletButtons = @[applePayWallet];` before presenting. The button and divider are hidden when Apple Pay is unavailable. See [apple-pay.md](apple-pay.md#card-form-drop-in-with-apple-pay).
+
+`applePayWallet` is built with a required `processPayment` step that charges on your server, so Apple's sheet shows success only after your server answers. If Apple closes the sheet before your server answers, the drop-in shows "Your payment is still being processed. Please don't pay again." until the final result arrives. See [apple-pay.md](apple-pay.md#charge-before-the-sheet-completes).
 
 ---
 

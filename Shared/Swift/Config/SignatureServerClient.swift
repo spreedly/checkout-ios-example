@@ -70,11 +70,7 @@ public class SignatureServerClient {
     public init(config: ServerConfig) {
         self.config = config
         
-        let sessionConfig = URLSessionConfiguration.default
-        sessionConfig.timeoutIntervalForRequest = config.timeoutInterval
-        sessionConfig.timeoutIntervalForResource = config.timeoutInterval
-        
-        self.session = URLSession(configuration: sessionConfig)
+        self.session = BackendBasicAuth.sharedSession(timeoutInterval: config.timeoutInterval)
     }
     
     /// Requests a signature from the local signature server
@@ -95,6 +91,7 @@ public class SignatureServerClient {
         if let apiKey = config.apiKey, !apiKey.isEmpty {
             urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
+        BackendBasicAuth.apply(to: &urlRequest)
         
         do {
             let (data, response) = try await session.data(for: urlRequest)

@@ -15,7 +15,7 @@
 // Flow:
 //   1. User configures options (validation toggles, theme, year format)
 //   2. User taps "Show Basic Checkout Form"
-//   3. App generates an HMAC signature (required for Spreedly API auth)
+//   3. App generates a request signature (required for Spreedly API auth)
 //   4. CardFormDropIn is presented as a sheet (SDK handles everything inside)
 //   5. App subscribes to payment results via Spreedly.shared().subscribeToPaymentResults
 //   6. On success → shows token; on failure → shows error message
@@ -537,7 +537,7 @@ struct CheckoutBasicView: View {
         .shadow(color: cardShadowColor, radius: 4, x: 0, y: 0)
     }
     
-    // Step 6: "Show Basic Checkout Form" button — generates HMAC signature, then opens the CardFormDropIn sheet
+    // Step 6: "Show Basic Checkout Form" button — generates the request signature, then opens the CardFormDropIn sheet
     private var showFormButtonSection: some View {
         Button("Show Basic Checkout Form") {
             isLoading = true
@@ -635,6 +635,7 @@ struct CheckoutBasicView: View {
             nameDisplayMode: nameDisplayMode,
             theme: useCustomTheme ? lightTheme : nil,
             darkTheme: useCustomTheme ? darkTheme : nil,
+            metadata: SampleAppOwner.metadata,
             onProcessingResult: { processingResult in
                 if processingResult.isProcessing { isLoading = true }
             }
@@ -656,6 +657,7 @@ struct CheckoutBasicView: View {
                 showForm = false
                 // If "Save card" was checked, retain the payment method for future use
                 if result.shouldRetain, let paymentMethodToken = result.token {
+                    // The card joins the saved list only once the retain succeeds.
                     Task { await retainPaymentMethod(token: paymentMethodToken) }
                 }
             } else if result.isFailure {
@@ -685,7 +687,9 @@ struct CheckoutBasicView: View {
             let apiClient = SpreedlyConfigManager.shared.createRetainPaymentMethodAPIClient()
             _ = try await apiClient.retainPaymentMethod(token: token)
         } catch {
-            logError(tag: "SpreedlyExample", message: "Retain payment method failed: \(error.localizedDescription)", error: error)
+            // Fixed text only: the error can carry backend response text, and the token is in the request URL.
+            let reason = (error as? RetainPaymentMethodAPIError)?.logSummary ?? "unexpected error"
+            logError(tag: "SpreedlyExample", message: "Retain payment method failed (\(reason))")
         }
     }
     

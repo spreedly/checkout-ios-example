@@ -50,7 +50,7 @@ Add 3D Secure authentication to protect against fraudulent card payments.
 
 ### Forter3DS Dependency (Required)
 
-Add the Forter3DS dependency to your app target. Without it, `DoChallengeIfNeeded` renders a fallback "3DS unavailable" view and publishes a `ThreeDSChallengeResult` with `isFailure == true` for any transaction that requires global 3DS — the app does not crash.
+Add the Forter3DS dependency to your app target if you use 3DS Global. If you don't use it, you can leave Forter3DS out: the SDK loads it only when your app includes it, so the app launches normally. Without it, 3DS Global fails closed: for any transaction that requires global 3DS, `DoChallengeIfNeeded` renders a fallback "3DS unavailable" view and publishes a `ThreeDSChallengeResult` with `isFailure == true`. The SDK never skips the challenge or reports success, and the app does not crash. Always handle the failure result so the shopper isn't left waiting.
 
 > **Module note:** A dedicated `SpreedlyForter3DS` module is planned for a future release. Today, merchants add the third-party `Forter3DS` framework directly (see options below).
 
@@ -100,11 +100,13 @@ targets: [
 ]
 ```
 
-**Without Forter3DS at runtime:** If the framework is **not linked** to your target, `DoChallengeIfNeeded` shows a "3DS unavailable" fallback view and publishes a `ThreeDSChallengeResult` with `isFailure == true`. If the framework is **linked but not embedded** in the app bundle, the dynamic loader fails to find the Forter3DS binary at app launch — verify it is added to your app target's **Frameworks, Libraries, and Embedded Content**.
+**Without Forter3DS at runtime:** If the framework is **not linked** to your target, `DoChallengeIfNeeded` shows a "3DS unavailable" fallback view and publishes a `ThreeDSChallengeResult` with `isFailure == true` and the error "Forter3DS framework is not available at runtime". No challenge runs and no completion call is made, so the transaction is never reported as authenticated. If the framework is **linked but not embedded** in the app bundle, the dynamic loader fails to find the Forter3DS binary at app launch — verify it is added to your app target's **Frameworks, Libraries, and Embedded Content**.
 
 If Forter3DS is an optional dependency, use `#if canImport(Forter3DS)` to conditionally import it.
 
 ### Spreedly Setup
+
+Before you start, [enable secure tokenization](getting-started.md#enable-secure-tokenization) on your Spreedly environment (required).
 
 Ensure `Spreedly.initializeSDK()` is called at app launch (e.g., in your `App.init()` or `AppDelegate`). Then call `Spreedly.setup(config:)` with `forterSiteId` before any 3DS operations:
 
@@ -352,7 +354,7 @@ Pass `transaction.token` to `DoChallengeIfNeeded` in the app. The SDK handles co
 
 | Error | Cause | Action |
 |-------|-------|--------|
-| Forter3DS framework not available | `Forter3DS` not embedded in app bundle | Add dependency and set "Embed & Sign" |
+| Forter3DS framework not available | `Forter3DS` not linked to your app target; the SDK publishes `isFailure == true` and no challenge runs | Add dependency and set "Embed & Sign" |
 | Forter SDK not initialized | Missing `forterSiteId` in `Spreedly.setup(config:)` | Call setup with `forterSiteId` |
 | Forter SDK challenge error | Challenge failed in Forter | Check `result.error`; use Forter portal for configuration |
 | Managed order token missing | Status API did not return `managed_order_token` | Verify backend response and transaction state |

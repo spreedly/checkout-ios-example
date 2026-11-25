@@ -21,6 +21,7 @@
 #import "ClickToPayPaymentFlowViewController.h"
 #import "BankAccountCheckoutViewController.h"
 #import "BankAccountCustomFormViewController.h"
+#import "ApplePayHubViewController.h"
 #import "ThemeHelper.h"
 #import <SpreedlyCore/SpreedlyCore-Swift.h>
 
@@ -196,7 +197,15 @@
             @"subtitle": @"Headless ACH built field-by-field with SPLTextFieldViewController and createBankAccountObjC",
             @"class": [BankAccountCustomFormViewController class],
             @"accessibilityId": @"bank-account-custom-form-navigation-link"
+        },
+#if __has_include(<SpreedlyApplePay/SpreedlyApplePay-Swift.h>)
+        @{
+            @"title": @"Apple Pay",
+            @"subtitle": @"One-time and recurring checkout, button design and configuration",
+            @"class": [ApplePayHubViewController class],
+            @"accessibilityId": @"navigation_apple_pay_link"
         }
+#endif
     ];
 }
 

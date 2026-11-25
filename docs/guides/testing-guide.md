@@ -26,6 +26,7 @@ How to test your Spreedly iOS SDK integration before going to production.
 ### Prerequisites
 
 - A Spreedly test environment with a valid `environmentKey`
+- [Secure tokenization enabled](getting-started.md#enable-secure-tokenization) on that test environment (required). It is a per-environment setting, so turning it on in production does not cover staging
 - Backend-signed authentication parameters (nonce, signature, timestamp, certificateToken)
 - For 3DS Global: a Forter `siteId` configured in your Spreedly environment
 - For Stripe APM: a Stripe test publishable key (`pk_test_...`) and a Stripe Payment Intents gateway
@@ -229,6 +230,15 @@ See [Stripe APM](stripe-apm.md) for the full integration.
 
 See [Braintree APM](braintree-apm.md) for the full integration.
 
+### Apple Pay
+
+1. Use a **physical device** signed in with an Apple sandbox tester that has a test card in Wallet. The Simulator shows the sheet but can't produce a payment token
+2. Build with a real Merchant ID in the app's Apple Pay capability, and upload its Payment Processing Certificate to Spreedly
+3. On a Spreedly Test gateway, set `testCardNumber` to a Spreedly test card; Apple Pay can't produce test cards itself
+4. Check `isSuccess`, `isPending`, `isFailure` (including `isStatusUnknown`) and `isCanceled` — for example, delay your server's answer past Apple's limit (about 30 seconds) to see `isPending`
+
+See [Apple Pay — Testing on a Spreedly Test gateway](apple-pay.md#testing-on-a-spreedly-test-gateway) and [Before going live](apple-pay.md#before-going-live).
+
 ---
 
 ## Testing Error Scenarios
@@ -289,6 +299,7 @@ Before switching to production:
 - [ ] All payment flows tested with test cards and test credentials
 - [ ] Error handling verified for validation, network, and auth errors
 - [ ] `environmentKey` switched from test to production
+- [ ] [Secure tokenization](getting-started.md#enable-secure-tokenization) enabled in the production environment
 - [ ] Log level set to `.none` (or `.error` at most) via `Spreedly.setLogLevel(.none)`
 - [ ] Stripe APM uses `pk_live_...` (not `pk_test_...`)
 - [ ] Braintree gateway switched from sandbox to production
@@ -297,6 +308,7 @@ Before switching to production:
 - [ ] URL schemes and universal links configured for Braintree/offsite returns
 - [ ] Screen prevention (`ScreenPreventionSecureView`) wraps payment UI
 - [ ] No test card numbers or credentials in source code
+- [ ] Apple Pay: `testCardNumber` unset, and one real payment completed on a physical device with the production Merchant ID
 
 ---
 

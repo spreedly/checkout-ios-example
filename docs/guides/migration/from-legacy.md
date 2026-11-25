@@ -21,7 +21,7 @@ Official legacy references: [iFrame UI](https://developer.spreedly.com/docs/ifra
 Five steps to replace iframe hosted fields on iOS:
 
 1. **App launch** — `Spreedly.initializeSDK()` once. See [Basic setup](../getting-started.md#basic-setup).
-2. **Before checkout** — your server returns signed credentials; call **`Spreedly.setup(config:)`** (Swift) or **`setupWithConfig(_:)`** (Objective-C).
+2. **Before checkout** — your server returns signed credentials; call **`Spreedly.setup(config:)`** (Swift) or **`setupWithConfig(_:)`** (Objective-C). Make sure **secure tokenization** is enabled on each Spreedly environment you use (required) — see [Enable Secure Tokenization](../getting-started.md#enable-secure-tokenization).
 3. **Choose UI** — **`CardFormDropIn`** (fastest) **or** headless **`SPLTextField`** (iframe-style per-field callbacks). See [Choose your path](#choose-your-path-headless-vs-express).
 4. **Tokenize** — `Spreedly.shared().createCreditCard(...)` and listen on **`subscribeToPaymentResults`** (Swift) or **`paymentDelegate`** (ObjC). There is no `createPaymentMethod` on iOS.
 5. **Leave checkout** — `Spreedly.shared().reset()` (alias `resetPaymentState()`). There is no `destroy()` — the SDK singleton stays alive. See [SDK lifecycle](../getting-started.md#sdk-lifecycle).

@@ -411,7 +411,7 @@ If you call `Spreedly.shared()` without first calling `Spreedly.setup(config:)`,
 
 **Error:** `SpreedlyApiError.unauthorized` or "Invalid environment key or authentication failed"
 
-**Solution:** Verify `environmentKey`, `certificateToken`, `nonce`, `signature`, and `timestamp` in `SpreedlyConfig`. Fetch signature parameters from your backend; they are time-sensitive.
+**Solution:** Verify `environmentKey`, `certificateToken`, `nonce`, `signature`, and `timestamp` in `SpreedlyConfig`. Fetch signature parameters from your backend; they are time-sensitive. If the error started after you turned on secure tokenization, see [Troubleshooting](troubleshooting.md#authentication-errors-after-enabling-secure-tokenization).
 
 ### Card Number Validation
 
@@ -436,6 +436,19 @@ If you call `Spreedly.shared()` without first calling `Spreedly.setup(config:)`,
 **Error:** `SpreedlyApiError.notFound`
 
 **Solution:** The requested resource (e.g., payment method token) does not exist. Verify the token or identifier before retrying.
+
+### Apple Pay
+
+Apple Pay results arrive on the same `PaymentResult` channel. Two states matter beyond success and failure:
+
+| Result | Meaning | What to do |
+|---|---|---|
+| `isPending` | Apple closed the sheet before your `processPayment` answered | Cover the checkout with a blocking overlay and "Your payment is still being processed. Please don't pay again." until the final result. See [Apple Pay — While a payment is pending](apple-pay.md#while-a-payment-is-pending) |
+| `isFailure` + `isStatusUnknown` | `processPayment` returned `.statusUnknown`, threw, or timed out | Check the order on your server before asking the shopper to pay again |
+| `isFailure` with "Spreedly is not configured…" | `Spreedly.setup(config:)` wasn't called before the checkout | Call `Spreedly.setup(config:)` with your environment key first |
+| `isFailure` with `validationErrors` | Spreedly rejected the Apple Pay payment; each entry names the field | Log the details; show your own failure message and offer card checkout |
+
+See [Apple Pay — Result States](apple-pay.md#result-states) and [Apple Pay — Troubleshooting](apple-pay.md#troubleshooting).
 
 ---
 
@@ -528,8 +541,8 @@ The examples use the simple `failureDetails.getDescription()` pattern for displa
 | Symptom | Likely cause | What to try |
 |---------|--------------|-------------|
 | SPM cannot resolve `checkout-ios-package` | Missing or invalid GitHub token | Confirm your PAT has `read:packages` scope; see [Getting Started -- Installation](getting-started.md#installation) |
-| CocoaPods `pod install` fails | Podspec source not configured or private repo token invalid | Use `:git =>` with a valid token; see [Getting Started -- Installation](getting-started.md#installation) |
-| `initializeSDK()` / `setup(config:)` fails immediately | Expired or reused signed auth params | Issue **fresh** environment key, HMAC signature, and timestamp from your backend per payment session |
+| CocoaPods `pod install` fails | Podfile uses a version-only line (`~> 1.8`), and new versions are not on the CocoaPods Trunk registry | Use `:git =>` with a release `:tag`; see [Getting Started -- Installation](getting-started.md#installation) |
+| `initializeSDK()` / `setup(config:)` fails immediately | Expired or reused signed auth params | Issue **fresh** environment key, RSA-SHA256 signature, and timestamp from your backend per payment session |
 | `UNAUTHORIZED` / auth errors | Wrong or revoked credentials | Rotate signing keys on the server; confirm `environmentKey` matches your Spreedly account |
 | `ACCOUNT_INACTIVE` | Live card data in a test environment | Use Spreedly test cards or activate the environment |
 | Timeouts / network errors | Device or API connectivity | Retry with backoff for transient failures; see [Best Practices](#best-practices) |
@@ -542,7 +555,7 @@ The examples use the simple `failureDetails.getDescription()` pattern for displa
 
 **OK to share:** SDK version, approximate time (UTC), masked `environment_key` (first 4 characters only), `session_id` from Datadog global attributes (if you use SDK telemetry), `PaymentResult` `errorType` / `apiError`, HTTP status code if shown, iOS version, device model.
 
-**Never share:** Full card number, CVV, full `environmentKey`, raw error responses if they could contain tokens or PII, complete auth signatures or HMAC secrets.
+**Never share:** Full card number, CVV, full `environmentKey`, raw error responses if they could contain tokens or PII, complete auth signatures or your certificate's private key.
 
 ### When to contact support
 

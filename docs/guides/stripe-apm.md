@@ -12,7 +12,7 @@ Stripe's native PaymentSheet.
 | **Use something else when** | PayPal or Venmo → [Braintree APM](braintree-apm.md) · other redirect APMs → [Offsite payments](offsite-payments.md) |
 | **You build** | 3 things: a purchase endpoint · a checkout screen · a webhook handler |
 | **Modules** | `SpreedlyCore` + `SpreedlySecurity` + `SpreedlyUI` + `SpreedlyStripeAPM` |
-| **Requires** | SDK 1.7.0+ · iOS 16.0+ (iOS 14.0+ on 1.6.x) · Xcode 26.0+ |
+| **Requires** | SDK 1.7.0+ · iOS 16.0+ (iOS 14.0+ on 1.6.x) · Xcode 27.0+ |
 | **Integration time** | ~15 minutes |
 | **UI** | Partner-hosted Stripe PaymentSheet — SwiftUI · UIKit · Objective-C |
 
@@ -78,7 +78,8 @@ at compile time.
 
 | SDK version | iOS | Xcode | Notes |
 |---|---|---|---|
-| 1.7.0+ | **16.0+** | 26.0+ | Stripe embedded in `SpreedlyStripeAPM` |
+| 1.8.0+ | **16.0+** | 27.0+ | Stripe embedded in `SpreedlyStripeAPM` |
+| 1.7.x | **16.0+** | 26.0+ | Stripe embedded in `SpreedlyStripeAPM` |
 | 1.6.x | 14.0+ | 26.0+ | Last line that supports iOS 14 and 15 — see [Migrating to iOS 16](migration/v1-to-v2.md) |
 
 Assumed done: [Getting Started](getting-started.md) — installation plus `Spreedly.initializeSDK()`
@@ -98,17 +99,17 @@ Stripe dependency for APM-only integrations.
 **Swift Package Manager**
 
 ```swift
-.package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.7.0")  // use the latest release tag
+.package(url: "https://github.com/spreedly/checkout-ios-package", from: "1.8.0")  // use the latest release tag
 // Link SpreedlyCore, SpreedlySecurity, SpreedlyUI, SpreedlyStripeAPM to your app target.
 ```
 
 **CocoaPods**
 
 ```ruby
-pod 'SpreedlyCore',      '~> 1.7'
-pod 'SpreedlySecurity',  '~> 1.7'
-pod 'SpreedlyUI',        '~> 1.7'
-pod 'SpreedlyStripeAPM', '~> 1.7'
+pod 'SpreedlyCore',      :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlySecurity',  :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlyUI',        :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
+pod 'SpreedlyStripeAPM', :git => 'https://github.com/spreedly/checkout-ios-package.git', :tag => '1.8.0'
 ```
 
 <a id="cocoapods-stripe-bundle-patcher"></a>

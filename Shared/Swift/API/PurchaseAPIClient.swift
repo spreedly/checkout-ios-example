@@ -31,11 +31,7 @@ public class PurchaseAPIClient {
     public init(config: ServerConfig) {
         self.config = config
 
-        let sessionConfig = URLSessionConfiguration.default
-        sessionConfig.timeoutIntervalForRequest = config.timeoutInterval
-        sessionConfig.timeoutIntervalForResource = config.timeoutInterval
-
-        self.session = URLSession(configuration: sessionConfig)
+        self.session = BackendBasicAuth.sharedSession(timeoutInterval: config.timeoutInterval)
     }
 
     /// Performs a purchase transaction
@@ -66,6 +62,7 @@ public class PurchaseAPIClient {
             forHTTPHeaderField: "Content-Type"
         )
         urlRequest.setValue("*/*", forHTTPHeaderField: "accept")
+        BackendBasicAuth.apply(to: &urlRequest)
 
         do {
             let encoder = JSONEncoder()
@@ -146,13 +143,14 @@ public class PurchaseAPIClient {
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue("*/*", forHTTPHeaderField: "accept")
+        BackendBasicAuth.apply(to: &urlRequest)
 
         let request = OffsitePurchaseRequest(
             gateway: gateway,
             amount: amount,
             currencyCode: currencyCode,
             paymentMethodToken: paymentMethodToken,
-            redirectUrl: redirectUrl,
+            redirectUrl: BackendRedirectPolicy.redirectURL(redirectUrl),
             callbackUrl: callbackUrl,
             channel: "app"
         )
@@ -190,7 +188,7 @@ public class PurchaseAPIClient {
             paymentMethodToken: nil,
             amount: amount,
             currencyCode: currencyCode,
-            redirectUrl: redirectUrl,
+            redirectUrl: BackendRedirectPolicy.redirectURL(redirectUrl),
             callbackUrl: callbackUrl,
             channel: "app",
             paymentMethod: paymentMethod,
@@ -212,7 +210,7 @@ public class PurchaseAPIClient {
         let transaction = HerokuBraintreeCreatePurchaseTransaction(
             amount: amount,
             currencyCode: currencyCode,
-            redirectUrl: redirectUrl,
+            redirectUrl: BackendRedirectPolicy.redirectURL(redirectUrl),
             callbackUrl: callbackUrl,
             channel: "app",
             paymentMethodType: paymentMethodType,
@@ -277,12 +275,33 @@ public class PurchaseAPIClient {
             paymentMethodToken: paymentMethodToken,
             amount: amount,
             currencyCode: currencyCode,
-            redirectUrl: redirectUrl,
+            redirectUrl: BackendRedirectPolicy.redirectURL(redirectUrl),
             callbackUrl: callbackUrl,
             channel: "app"
         )
         let body = HerokuCreatePurchaseRequest(gateway: "ebanx", transaction: transaction)
         return try await postHeroku(path: "create-purchase", body: body)
+    }
+
+    /// Performs a purchase without Spreedly 3DS (POST {baseURL}/simple-purchase). Use it for payment
+    /// methods the wallet already authenticated, such as Apple Pay: Spreedly 3DS accepts credit cards only.
+    /// - Parameters:
+    ///   - paymentMethodToken: Token of the payment method to use
+    ///   - amount: Purchase amount in minor units (e.g. cents)
+    ///   - currencyCode: ISO 4217 currency code (e.g. "USD", "INR")
+    /// - Returns: PurchaseResponse with the transaction
+    /// - Throws: PurchaseAPIError if the request fails
+    public func simplePurchase(
+        paymentMethodToken: String,
+        amount: Decimal,
+        currencyCode: String
+    ) async throws -> PurchaseResponse {
+        let body = PurchaseTransactionRequest(
+            amount: amount,
+            currencyCode: currencyCode,
+            paymentMethodToken: paymentMethodToken
+        )
+        return try await postHeroku(path: "simple-purchase", body: body)
     }
 
     private func postHeroku<T: Encodable>(path: String, body: T) async throws -> PurchaseResponse {
@@ -294,6 +313,7 @@ public class PurchaseAPIClient {
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue("*/*", forHTTPHeaderField: "accept")
+        BackendBasicAuth.apply(to: &urlRequest)
         do {
             urlRequest.httpBody = try JSONEncoder().encode(body)
         } catch {
@@ -339,6 +359,7 @@ public class PurchaseAPIClient {
             forHTTPHeaderField: "Content-Type"
         )
         urlRequest.setValue("*/*", forHTTPHeaderField: "accept")
+        BackendBasicAuth.apply(to: &urlRequest)
 
         do {
             let (data, response) = try await session.data(for: urlRequest)

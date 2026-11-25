@@ -20,17 +20,18 @@ Integrate the Spreedly iOS SDK into Objective-C projects using delegates and UIV
 12. [Custom field validators](#custom-field-validators)
 13. [Mandate Passthrough](#mandate-passthrough)
 14. [Click to Pay](#click-to-pay)
-15. [Offsite Payments](#offsite-payments)
-16. [Stripe APM](#stripe-apm)
-17. [Stripe Radar](#stripe-radar)
-18. [EBANX](#ebanx)
-19. [Braintree](#braintree)
-20. [Theming](#theming)
-21. [URL Handling](#url-handling)
-22. [Cleanup and Teardown](#cleanup-and-teardown)
-23. [Submit Label Values](#submit-label-values)
-24. [Telemetry Events](#telemetry-events)
-25. [Related Documentation](#related-documentation)
+15. [Apple Pay](#apple-pay)
+16. [Offsite Payments](#offsite-payments)
+17. [Stripe APM](#stripe-apm)
+18. [Stripe Radar](#stripe-radar)
+19. [EBANX](#ebanx)
+20. [Braintree](#braintree)
+21. [Theming](#theming)
+22. [URL Handling](#url-handling)
+23. [Cleanup and Teardown](#cleanup-and-teardown)
+24. [Submit Label Values](#submit-label-values)
+25. [Telemetry Events](#telemetry-events)
+26. [Related Documentation](#related-documentation)
 
 ---
 
@@ -65,7 +66,7 @@ The Spreedly iOS SDK provides full Objective-C support through UIKit wrappers. A
 
 ### Initialization
 
-Call `[Spreedly initializeSDK]` at app launch -- either in `AppDelegate application:didFinishLaunchingWithOptions:` or when setting up your root scene in `SceneDelegate scene:willConnectToSession:options:`. Scene-based apps (the default since iOS 14) should use `SceneDelegate`. Then call `[Spreedly setupWithConfig:]` with your credentials before presenting any payment UI:
+Call `[Spreedly initializeSDK]` at app launch -- either in `AppDelegate application:didFinishLaunchingWithOptions:` or when setting up your root scene in `SceneDelegate scene:willConnectToSession:options:`. Scene-based apps (the default since iOS 14) should use `SceneDelegate`. Then call `[Spreedly setupWithConfig:]` with your credentials before presenting any payment UI. Your Spreedly environment must also have secure tokenization enabled (required) — see [Enable Secure Tokenization](getting-started.md#enable-secure-tokenization):
 
 ```objc
 // In AppDelegate or SceneDelegate at launch:
@@ -81,6 +82,8 @@ config.certificateToken = certificateToken;
 config.timestamp = timestamp;
 // config.sdkPlatform = SdkPlatformIos;          // default — native iOS
 // config.sdkPlatform = SdkPlatformReactNative;   // use for React Native bridges
+// config.rnVersion = @"0.76.5";                  // React Native bridges only: host app's React Native version
+// config.rnSdkVersion = @"1.3.0";                // React Native bridges only: Spreedly React Native package version
 // config.blockJailbrokenDevices = YES;           // or set here instead of the static property
 [Spreedly setupWithConfig:config];
 
@@ -912,6 +915,92 @@ checkoutVC.clickToPayDelegate = self;
 ```
 
 Tokenize via Core when needed: `createClickToPayPaymentMethodWithMetadata:verificationValue:billingFields:metadata:eligibleForCardUpdater:mandate:` (see [Mandate Passthrough](#mandate-passthrough)).
+
+---
+
+## Apple Pay
+
+Button and sheet ship in the optional `SpreedlyApplePay` module; results arrive on `paymentDelegate` (`paymentDidComplete:`), including `result.isCanceled` when the shopper closes the sheet. Full configuration, recurring, and troubleshooting: [apple-pay.md](apple-pay.md).
+
+```objc
+@import SpreedlyUI;
+@import SpreedlyApplePay;
+@import PassKit;
+
+ApplePayConfiguration *config =
+    [[ApplePayConfiguration alloc] initWithMerchantIdentifier:@"merchant.com.example.store"
+                                                  countryCode:@"US"
+                                                 currencyCode:@"USD"];
+config.emptyWalletBehavior = ApplePayEmptyWalletBehaviorHide;
+
+ApplePayOrder *order =
+    [[ApplePayOrder alloc] initWithLabel:@"Your Store"
+                                  amount:[NSDecimalNumber decimalNumberWithString:@"19.99"]];
+
+// Your server charges the token before the sheet shows success. Call completion exactly once.
+void (^chargeOnServer)(ApplePayPaymentAuthorization *, void (^)(ApplePayPaymentDecision *)) =
+    ^(ApplePayPaymentAuthorization *authorization, void (^completion)(ApplePayPaymentDecision *)) {
+    [self.server chargeToken:authorization.paymentMethodToken completion:^(BOOL charged, NSError *error) {
+        if (error) {
+            // You can't tell whether the charge went through: close the sheet, don't offer a retry.
+            completion(ApplePayPaymentDecision.statusUnknown);
+            return;
+        }
+        completion(charged ? ApplePayPaymentDecision.approved
+                           : [ApplePayPaymentDecision declinedWithMessage:@"Your card was declined."]);
+    }];
+};
+
+// Fresh signed auth from your server for every payment attempt. Call completion exactly once.
+void (^signedAuth)(void (^)(SpreedlyConfig *, NSError *)) = ^(void (^completion)(SpreedlyConfig *, NSError *)) {
+    [self.server fetchSpreedlyAuth:completion];
+};
+
+SpreedlyApplePayButtonView *button =
+    [[SpreedlyApplePayButtonView alloc] initWithConfiguration:config
+                                                        order:order
+                                            signedAuthHandler:signedAuth
+                                        processPaymentHandler:chargeOnServer];
+[stack addArrangedSubview:button];   // hides itself when Apple Pay is unavailable
+```
+
+The signed-auth handler runs for every payment attempt, including a retry in the same sheet, because signed auth works for one request only. Mint fresh auth every time it's called. It signs that Apple Pay request only, so your card form keeps the auth from `setupWithConfig:`. See [Signed auth for each attempt](apple-pay.md#retry-auth).
+
+The same button belongs next to hosted `SPLTextFieldViewController` rows on a custom form. See [custom-payment-forms.md](custom-payment-forms.md#apple-pay-next-to-hosted-fields).
+
+To show Apple Pay at the top of the card drop-in with an "or pay with card" divider, set wallets before presenting:
+
+```objc
+SpreedlyApplePayWallet *applePay =
+    [[SpreedlyApplePayWallet alloc] initWithConfiguration:config
+                                                    order:order
+                                        signedAuthHandler:signedAuth
+                                    processPaymentHandler:chargeOnServer];
+dropInVC.walletButtons = @[applePay];   // CardFormDropInViewController
+```
+
+The process-payment handler is required: the sheet shows success only after it answers `ApplePayPaymentDecision.approved`. To save the card without charging now (free trial, card on file), retain the payment method on your server and answer `approved`.
+
+To mark the field the shopper must change (for example an address you don't deliver to), decline with PassKit errors:
+
+```objc
+NSError *unserviceable =
+    [PKPaymentRequest paymentShippingAddressUnserviceableErrorWithLocalizedDescription:@"We don't deliver here"];
+completion([ApplePayPaymentDecision declinedWithMessage:@"We don't deliver to this address."
+                                                 errors:@[unserviceable]]);
+```
+
+A saved address and the sheet's wording are set on the configuration. The SDK fails the checkout before the sheet opens if a saved contact's matching required fields aren't set:
+
+```objc
+config.requiredShippingContactFields = [NSSet setWithObjects:PKContactFieldPostalAddress, PKContactFieldName, nil];
+config.shippingContact = savedContact;            // a PKContact you already have on file
+config.shippingType = PKShippingTypeDelivery;     // "Delivery Address" instead of "Shipping Address"
+```
+
+`paymentDidComplete:` can receive `result.isPending` (Apple closed the sheet before your server answered) before the final result. It receives `result.isStatusUnknown` on a failure when you answered `ApplePayPaymentDecision.statusUnknown` or no answer came within `processPaymentTimeout`.
+
+Availability: `[SpreedlyApplePayWallet availabilityForConfiguration:config]`. Standalone Wallet setup button: `[[SpreedlyApplePaySetUpButtonView alloc] init]`.
 
 ---
 

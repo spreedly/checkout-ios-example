@@ -20,8 +20,8 @@ tokenization.
 
 ### Data Collection
 - **Payment data**: The SDK processes payment card data in memory for tokenization only
-- **Operational telemetry**: The SDK collects non-personal operational data for reliability monitoring, including: SDK version, OS version, device region, ephemeral session ID, environment key (identifies the merchant account), API endpoint paths, HTTP methods, response status codes, error types, flow durations, and payment method types. Field-level interaction events (focus/blur on form fields) are also collected for form usability monitoring. No card numbers, CVVs, expiry dates, or PII are included in telemetry.
-- **Telemetry destination**: Operational telemetry is sent to **Datadog** when configured. Telemetry is disabled if no Datadog client token is provided.
+- **Operational telemetry**: The SDK collects non-personal operational data for reliability monitoring, including: SDK version (and, in React Native apps, the React Native and Spreedly React Native package versions), OS version, device region, ephemeral session ID, environment key (identifies the merchant account), API endpoint paths, HTTP methods, response status codes, error types, flow durations, and payment method types. Field-level interaction events (focus/blur on form fields) are also collected for form usability monitoring. No card numbers, CVVs, expiry dates, or PII are included in telemetry.
+- **Telemetry destination**: Operational telemetry is sent to **Datadog**. It is on by default in the published SDK frameworks. You can reduce it or turn it off with `Spreedly.configureLogging(_:)`; see [Telemetry and opting out](getting-started.md#telemetry-and-opting-out).
 - **Purpose**: Payment data is used for tokenization. Telemetry data is used to monitor SDK health, detect failures, measure latency, and improve reliability.
 
 ### Persistent Storage
@@ -35,23 +35,33 @@ tokenization.
 
 ### Third-Party Sharing
 - **Spreedly**: Card data is shared exclusively with Spreedly for tokenization. No card data is sent to any other party
-- **Datadog**: Non-sensitive operational telemetry (SDK version, OS version, region, session ID, flow success/failure events) is sent to Datadog for SDK reliability monitoring. No card data, tokens, or PII is included in telemetry payloads
+- **Apple Pay**: With `SpreedlyApplePay`, the encrypted Apple Pay payment and any contact fields you request (name, email, phone, address) are sent to Spreedly with the payment. A saved address you pass as `billingContact` or `shippingContact` goes to Apple only, to prefill the sheet; the SDK doesn't log it or send it to Spreedly. See [Apple Pay — App Store Privacy Label](apple-pay.md#app-store-privacy-label) for what to declare
+- **Datadog**: Non-sensitive operational telemetry (SDK version, OS version, region, session ID, environment key, flow success/failure events) is sent to Datadog for SDK reliability monitoring, unless you turn it off. No card data, tokens, or PII is included in telemetry payloads
 
 ## iOS-Specific Requirements
 
-### Privacy Manifest (PrivacyInfo.xcprivacy)
+### Privacy Manifests (PrivacyInfo.xcprivacy)
 
-The SDK includes a `PrivacyInfo.xcprivacy` file that declares:
-- **NSPrivacyCollectedDataTypes**: Empty array — the SDK does not collect any data that is **linked to the user's identity**
-- **NSPrivacyTracking**: Not used — the SDK does not perform tracking as defined by Apple's [App Tracking Transparency](https://developer.apple.com/app-store/user-privacy-and-data-use/)
-- **NSPrivacyTrackingDomains**: Not used
-- **NSPrivacyAccessedAPITypes**: Declares only required APIs for core functionality
+Every Spreedly framework ships its own `PrivacyInfo.xcprivacy` inside the framework bundle. You do not add it to your app. Each manifest covers the framework's own code and the third-party libraries compiled into it, so a module's declarations appear in your app's privacy report only if you add that module.
 
-This manifest ships inside the SDK — you do not add it to your app yourself.
+All manifests declare `NSPrivacyTracking` as `false` with no tracking domains: the SDK does not perform tracking as defined by Apple's [App Tracking Transparency](https://developer.apple.com/app-store/user-privacy-and-data-use/).
 
-The operational telemetry described above (SDK version, region, ephemeral session ID, etc.) is **not linked to the user's identity** and is used only for SDK reliability monitoring. Under Apple's App Store privacy framework, this is "Data Not Linked to You" and does not need to be declared in `NSPrivacyCollectedDataTypes`.
+| Module | Required-reason APIs declared | Data types declared |
+|---|---|---|
+| `SpreedlySecurity` | None | None |
+| `SpreedlyCore` | System boot time (`35F9.1`), UserDefaults (`CA92.1`, from the bundled Datadog library), file timestamp (`C617.1`, from the bundled Datadog library) | Payment info, name, email address, phone number, physical address (linked to the user, not used for tracking, purpose: app functionality); performance data, other diagnostic data and product interaction (not linked) |
+| `SpreedlyUI` | System boot time (`35F9.1`) | None |
+| `SpreedlyStripeAPM` | UserDefaults (`CA92.1`) | Payment info and product interaction, from the bundled Stripe libraries |
+| `SpreedlyStripeRadar` | UserDefaults (`CA92.1`) | Product interaction, from the bundled Stripe libraries |
+| `SpreedlyBraintree` | UserDefaults (`CA92.1`) | Payment info, name, physical address, device ID, performance data, coarse location and precise location, from the bundled Braintree and PPRiskMagnes libraries. PPRiskMagnes declares location and performance data as linked to the user |
+| `SpreedlyClickToPay` | None | None |
+| `SpreedlyApplePay` | None | None. The Apple Pay token and any contact fields you request go to Spreedly through `SpreedlyCore`, which declares them |
 
-If your app reports App Store privacy nutrition labels, declare any payment-related data your **app** sends to Spreedly (such as card data for tokenization) under your own privacy disclosures, not the SDK's manifest.
+The data types under `SpreedlyCore` are the fields the SDK sends to Spreedly to tokenize a payment method: card or bank account details, the name, email, phone number and billing or shipping address you pass in.
+
+The operational telemetry described above (SDK version, region, ephemeral session ID, etc.) is **not linked to the user's identity** and is used only for SDK reliability monitoring. It is declared, because the events are retained by Datadog: flow and error events as other diagnostic data, and field focus and blur events as product interaction.
+
+Your app's own App Store privacy disclosure stays your responsibility. Apple combines the SDK manifests with your app's, but you still answer for payment-related data your **app** collects or sends to Spreedly, such as card data for tokenization, in your own privacy disclosures.
 
 ### Platform Compliance
 
@@ -82,13 +92,15 @@ When integrating the Spreedly iOS SDK:
 
 When using the Spreedly iOS SDK, you should include in your app's privacy policy:
 - That payment card data is processed by Spreedly for tokenization
+- If you use Apple Pay: that the Apple Pay payment and any contact details you request are sent to Spreedly to process the payment
 - That card data is not stored on the device
 - That data transmission is encrypted
-- That the SDK collects non-personal operational telemetry (device type, OS version, region) for reliability monitoring via Datadog
+- That the SDK collects non-personal operational telemetry (SDK version, OS version, region, your environment key) for reliability monitoring via Datadog, unless you turn it off
 - That no user behavior tracking, profiling, or advertising analytics is performed by the SDK
 
 ## Related Documentation
 
 - [Security](security.md) -- Screen prevention and PCI compliance
 - [Getting Started](getting-started.md) -- Installation and initialization
+- [Apple Pay](apple-pay.md#app-store-privacy-label) -- What Apple Pay adds to your App Store privacy label
 - [Spreedly Privacy Policy](https://www.spreedly.com/privacy)

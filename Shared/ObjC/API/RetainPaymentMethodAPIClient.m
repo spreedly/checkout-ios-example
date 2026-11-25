@@ -7,6 +7,7 @@
 
 #import "RetainPaymentMethodAPIClient.h"
 #import "RetainPaymentMethodModels.h"
+#import "SavedPaymentMethodsStore.h"
 #import "SignatureServerClient.h" // For ServerConfig
 
 @interface RetainPaymentMethodAPIClient ()
@@ -19,14 +20,13 @@
 @implementation RetainPaymentMethodAPIClient
 
 - (instancetype)initWithConfig:(ServerConfig *)config {
+    return [self initWithConfig:config session:SPLExampleSharedBackendSession(config.timeoutInterval)];
+}
+
+- (instancetype)initWithConfig:(ServerConfig *)config session:(NSURLSession *)session {
     if (self = [super init]) {
         _config = config;
-        
-        NSURLSessionConfiguration *sessionConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
-        sessionConfig.timeoutIntervalForRequest = config.timeoutInterval;
-        sessionConfig.timeoutIntervalForResource = config.timeoutInterval;
-        
-        _session = [NSURLSession sessionWithConfiguration:sessionConfig];
+        _session = session;
     }
     return self;
 }
@@ -56,7 +56,9 @@
     if (self.config.apiKey.length > 0) {
         [urlRequest setValue:[NSString stringWithFormat:@"Bearer %@", self.config.apiKey] forHTTPHeaderField:@"Authorization"];
     }
-    
+    SPLExampleApplyBackendBasicAuth(urlRequest);
+    urlRequest.HTTPBody = SPLExampleSampleAppOwnerRetainBody();
+
     NSURLSessionDataTask *task = [self.session dataTaskWithRequest:urlRequest completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
         if (error) {
             if (completion) {
@@ -74,14 +76,12 @@
         NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
         if (httpResponse.statusCode != 200) {
             if (completion) {
-                NSString *errorMessage = @"Unknown error";
-                if (data) {
-                    errorMessage = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: @"Unknown error";
-                }
+                // The response body is kept out of the description, which is shown and could be logged; it can
+                // echo request data.
                 NSError *serverError = [NSError errorWithDomain:@"RetainPaymentMethodAPIClient"
                                                            code:3
                                                        userInfo:@{
-                                                           NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Payment method API error (%ld): %@", (long)httpResponse.statusCode, errorMessage]
+                                                           NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Payment method API error (%ld)", (long)httpResponse.statusCode]
                                                        }];
                 completion(nil, serverError);
             }
@@ -109,6 +109,14 @@
             return;
         }
         
+        if (responseObj.transaction.succeeded) {
+            if (!SPLExampleRememberPaymentMethod(responseObj.transaction.paymentMethod)) {
+                // The retain succeeded on the backend, but this device's list couldn't take the card. Fixed text:
+                // no token or card data.
+                NSLog(@"Retained card was not saved to this device's list");
+            }
+        }
+
         if (completion) {
             completion(responseObj, nil);
         }

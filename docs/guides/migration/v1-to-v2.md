@@ -60,7 +60,7 @@ Every row also applies to 1.6.x, so you can make these changes before you upgrad
 
 1. In Xcode, set the app target's **Minimum Deployments** to **iOS 16.0** or later. Do the same for
    every extension and test target that links the SDK.
-2. Install **Xcode 26.0** or later. **26.5** is the version the published binaries are built with.
+2. Install **Xcode 27.0** or later. **27.1** is the version the published binaries are built with.
 3. If you use CocoaPods, set `platform :ios, '16.0'` in the Podfile. Move off the deprecated symbols
    in the table above.
 4. Bump every Spreedly dependency to **1.7.0** — one version for all of them:
@@ -84,7 +84,7 @@ Every row also applies to 1.6.x, so you can make these changes before you upgrad
 |---|---|---|
 | iOS | 14.0 | 16.0 |
 | Swift | 6.0 | 6.0 |
-| Xcode | 26.0 (26.5 recommended) | 26.0 (26.5 recommended) |
+| Xcode | 27.0 (27.1 recommended) | 27.0 (27.1 recommended) |
 
 ## Staying on 1.6.x
 
